@@ -602,6 +602,7 @@ public partial class Main : Control
         if (Arg("--shot") is string shot)
         {
             for (int i = 0; i < 4; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            if (Arg("--zoom") is string zoom) { _map.ZoomCentre(float.Parse(zoom)); await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }
             GetViewport().GetTexture().GetImage().SavePng(shot);
             GetTree().Quit();
         }

@@ -29,14 +29,50 @@ public partial class MapView : Control
     private int _nextAction;
     private List<Actor> _actors = new();
 
-    private float Tile => Mathf.Floor(Mathf.Min(Size.X / CityMap.Width, Size.Y / CityMap.Height));
-    private Vector2 Origin => (Size - new Vector2(CityMap.Width, CityMap.Height) * Tile) / 2;
+    /// <summary>Seconds of real time, for scenery that moves whether or not the week is running.</summary>
+    private float _anim;
+
+    private float _zoom = 1;
+    private Vector2 _pan;
+    private bool _dragging;
+
+    private float FitTile => Mathf.Floor(Mathf.Min(Size.X / (CityMap.Width + 0.6f), Size.Y / (CityMap.Height + 0.6f)));
+    private float Tile => FitTile * _zoom;
+    private Vector2 Origin => (Size - new Vector2(CityMap.Width, CityMap.Height) * Tile) / 2 + _pan;
 
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Stop;
+        ClipContents = true;
         TooltipText = " "; // enables _GetTooltip
         Resized += QueueRedraw;
+        BuildTraffic();
+    }
+
+    public override void _Process(double delta)
+    {
+        _anim += (float)delta;
+        QueueRedraw();
+    }
+
+    /// <summary>Zoom about a point on screen, keeping whatever is under it in place.</summary>
+    private void ZoomAt(Vector2 screen, float factor)
+    {
+        var tileUnder = (screen - Origin) / Tile;
+        _zoom = Mathf.Clamp(_zoom * factor, 1, 4);
+        if (_zoom <= 1.001f) { _pan = Vector2.Zero; return; }
+        _pan += screen - (Origin + tileUnder * Tile);
+        ClampPan();
+    }
+
+    /// <summary>Zoom about the middle of the map, for screenshots.</summary>
+    public void ZoomCentre(float zoom) => ZoomAt(Size / 2, zoom / _zoom);
+
+    private void ClampPan()
+    {
+        var excess = (new Vector2(CityMap.Width, CityMap.Height) * Tile - Size) / 2 + Vector2.One * Tile;
+        excess = excess.Max(Vector2.Zero);
+        _pan = _pan.Clamp(-excess, excess);
     }
 
     // ---- Live replay ----------------------------------------------------------
@@ -59,6 +95,9 @@ public partial class MapView : Control
             var from = World.Map.LotAt(a.FromLot);
             var to = World.Map.LotAt(a.ToLot);
             var path = World.Map.Path(from, to).Select(p => new Vector2(p.X + 0.5f, p.Y + 0.5f)).ToList();
+            // Men leave from one front door and stand at another, out on the pavement.
+            path[0] = Doorstep(from);
+            path[^1] = Doorstep(to);
             float hours = Mathf.Clamp(World.Map.Distance(from, to) / 7f, 0.75f, 3f);
             float arrive = a.Tick;
             // Sunday collectors set out in waves rather than all at once.
@@ -72,6 +111,8 @@ public partial class MapView : Control
         }
         QueueRedraw();
     }
+
+    private static Vector2 Doorstep(Lot lot) => new(lot.X + 0.5f, lot.FrontY < lot.Y ? lot.Y - 0.1f : lot.Y + 1.1f);
 
     public void EndReplay()
     {
@@ -114,8 +155,14 @@ public partial class MapView : Control
     public override void _GuiInput(InputEvent e)
     {
         if (World == null) return;
+        if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.WheelUp } up) { ZoomAt(up.Position, 1.15f); return; }
+        if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.WheelDown } down) { ZoomAt(down.Position, 1 / 1.15f); return; }
+        if (e is InputEventMouseButton { ButtonIndex: MouseButton.Right or MouseButton.Middle } drag) { _dragging = drag.Pressed; return; }
+        if (e is InputEventMagnifyGesture pinch) { ZoomAt(pinch.Position, pinch.Factor); return; }
+        if (e is InputEventPanGesture panGesture) { _pan -= panGesture.Delta * 8; ClampPan(); return; }
         if (e is InputEventMouseMotion motion)
         {
+            if (_dragging) { _pan += motion.Relative; ClampPan(); }
             int lot = LotUnder(motion.Position);
             if (lot != _hoverLot) { _hoverLot = lot; QueueRedraw(); }
         }
@@ -169,120 +216,146 @@ public partial class MapView : Control
     {
         if (World == null) return;
         var w = World;
-        float t = Tile;
-        var o = Origin;
+        _t = Tile;
+        _o = Origin;
+        _headlights.Clear();
         var font = ThemeDB.FallbackFont;
+        float night = Night;
 
-        DrawRect(new Rect2(o, new Vector2(CityMap.Width, CityMap.Height) * t), Palette.Street);
+        DrawGround();
+        DrawShadows();
+        foreach (var lot in w.Map.Lots) DrawLot(lot, night);
+        DrawLampPosts(night);
+        DrawStreetNames(font);
+        DrawTraffic(night);
+        DrawPassersBy();
+        DrawNight(night);
+        foreach (var lot in w.Map.Lots) DrawLotOutline(lot);
 
-        // Blocks, with a faint kerb line along the streets.
-        for (int by = 0; by < CityMap.BlocksY; by++)
-        for (int bx = 0; bx < CityMap.BlocksX; bx++)
-        {
-            var r = new Rect2(o + new Vector2(bx * CityMap.StrideX + 1, by * CityMap.StrideY + 1) * t,
-                new Vector2(CityMap.LotsPerBlockX, CityMap.LotsPerBlockY) * t);
-            DrawRect(r.Grow(2), Palette.StreetLine);
-            DrawRect(r, Palette.Block);
-        }
-
-        // Street names along the rows, avenue names down the columns.
-        int labelSize = Mathf.Max(9, (int)(t * 0.32f));
-        for (int i = 0; i < w.Map.StreetNames.Length; i++)
-        {
-            float y = o.Y + (i * CityMap.StrideY + 0.5f) * t + labelSize * 0.35f;
-            DrawString(font, new Vector2(o.X + t * 1.1f, y), $"{w.Map.StreetNames[i].ToUpperInvariant()} ST", HorizontalAlignment.Left, -1, labelSize, Palette.InkQuiet with { A = 0.55f });
-        }
-
-        foreach (var lot in w.Map.Lots) DrawLot(lot, o, t, font);
-
-        if (Live) DrawActors(o, t, font);
+        if (Live) DrawActors(font);
     }
 
-    private void DrawLot(Lot lot, Vector2 o, float t, Font font)
+    /// <summary>Who protects a business, and what's in its back room, as of the live clock.</summary>
+    private (int Gang, RacketKind Racket) ShownState(Business b) =>
+        Live && _shown.TryGetValue(b.Id, out var shown) ? shown : (b.ProtectorGangId, b.Racket);
+
+    private void DrawLot(Lot lot, float night)
     {
         var w = World!;
-        var r = new Rect2(o + new Vector2(lot.X, lot.Y) * t, new Vector2(t, t)).Grow(-2);
         switch (lot.Use)
         {
             case LotUse.Business:
             {
                 var b = w.BusinessById(lot.BusinessId);
-                var (protector, racket) = Live && _shown.TryGetValue(b.Id, out var shown) ? shown : (b.ProtectorGangId, b.Racket);
-                var fill = protector >= 0 ? Palette.Gang(w, protector).Darkened(0.35f) : Palette.Lot;
-                if (!b.IsOpen && !Live) fill = fill.Darkened(0.5f);
-                DrawRect(r, fill);
-                if (protector >= 0) DrawRect(r, Palette.Gang(w, protector), false, 2);
-                // Door on the street side.
-                float doorY = lot.FrontY < lot.Y ? r.Position.Y : r.End.Y - 3;
-                DrawRect(new Rect2(r.Position.X + r.Size.X * 0.4f, doorY, r.Size.X * 0.2f, 3), Palette.Ink with { A = 0.5f });
-                string glyph = Glyph(b);
-                int size = (int)(t * 0.42f);
-                DrawString(font, new Vector2(r.Position.X, r.GetCenter().Y + size * 0.36f), glyph, HorizontalAlignment.Center, r.Size.X, size, Palette.Ink with { A = 0.85f });
-                if (racket != RacketKind.None)
-                    DrawCircle(r.Position + new Vector2(r.Size.X - 5, 5), 3.5f, Palette.Bad);
+                var (protector, racket) = ShownState(b);
+                bool open = b.IsOpen || Live;
+                var roof = Roofs[(int)(Hash(lot.Id, 1) * Roofs.Length)];
+                if (b.Kind == BusinessKind.Warehouse) roof = new Color("5d5a55");
+                DrawBuilding(lot, open ? roof : roof.Darkened(0.35f), night);
+                if (b.Kind == BusinessKind.Warehouse)
+                {
+                    var f = Footprint(lot);
+                    for (float x = f.Position.X + _t * 0.1f; x < f.End.X - _t * 0.05f; x += _t * 0.1f)
+                        DrawLine(new Vector2(x, f.Position.Y + _t * 0.08f), new Vector2(x, f.End.Y - _t * 0.08f), roof.Darkened(0.15f), 1);
+                }
+                if (b.Kind == BusinessKind.Hotel)
+                {
+                    // A water tower on its stilts.
+                    var c = P(lot.X + 0.78f, lot.Y + (lot.FrontY < lot.Y ? 0.78f : 0.24f));
+                    DrawCircle(c + Vector2.One * _t * 0.08f, _t * 0.12f, Shadow);
+                    DrawCircle(c, _t * 0.12f, new Color("6b5038"));
+                    DrawArc(c, _t * 0.12f, 0, Mathf.Tau, 14, new Color("3a2a1e"), Mathf.Max(1, _t * 0.025f));
+                    DrawCircle(c, _t * 0.04f, new Color("3a2a1e"));
+                }
+                DrawAwning(lot, protector >= 0 ? Palette.Gang(w, protector) : null, open);
+                DrawSign(lot, b);
+                if (racket != RacketKind.None) DrawRacketBadge(lot, racket);
+                if (!open) DrawBoardedUp(lot);
                 break;
             }
             case LotUse.Headquarters:
-            {
-                var c = Palette.Gang(w, lot.GangId);
-                DrawRect(r, c.Darkened(0.55f));
-                DrawRect(r, c, false, 3);
-                int size = (int)(t * 0.34f);
-                DrawString(font, new Vector2(r.Position.X, r.GetCenter().Y + size * 0.36f), "HQ", HorizontalAlignment.Center, r.Size.X, size, c);
+                DrawHeadquarters(lot, Palette.Gang(w, lot.GangId), night);
                 break;
-            }
             case LotUse.Precinct:
-            {
-                DrawRect(r, Palette.Police.Darkened(0.6f));
-                DrawRect(r, Palette.Police, false, 2);
-                int size = (int)(t * 0.42f);
-                DrawString(font, new Vector2(r.Position.X, r.GetCenter().Y + size * 0.36f), "P", HorizontalAlignment.Center, r.Size.X, size, Palette.Police);
+                DrawPrecinct(lot, night);
                 break;
-            }
             default:
-                DrawRect(r, Palette.LotEmpty);
+                DrawEmptyLot(lot);
                 break;
         }
-
-        bool selected = lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness;
-        if (selected) DrawRect(r.Grow(3), Palette.Ink, false, 2);
-        else if (lot.Id == _hoverLot && lot.Use != LotUse.Empty) DrawRect(r.Grow(2), Palette.Ink with { A = 0.5f }, false, 1);
     }
 
-    /// <summary>One letter per trade so a glance tells a hotel from a barber.</summary>
-    private static string Glyph(Business b) => b.Kind switch
+    /// <summary>Ownership rims, selection and hover, drawn over the lighting so they read at night.</summary>
+    private void DrawLotOutline(Lot lot)
     {
-        BusinessKind.Grocer => "G",
-        BusinessKind.Diner => "D",
-        BusinessKind.Barber => "B",
-        BusinessKind.Tailor => "T",
-        BusinessKind.Garage => "A",
-        BusinessKind.Laundry => "L",
-        BusinessKind.Hotel => "H",
-        BusinessKind.Pharmacy => "Rx",
-        BusinessKind.PoolHall => "8",
-        BusinessKind.Warehouse => "W",
-        _ => "?",
-    };
+        var w = World!;
+        var r = Footprint(lot);
+        if (lot.Use == LotUse.Business)
+        {
+            var (protector, _) = ShownState(w.BusinessById(lot.BusinessId));
+            if (protector >= 0) DrawRect(r, Palette.Gang(w, protector), false, Mathf.Max(2, _t * 0.06f));
+        }
+        else if (lot.Use == LotUse.Headquarters)
+            DrawRect(r, Palette.Gang(w, lot.GangId), false, Mathf.Max(2, _t * 0.09f));
 
-    private void DrawActors(Vector2 o, float t, Font font)
+        bool selected = lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness;
+        if (selected)
+        {
+            float pulse = 0.75f + 0.25f * Mathf.Sin(_anim * 4);
+            DrawRect(r.Grow(Mathf.Max(3, _t * 0.08f)), Palette.Ink with { A = pulse }, false, Mathf.Max(2, _t * 0.06f));
+        }
+        else if (lot.Id == _hoverLot && lot.Use != LotUse.Empty) DrawRect(r.Grow(2), Palette.Ink with { A = 0.6f }, false, 1.5f);
+    }
+
+    /// <summary>A man seen from above: shoulders in his coat, a hat on top, a shadow under him.</summary>
+    private void DrawFigure(Vector2 pos, Vector2 facing, float r, Color coat, Color hat, Color band, bool walking)
+    {
+        float angle = facing.LengthSquared() > 0.0001f ? facing.Angle() : 0;
+        float sway = walking ? Mathf.Sin(_anim * 10 + pos.X * 0.1f) * 0.15f : 0;
+        Ellipse(pos + new Vector2(r * 0.35f, r * 0.45f), new Vector2(r * 0.75f, r * 1.05f), Shadow, angle);
+        Ellipse(pos, new Vector2(r * 0.62f, r * 1.0f), coat.Darkened(0.55f), angle + sway, 16);
+        Ellipse(pos, new Vector2(r * 0.52f, r * 0.9f), coat, angle + sway, 16);
+        DrawCircle(pos + facing.Normalized() * r * 0.08f, r * 0.62f, hat);
+        DrawArc(pos + facing.Normalized() * r * 0.08f, r * 0.42f, 0, Mathf.Tau, 14, band, Mathf.Max(1, r * 0.16f));
+        DrawCircle(pos + facing.Normalized() * r * 0.08f, r * 0.3f, hat.Lightened(0.12f));
+    }
+
+    private void DrawActors(Font font)
     {
         float now = Clock;
+        var o = _o;
+        float t = _t;
         foreach (var actor in _actors)
         {
             if (now < actor.Depart || now > actor.Home + 0.01f) continue;
             var a = actor.Action;
             var target = actor.Path[^1];
-            Vector2 at;
-            if (now < actor.Arrive) at = Along(actor.Path, (now - actor.Depart) / (actor.Arrive - actor.Depart));
-            else if (now <= actor.Leave) at = target;
-            else at = Along(actor.Path, 1 - (now - actor.Leave) / Mathf.Max(0.01f, actor.Home - actor.Leave));
+            Vector2 at, ahead;
+            bool walking = true;
+            if (now < actor.Arrive)
+            {
+                float f = (now - actor.Depart) / (actor.Arrive - actor.Depart);
+                at = Along(actor.Path, f);
+                ahead = Along(actor.Path, f + 0.02f) - at;
+            }
+            else if (now <= actor.Leave)
+            {
+                at = target;
+                ahead = actor.Path[^2] - target;
+                walking = false;
+            }
+            else
+            {
+                float f = 1 - (now - actor.Leave) / Mathf.Max(0.01f, actor.Home - actor.Leave);
+                at = Along(actor.Path, f);
+                ahead = Along(actor.Path, f - 0.02f) - at;
+            }
 
             var pos = o + at * t;
-            float radius = Mathf.Max(4.5f, t * 0.22f);
+            float radius = Mathf.Max(5.5f, t * 0.24f);
             bool atScene = now >= actor.Arrive && now <= actor.Leave;
 
-            // Outcome rings while the hood is on the job.
+            // Outcome rings while the man is on the job.
             if (atScene && a.Kind != ActionKind.Guard && a.Kind != ActionKind.Collect)
             {
                 var ring = a.Result switch
@@ -293,22 +366,26 @@ public partial class MapView : Control
                     _ => Palette.Neutral,
                 };
                 float pulse = 1 + 0.35f * Mathf.Sin((now - actor.Arrive) * 9);
-                DrawArc(o + target * t, t * 0.55f * pulse, 0, Mathf.Tau, 24, ring, 2.5f);
+                DrawArc(o + target * t, t * 0.4f * pulse, 0, Mathf.Tau, 24, ring, 2.5f);
             }
 
-            // In a takeover the rival's man stands in the doorway.
+            // In a takeover the rival's man stands in the doorway, and shots are traded.
             if (a.Kind == ActionKind.Takeover && a.DefenderHoodId >= 0 && now >= actor.Arrive - 0.5f && now <= actor.Leave)
             {
-                var defPos = o + (target + new Vector2(0.28f, -0.22f)) * t;
-                DrawCircle(defPos, radius, Palette.Gang(World!, a.DefenderGangId));
-                DrawArc(defPos, radius, 0, Mathf.Tau, 16, Palette.Background, 1.5f);
+                var defPos = o + (target + new Vector2(0.3f, -0.2f)) * t;
+                var dc = Palette.Gang(World!, a.DefenderGangId);
+                DrawFigure(defPos, pos - defPos, radius, dc, new Color("1c1a19"), dc, false);
+                if (atScene && now - actor.Arrive < 0.8f && Mathf.Sin(_anim * 23 + a.HoodId) > 0.55f)
+                    Star(pos.Lerp(defPos, Hash((int)(_anim * 8), a.HoodId) < 0.5f ? 0.3f : 0.7f), radius * 0.7f, new Color("ffe28a"), 6, 0.4f);
             }
 
             bool fallen = a.CasualtyHoodId >= 0 && a.CasualtyHoodId == a.HoodId && now >= actor.Arrive;
             if (fallen) continue; // drawn below as a cross
 
-            DrawCircle(pos, radius, actor.Colour);
-            DrawArc(pos, radius, 0, Mathf.Tau, 16, Palette.Background, 1.5f);
+            if (a.Kind == ActionKind.Raid)
+                DrawFigure(pos, ahead, radius, Palette.Police, new Color("1b2a4a"), Palette.Police.Lightened(0.3f), walking);
+            else
+                DrawFigure(pos, ahead, radius, actor.Colour, new Color("1c1a19"), actor.Colour.Lightened(0.25f), walking);
             if (a.Kind == ActionKind.Guard && atScene) DrawArc(pos, radius + 3, 0, Mathf.Tau, 16, actor.Colour with { A = 0.6f }, 1.5f);
         }
 

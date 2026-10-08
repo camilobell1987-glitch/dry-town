@@ -34,6 +34,15 @@ dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
 
 ![The live week on Sunday morning](docs/screenshots/live-week.png)
 
+## The map
+
+The map is drawn in code from simple shapes, so it uses no image files. Each business is a rooftop with a sign showing its trade, such as a barber pole, a coffee cup or a tyre for a garage. Its awning is striped in the colours of the gang it pays. A red badge on the roof marks a racket in the back room: a bottle for a speakeasy, a copper pot for a still, a die for numbers and a coin for loans. The empty lots are parks, parking lots and vacant ground. Each gang headquarters has a neon sign and the boss's car parked outside, and the precinct house has patrol cars at the kerb. Traffic and people on the pavements keep the streets moving. During the live week the light follows the clock, so streetlamps and shop windows come on at dusk.
+
+Scroll to zoom, and drag with the right or middle mouse button to pan. Trackpad pinch and two-finger scroll also work.
+
+![Zoomed in on Tanner Street](docs/screenshots/close-up.png)
+![Saturday night](docs/screenshots/night.png)
+
 The **Console** tab and `sim play` take the same text orders: `extort <hood> <business>`, `racket <hood> <business> <kind>`, `guard <hood> <business>`, `recruit`, `bribe <dollars>`, `rate <business> <percent>`, `auto`, `end`.
 
 ## Systems
@@ -67,4 +76,4 @@ The AI is a cautious but simple player; a person paying attention should do bett
 
 - **Crews led by lieutenants.** Orders still go to individual hoods.
 - **Mid-week orders.** You can pause the live week, but you can't intervene in it.
-- **Art and sound.** The map is drawn with flat shapes and letters: G grocer, D diner, B barber, T tailor, A garage, L laundry, H hotel, Rx pharmacy, 8 pool hall, W warehouse.
+- **Sound.** The game is silent.
