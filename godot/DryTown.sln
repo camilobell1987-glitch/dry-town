@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryTown", "DryTown.csproj", "{CE9A4306-20D6-44A4-9F4D-61FD24921E08}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryTown.Core", "..\core\DryTown.Core.csproj", "{2F431C6E-41D8-41B8-91FA-44561A33996A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CE9A4306-20D6-44A4-9F4D-61FD24921E08}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE9A4306-20D6-44A4-9F4D-61FD24921E08}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE9A4306-20D6-44A4-9F4D-61FD24921E08}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE9A4306-20D6-44A4-9F4D-61FD24921E08}.Release|Any CPU.Build.0 = Debug|Any CPU
+		{2F431C6E-41D8-41B8-91FA-44561A33996A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F431C6E-41D8-41B8-91FA-44561A33996A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F431C6E-41D8-41B8-91FA-44561A33996A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F431C6E-41D8-41B8-91FA-44561A33996A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

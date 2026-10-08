@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DryTown.Core</RootNamespace>
+    <!-- Godot imports this folder's parent; keep the core free of any Godot dependency. -->
+  </PropertyGroup>
+
+</Project>

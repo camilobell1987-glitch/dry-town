@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryTown.Core", "core\DryTown.Core.csproj", "{B1036DDE-6924-4731-A189-52EC8392E8C5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryTown.Sim", "sim\DryTown.Sim.csproj", "{0B8C9171-FFB9-4540-B97F-65FCC76FCAB3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryTown.Core.Tests", "tests\DryTown.Core.Tests.csproj", "{B4F9825A-C6D6-4DC1-8DA6-19D6EDD3D499}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryTown", "godot\DryTown.csproj", "{7F8A9AD4-18B3-4017-8479-E43D01019EAA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B1036DDE-6924-4731-A189-52EC8392E8C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1036DDE-6924-4731-A189-52EC8392E8C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1036DDE-6924-4731-A189-52EC8392E8C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1036DDE-6924-4731-A189-52EC8392E8C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0B8C9171-FFB9-4540-B97F-65FCC76FCAB3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0B8C9171-FFB9-4540-B97F-65FCC76FCAB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0B8C9171-FFB9-4540-B97F-65FCC76FCAB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0B8C9171-FFB9-4540-B97F-65FCC76FCAB3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4F9825A-C6D6-4DC1-8DA6-19D6EDD3D499}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4F9825A-C6D6-4DC1-8DA6-19D6EDD3D499}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4F9825A-C6D6-4DC1-8DA6-19D6EDD3D499}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4F9825A-C6D6-4DC1-8DA6-19D6EDD3D499}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F8A9AD4-18B3-4017-8479-E43D01019EAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F8A9AD4-18B3-4017-8479-E43D01019EAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F8A9AD4-18B3-4017-8479-E43D01019EAA}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F8A9AD4-18B3-4017-8479-E43D01019EAA}.Release|Any CPU.Build.0 = Debug|Any CPU
+	EndGlobalSection
+EndGlobal
