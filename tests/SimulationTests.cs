@@ -314,7 +314,7 @@ public class Phase3Tests
         var order = Assert.IsType<ExtortOrder>(shell.Pending.Single());
         Assert.Equal(men.Select(h => h.Id).ToHashSet(), order.Team.ToHashSet());
         shell.EndWeek();
-        var action = w.Script.Single(s => s.HoodId == men[0].Id && s.Kind == ActionKind.Extort);
+        var action = w.Script.Single(s => s.HoodId == order.HoodId && s.Kind == ActionKind.Extort);
         Assert.Equal(2, action.Backup.Count);
     }
 

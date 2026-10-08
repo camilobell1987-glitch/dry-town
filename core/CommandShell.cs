@@ -11,7 +11,11 @@ public sealed class CommandShell
     public Simulation Sim { get; }
     public List<Order> Pending { get; private set; } = new();
 
-    public CommandShell(Simulation sim) => Sim = sim;
+    public CommandShell(Simulation sim, IEnumerable<Order>? pending = null)
+    {
+        Sim = sim;
+        if (pending != null) Pending = pending.ToList();
+    }
 
     private World W => Sim.World;
     private int Me => W.Player.Id;
@@ -103,7 +107,11 @@ public sealed class CommandShell
     {
         var crew = W.CrewById(crewId);
         if (crew == null || crew.GangId != Me) return null;
-        var free = crew.Everyone.Where(id => W.HoodById(id).IsAvailable && busy?.Contains(id) != true).ToList();
+        // The best man for the job goes in front: the hardest for a fight, the most menacing for a shakedown.
+        var biz = W.BusinessById(businessId);
+        bool fight = guard || biz.IsProtected;
+        var free = crew.Everyone.Where(id => W.HoodById(id).IsAvailable && busy?.Contains(id) != true)
+            .OrderByDescending(id => fight ? W.HoodById(id).Strength : W.HoodById(id).Intimidation).ToList();
         if (free.Count == 0) return null;
         int lead = free[0];
         int[]? backup = free.Count > 1 ? free.Skip(1).ToArray() : null;
@@ -117,6 +125,13 @@ public sealed class CommandShell
         var order = CrewOrderFor(crewId, businessId, guard, busy);
         if (order == null) return "That crew has nobody free. Type 'crews'.\n";
         return Queue(order);
+    }
+
+    /// <summary>Start the week with the queued orders, to be run hour by hour.</summary>
+    public void StartWeek()
+    {
+        Sim.BeginWeek(new Dictionary<int, List<Order>> { [Me] = Pending });
+        Pending = new List<Order>();
     }
 
     public string EndWeek()
