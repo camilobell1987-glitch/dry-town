@@ -83,6 +83,25 @@ public sealed class Gang
     public int HqLotId { get; set; } = -1;
 }
 
+/// <summary>
+/// A lieutenant and the men who answer to him. A crew can be sent as one team: it hits harder
+/// and guards better than one man, but every member is tied up for the week. Lieutenants set
+/// the mood of their crew, and an ambitious one who breaks away takes his crew with him.
+/// </summary>
+public sealed class Crew
+{
+    public const int MaxMembers = 3;
+
+    public int Id { get; init; }
+    public int GangId { get; set; }
+    public int LieutenantHoodId { get; set; }
+
+    /// <summary>The men under the lieutenant, not counting him.</summary>
+    public List<int> MemberIds { get; init; } = new();
+
+    public IEnumerable<int> Everyone => MemberIds.Prepend(LieutenantHoodId);
+}
+
 public sealed class WeekLedger
 {
     public long Protection { get; set; }
@@ -127,4 +146,8 @@ public enum ActionResult { None, Success, Failed, Won, Lost, BackedOff, Killed, 
 public sealed record ScriptAction(
     ActionKind Kind, int GangId, int HoodId, int FromLot, int ToLot, int BusinessId,
     ActionResult Result, string Text,
-    int DefenderGangId = -1, int DefenderHoodId = -1, int CasualtyHoodId = -1, int Tick = 0);
+    int DefenderGangId = -1, int DefenderHoodId = -1, int CasualtyHoodId = -1, int Tick = 0)
+{
+    /// <summary>Men who went along as backup, not counting <see cref="HoodId"/>.</summary>
+    public IReadOnlyList<int> Backup { get; init; } = Array.Empty<int>();
+}

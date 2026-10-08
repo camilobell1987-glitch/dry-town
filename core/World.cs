@@ -31,7 +31,7 @@ public sealed class WorldSettings
 public sealed class World
 {
     public WorldSettings Settings { get; }
-    public Rng Rng { get; }
+    public Rng Rng { get; private set; }
     public int Week { get; set; }
 
     /// <summary>Hour of the current week, 0 to 167. Everything logged is stamped with it.</summary>
@@ -46,6 +46,7 @@ public sealed class World
     public List<Hood> Hoods { get; } = new();
     public List<Business> Businesses { get; } = new();
     public List<GameEvent> Events { get; } = new();
+    public List<Crew> Crews { get; } = new();
 
     /// <summary>This week's books per gang, reset at the start of each week.</summary>
     public Dictionary<int, WeekLedger> LastLedger { get; } = new();
@@ -58,6 +59,7 @@ public sealed class World
 
     private int _nextHoodId;
     private int _nextGangId;
+    private int _nextCrewId;
 
     public World(WorldSettings settings)
     {
@@ -79,6 +81,55 @@ public sealed class World
     public IEnumerable<Hood> HoodsOf(int gangId) => Hoods.Where(h => h.GangId == gangId && h.IsActive);
     public IEnumerable<Hood> AvailableHoodsOf(int gangId) => Hoods.Where(h => h.GangId == gangId && h.IsAvailable);
     public IEnumerable<Business> TurfOf(int gangId) => Businesses.Where(b => b.ProtectorGangId == gangId);
+
+    // ---- Crews ----------------------------------------------------------------
+
+    public IEnumerable<Crew> CrewsOf(int gangId) => Crews.Where(c => c.GangId == gangId);
+    public Crew? CrewById(int id) => Crews.FirstOrDefault(c => c.Id == id);
+    public Crew? CrewOfHood(int hoodId) => Crews.FirstOrDefault(c => c.LieutenantHoodId == hoodId || c.MemberIds.Contains(hoodId));
+
+    /// <summary>Make a hood the lieutenant of a new crew. He leaves any crew he was in.</summary>
+    public Crew FormCrew(Hood lieutenant)
+    {
+        LeaveCrew(lieutenant.Id);
+        var crew = new Crew { Id = _nextCrewId++, GangId = lieutenant.GangId, LieutenantHoodId = lieutenant.Id };
+        Crews.Add(crew);
+        return crew;
+    }
+
+    /// <summary>Put a hood under a lieutenant. Returns false if the crew is full or he's in another gang.</summary>
+    public bool JoinCrew(Crew crew, Hood hood)
+    {
+        if (hood.GangId != crew.GangId || crew.MemberIds.Count >= Crew.MaxMembers || crew.LieutenantHoodId == hood.Id) return false;
+        if (crew.MemberIds.Contains(hood.Id)) return true;
+        LeaveCrew(hood.Id);
+        crew.MemberIds.Add(hood.Id);
+        return true;
+    }
+
+    /// <summary>Take a hood out of his crew. A lieutenant leaving breaks his crew up.</summary>
+    public void LeaveCrew(int hoodId)
+    {
+        var crew = CrewOfHood(hoodId);
+        if (crew == null) return;
+        if (crew.LieutenantHoodId == hoodId) Crews.Remove(crew);
+        else crew.MemberIds.Remove(hoodId);
+    }
+
+    /// <summary>Drop men who have died, gone or changed sides; a crew whose lieutenant is lost promotes its best man.</summary>
+    public void TidyCrews()
+    {
+        foreach (var crew in Crews.ToList())
+        {
+            crew.MemberIds.RemoveAll(id => HoodById(id) is var h && (h.GangId != crew.GangId || !h.IsActive));
+            var lt = HoodById(crew.LieutenantHoodId);
+            if (lt.GangId == crew.GangId && lt.IsActive) continue;
+            var next = crew.MemberIds.Select(HoodById).OrderByDescending(h => h.Brains + h.Strength).ThenBy(h => h.Id).FirstOrDefault();
+            if (next == null) { Crews.Remove(crew); continue; }
+            crew.MemberIds.Remove(next.Id);
+            crew.LieutenantHoodId = next.Id;
+        }
+    }
 
     public void Log(EventKind kind, int gangId, string text) => Events.Add(new GameEvent(Week, kind, gangId, text, Tick));
 
@@ -212,6 +263,41 @@ public sealed class World
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
         return hood;
+    }
+
+    // ---- Saving ---------------------------------------------------------------
+
+    public SaveData ToSave() => new()
+    {
+        Settings = Settings,
+        RngState = Rng.State,
+        Week = Week,
+        NextHoodId = _nextHoodId,
+        NextGangId = _nextGangId,
+        NextCrewId = _nextCrewId,
+        StreetNames = Map.StreetNames,
+        AvenueNames = Map.AvenueNames,
+        Lots = Map.Lots,
+        Gangs = Gangs,
+        Hoods = Hoods,
+        Businesses = Businesses,
+        Crews = Crews,
+        Events = Events,
+        LastLedger = LastLedger,
+    };
+
+    public static World FromSave(SaveData d)
+    {
+        var w = new World(d.Settings) { Week = d.Week, _nextHoodId = d.NextHoodId, _nextGangId = d.NextGangId, _nextCrewId = d.NextCrewId };
+        w.Rng = Rng.FromState(d.RngState);
+        w.Map = CityMap.FromSave(d.Lots, d.StreetNames, d.AvenueNames);
+        w.Gangs.AddRange(d.Gangs);
+        w.Hoods.AddRange(d.Hoods);
+        w.Businesses.AddRange(d.Businesses);
+        w.Crews.AddRange(d.Crews);
+        w.Events.AddRange(d.Events);
+        foreach (var (id, ledger) in d.LastLedger) w.LastLedger[id] = ledger;
+        return w;
     }
 
     public static string Surname(string fullName) => fullName.Split(' ').Last();

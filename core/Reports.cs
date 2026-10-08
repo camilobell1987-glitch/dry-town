@@ -84,4 +84,18 @@ public static class Reports
     }
 
     private static string Trim(string s, int n) => s.Length <= n ? s : s[..(n - 1)] + ".";
+
+    public static string Crews(World w, int gangId)
+    {
+        var crews = w.CrewsOf(gangId).ToList();
+        if (crews.Count == 0) return "No crews. 'crew new <hood>' makes a hood a lieutenant.\n";
+        var sb = new System.Text.StringBuilder();
+        foreach (var c in crews)
+        {
+            var lt = w.HoodById(c.LieutenantHoodId);
+            var men = c.MemberIds.Select(w.HoodById).Select(h => $"{h.Id} {h.Name}");
+            sb.AppendLine($"  crew {c.Id}: {lt.Id} {lt.Name} (lieutenant, loyalty {lt.Loyalty})" + (c.MemberIds.Count > 0 ? $" with {string.Join(", ", men)}" : ""));
+        }
+        return sb.ToString();
+    }
 }

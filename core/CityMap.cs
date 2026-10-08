@@ -64,6 +64,15 @@ public sealed class CityMap
         return map;
     }
 
+    public static CityMap FromSave(List<Lot> lots, string[] streets, string[] avenues)
+    {
+        var map = new CityMap();
+        map.Lots.AddRange(lots.OrderBy(l => l.Id));
+        Array.Copy(streets, map.StreetNames, Math.Min(streets.Length, map.StreetNames.Length));
+        Array.Copy(avenues, map.AvenueNames, Math.Min(avenues.Length, map.AvenueNames.Length));
+        return map;
+    }
+
     public Lot LotAt(int id) => Lots[id];
 
     public string StreetOf(Lot lot) => StreetNames[lot.FrontY / StrideY];
