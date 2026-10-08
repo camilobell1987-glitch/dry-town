@@ -1,8 +1,9 @@
 namespace DryTown.Core;
 
 /// <summary>
-/// Resolves one week. Phase 1 resolves the whole week at once; Phase 2 splits the same
-/// steps into ticks so the live city view can show them happening.
+/// Resolves one week. Each order happens at its own hour between Monday and Saturday;
+/// Sunday is collection day and the reckoning. Everything that happens on the street is
+/// written to <see cref="World.Script"/> so the live view can replay the week.
 /// </summary>
 public sealed class Simulation
 {
@@ -23,6 +24,9 @@ public sealed class Simulation
     {
         var w = World;
         w.LastLedger.Clear();
+        w.Script.Clear();
+        w.Tick = 0;
+        _guards.Clear();
 
         var plans = new List<(Gang gang, List<Order> orders)>();
         foreach (var g in w.LivingGangs.ToList())
@@ -33,32 +37,41 @@ public sealed class Simulation
             else list = AiPlanner.Plan(w, g);
             plans.Add((g, list));
         }
-        w.Rng.Shuffle(plans);
+
+        // Every order gets an hour of the working week. Guards take up their posts first thing Monday.
+        var timeline = new List<(int Tick, Gang Gang, Order Order)>();
+        foreach (var (gang, list) in plans)
+            foreach (var order in list.Where(o => o.GangId == gang.Id))
+                timeline.Add((TickFor(order), gang, order));
+        w.Rng.Shuffle(timeline);
+        timeline = timeline.OrderBy(t => t.Tick).ToList();
 
         _protectorAtPlanning = w.Businesses.ToDictionary(b => b.Id, b => b.ProtectorGangId);
         var usedHoods = new HashSet<int>();
-        int recruitsBefore = 0;
-        foreach (var (gang, list) in plans)
+        var recruits = new Dictionary<int, int>();
+        foreach (var (tick, gang, order) in timeline)
         {
-            recruitsBefore = 0;
-            foreach (var order in list)
+            if (!gang.Alive) continue;
+            w.Tick = tick;
+            switch (order)
             {
-                if (!gang.Alive || order.GangId != gang.Id) continue;
-                switch (order)
-                {
-                    case ExtortOrder o: Extort(gang, o, usedHoods); break;
-                    case RacketOrder o: OpenRacket(gang, o, usedHoods); break;
-                    case RecruitOrder: if (recruitsBefore++ < 2) Recruit(gang); break;
-                    case BribeOrder o: Bribe(gang, o.Amount); break;
-                    case SetRateOrder o: SetRate(gang, o); break;
-                }
+                case GuardOrder o: Guard(gang, o, usedHoods); break;
+                case ExtortOrder o: Extort(gang, o, usedHoods); break;
+                case RacketOrder o: OpenRacket(gang, o, usedHoods); break;
+                case RecruitOrder:
+                    if (recruits.GetValueOrDefault(gang.Id) < 2) { recruits[gang.Id] = recruits.GetValueOrDefault(gang.Id) + 1; Recruit(gang); }
+                    break;
+                case BribeOrder o: Bribe(gang, o.Amount); break;
+                case SetRateOrder o: SetRate(gang, o); break;
             }
         }
 
         int takeoversThisWeek = w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.Takeover);
 
+        w.Tick = Content.CollectionTick;
         Collect();
         PayWages();
+        w.Tick = Content.ReckoningTick;
         Police();
         Feds();
         Loyalty();
@@ -78,6 +91,41 @@ public sealed class Simulation
 
     private Dictionary<int, int> _protectorAtPlanning = new();
 
+    /// <summary>Business id to the hood guarding it this week.</summary>
+    private readonly Dictionary<int, Hood> _guards = new();
+
+    private int TickFor(Order order)
+    {
+        var rng = World.Rng;
+        return order switch
+        {
+            SetRateOrder => 0,
+            GuardOrder => 7 + rng.Range(0, 2),
+            BribeOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
+            RecruitOrder => rng.Range(0, 5) * 24 + rng.Range(10, 17),
+            _ => rng.Range(0, 5) * 24 + rng.Range(9, 22),
+        };
+    }
+
+    private void Guard(Gang gang, GuardOrder o, HashSet<int> used)
+    {
+        var w = World;
+        var biz = w.Businesses.FirstOrDefault(b => b.Id == o.BusinessId);
+        if (biz == null || biz.ProtectorGangId != gang.Id || _guards.ContainsKey(biz.Id)) return;
+        if (!TryUseHood(gang, o.HoodId, used, out var hood)) return;
+        _guards[biz.Id] = hood;
+        w.Act(new ScriptAction(ActionKind.Guard, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Success,
+            $"{hood.Name} is watching {biz.Name} this week."));
+    }
+
+    /// <summary>Who answers the door when a rival comes for a business: its guard, else its handler.</summary>
+    private Hood? DefenderAt(Gang rival, Business biz)
+    {
+        if (_guards.TryGetValue(biz.Id, out var guard) && guard.IsAvailable && guard.GangId == rival.Id) return guard;
+        var handler = World.Hoods.FirstOrDefault(h => h.Id == biz.HandlerHoodId);
+        return handler is { IsAvailable: true } && handler.GangId == rival.Id ? handler : null;
+    }
+
     private bool TryUseHood(Gang gang, int hoodId, HashSet<int> used, out Hood hood)
     {
         hood = World.Hoods.FirstOrDefault(h => h.Id == hoodId)!;
@@ -86,8 +134,12 @@ public sealed class Simulation
         return true;
     }
 
-    public static double ExtortChance(Hood hood, Business biz) =>
-        Math.Clamp(0.35 + (hood.Intimidation - biz.Toughness) * 0.08, 0.1, 0.95);
+    /// <summary>
+    /// Chance a shopkeeper pays up. Owners take a gang less seriously the further its
+    /// headquarters is, so spreading out means opening more bases (a later phase).
+    /// </summary>
+    public static double ExtortChance(World w, Gang gang, Hood hood, Business biz) =>
+        Math.Clamp(0.35 + (hood.Intimidation - biz.Toughness) * 0.08 - Math.Max(0, w.BlocksFromHq(gang, biz) - 2) * 0.04, 0.05, 0.95);
 
     private void Extort(Gang gang, ExtortOrder o, HashSet<int> used)
     {
@@ -100,33 +152,44 @@ public sealed class Simulation
         // a hood sent to shake down a shopkeeper doesn't start a war on his own initiative.
         if (_protectorAtPlanning.GetValueOrDefault(biz.Id, -1) != biz.ProtectorGangId)
         {
-            w.Log(EventKind.ExtortFailed, gang.Id, $"{hood.Name} found {biz.Name} already under {w.GangById(biz.ProtectorGangId).Name}'s protection and backed off.");
+            string text = $"{hood.Name} found {biz.Name} already under {w.GangById(biz.ProtectorGangId).Name}'s protection and backed off.";
+            w.Log(EventKind.ExtortFailed, gang.Id, text);
+            w.Act(new ScriptAction(ActionKind.Extort, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.BackedOff, text));
             return;
         }
 
         if (!biz.IsProtected)
         {
-            if (w.Rng.Chance(ExtortChance(hood, biz)))
+            if (w.Rng.Chance(ExtortChance(w, gang, hood, biz)))
             {
                 biz.ProtectorGangId = gang.Id;
                 biz.HandlerHoodId = hood.Id;
                 biz.ProtectionRate = Content.DefaultRatePercent;
                 biz.Resentment = Math.Min(100, biz.Resentment + 10);
                 gang.Heat = Math.Min(100, gang.Heat + 1);
-                w.Log(EventKind.Extorted, gang.Id, $"{hood.Name} of {gang.Name} now protects {biz.Name}.");
+                string text = $"{hood.Name} of {gang.Name} now protects {biz.Name}.";
+                w.Log(EventKind.Extorted, gang.Id, text);
+                w.Act(new ScriptAction(ActionKind.Extort, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Success, text));
             }
             else
             {
                 biz.Resentment = Math.Min(100, biz.Resentment + 15);
                 gang.Heat = Math.Min(100, gang.Heat + 2);
-                w.Log(EventKind.ExtortFailed, gang.Id, $"{biz.Name} threw {hood.Name} out.");
-                if (w.Rng.Chance(0.06 + (10 - hood.Stealth) * 0.01)) Jail(hood, w.Rng.Range(2, 8), "for menacing a shopkeeper");
+                string text = $"{biz.Name} threw {hood.Name} out.";
+                w.Log(EventKind.ExtortFailed, gang.Id, text);
+                bool arrested = w.Rng.Chance(0.06 + (10 - hood.Stealth) * 0.01);
+                if (arrested) Jail(hood, w.Rng.Range(2, 8), "for menacing a shopkeeper");
+                w.Act(new ScriptAction(ActionKind.Extort, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id,
+                    arrested ? ActionResult.Arrested : ActionResult.Failed, arrested ? $"{text} The police picked him up." : text,
+                    CasualtyHoodId: arrested ? hood.Id : -1));
             }
             return;
         }
 
         var rival = w.GangById(biz.ProtectorGangId);
-        double defence = DefenceStrength(w, rival, biz);
+        var defender = DefenderAt(rival, biz);
+        _guards.TryGetValue(biz.Id, out var guard);
+        double defence = DefenceStrength(w, rival, biz, guard is { IsAvailable: true } && guard.GangId == rival.Id ? guard : null);
         double attack = hood.Strength + w.Rng.Range(0, 6);
         double roll = defence + w.Rng.Range(0, 6);
         gang.Heat = Math.Min(100, gang.Heat + 5);
@@ -138,16 +201,27 @@ public sealed class Simulation
             biz.ProtectorGangId = gang.Id;
             biz.HandlerHoodId = hood.Id;
             biz.ProtectionRate = Content.DefaultRatePercent;
-            if (biz.Racket != RacketKind.None)
-                w.Log(EventKind.Takeover, gang.Id, $"{gang.Name} seized {biz.Name} and its {Content.Rackets[biz.Racket].Label} from {rival.Name}.");
-            else
-                w.Log(EventKind.Takeover, gang.Id, $"{gang.Name} muscled {rival.Name} out of {biz.Name}.");
-            if (w.Rng.Chance(0.3)) KillOne(rival, $"in a fight over {biz.Name}");
+            string text = biz.Racket != RacketKind.None
+                ? $"{gang.Name} seized {biz.Name} and its {Content.Rackets[biz.Racket].Label} from {rival.Name}."
+                : $"{gang.Name} muscled {rival.Name} out of {biz.Name}.";
+            w.Log(EventKind.Takeover, gang.Id, text);
+            int casualty = -1;
+            if (w.Rng.Chance(0.3))
+            {
+                var victim = defender ?? PickVictim(rival);
+                if (victim != null) { Kill(victim, $"in a fight over {biz.Name}"); casualty = victim.Id; }
+            }
+            w.Act(new ScriptAction(ActionKind.Takeover, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Won, text,
+                rival.Id, defender?.Id ?? -1, casualty));
         }
         else
         {
-            w.Log(EventKind.TakeoverRepelled, rival.Id, $"{rival.Name} saw off {hood.Name} at {biz.Name}.");
-            if (w.Rng.Chance(0.25)) Kill(hood, $"trying to take {biz.Name}");
+            string text = $"{rival.Name} saw off {hood.Name} at {biz.Name}.";
+            w.Log(EventKind.TakeoverRepelled, rival.Id, text);
+            int casualty = -1;
+            if (w.Rng.Chance(0.25)) { Kill(hood, $"trying to take {biz.Name}"); casualty = hood.Id; }
+            w.Act(new ScriptAction(ActionKind.Takeover, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Lost, text,
+                rival.Id, defender?.Id ?? -1, casualty));
         }
     }
 
@@ -155,13 +229,15 @@ public sealed class Simulation
     /// How hard a business is to take. Mostly it's the hood who handles it; the rest of the gang
     /// only helps if it isn't spread thin, so sprawling gangs are easy to pick at around the edges.
     /// </summary>
-    public static double DefenceStrength(World world, Gang rival, Business biz)
+    public static double DefenceStrength(World world, Gang rival, Business biz, Hood? guard = null)
     {
         var available = world.AvailableHoodsOf(rival.Id).ToList();
         if (available.Count == 0) return 0;
         double avg = available.OrderByDescending(h => h.Strength).Take(3).Average(h => h.Strength);
         var handler = available.FirstOrDefault(h => h.Id == biz.HandlerHoodId);
         double front = Math.Max(handler?.Strength ?? 0, avg * 0.5);
+        // A man posted on the door all week, expecting trouble, fights harder than one called in.
+        if (guard != null) front = Math.Max(front, guard.Strength + 3);
         int turf = world.TurfOf(rival.Id).Count();
         double coverage = Math.Min(1.0, available.Count * (double)BusinessesPerHandler / Math.Max(1, turf * 2));
         return front + 3 * coverage;
@@ -180,16 +256,14 @@ public sealed class Simulation
 
         gang.Cash -= info.SetupCost;
         w.Ledger(gang.Id).Spending += info.SetupCost;
-        if (w.Rng.Chance(0.6 + hood.Brains * 0.04))
-        {
-            biz.Racket = o.Racket;
-            w.Log(EventKind.RacketOpened, gang.Id, $"{gang.Name} opened a {info.Label} behind {biz.Name}.");
-        }
-        else
-        {
-            gang.Heat = Math.Min(100, gang.Heat + 4);
-            w.Log(EventKind.RacketOpened, gang.Id, $"{hood.Name} botched setting up a {info.Label}; the money is gone.");
-        }
+        bool ok = w.Rng.Chance(0.6 + hood.Brains * 0.04);
+        string text = ok
+            ? $"{gang.Name} opened a {info.Label} behind {biz.Name}."
+            : $"{hood.Name} botched setting up a {info.Label}; the money is gone.";
+        if (ok) biz.Racket = o.Racket;
+        else gang.Heat = Math.Min(100, gang.Heat + 4);
+        w.Log(EventKind.RacketOpened, gang.Id, text);
+        w.Act(new ScriptAction(ActionKind.Racket, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ok ? ActionResult.Success : ActionResult.Failed, text));
     }
 
     private void Recruit(Gang gang)
@@ -238,6 +312,8 @@ public sealed class Simulation
                 int pay = biz.Takings * biz.ProtectionRate / 100;
                 gang.Cash += pay;
                 ledger.Protection += pay;
+                w.Act(new ScriptAction(ActionKind.Collect, gang.Id, biz.HandlerHoodId, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Success,
+                    $"Collected ${pay} from {biz.Name}."));
             }
 
             biz.Resentment = Math.Clamp(biz.Resentment + (biz.ProtectionRate - 12) / 2 - 1, 0, 100);
@@ -353,24 +429,31 @@ public sealed class Simulation
             var ledger = w.Ledger(gang.Id);
             var racketSite = w.TurfOf(gang.Id).Where(b => b.Racket != RacketKind.None).ToList();
             string what = "";
+            int targetLot = gang.HqLotId, targetBiz = -1;
             if (racketSite.Count > 0)
             {
                 var site = w.Rng.Pick(racketSite);
                 what = $" and closed the {Content.Rackets[site.Racket].Label} at {site.Name}";
                 site.Racket = RacketKind.None;
                 site.ShutWeeks = 6;
+                targetLot = site.LotId;
+                targetBiz = site.Id;
             }
             long fine = Math.Min(gang.Cash, 200 + gang.Heat * 5 + gang.Cash / 50);
             gang.Cash -= fine;
             ledger.Fines += fine;
-            w.Log(EventKind.Raid, gang.Id, $"Police raided {gang.Name}{what}. Fines ${fine}.");
+            string text = $"Police raided {gang.Name}{what}. Fines ${fine}.";
+            w.Log(EventKind.Raid, gang.Id, text);
 
+            int arrested = -1;
             var suspects = w.AvailableHoodsOf(gang.Id).ToList();
             if (suspects.Count > 0)
             {
                 var hood = w.Rng.Pick(suspects);
-                if (!w.Rng.Chance(hood.Stealth * 0.05)) Jail(hood, w.Rng.Range(6, 30), "after a raid");
+                if (!w.Rng.Chance(hood.Stealth * 0.05)) { Jail(hood, w.Rng.Range(6, 30), "after a raid"); arrested = hood.Id; }
             }
+            w.Act(new ScriptAction(ActionKind.Raid, -1, -1, w.Precinct.Id, targetLot, targetBiz,
+                arrested >= 0 ? ActionResult.Arrested : ActionResult.Success, text, gang.Id, -1, arrested));
             gang.Heat = Math.Max(0, gang.Heat - 15);
         }
 
@@ -419,13 +502,16 @@ public sealed class Simulation
         var w = World;
         long stake = from.Cash * 15 / 100;
         from.Cash -= stake;
+        // A split in a big outfit is a faction, not a man and his cousin.
+        int following = Math.Max(2, w.HoodsOf(from.Id).Count() / 4);
         var friends = w.AvailableHoodsOf(from.Id)
-            .Where(h => h.Id != leader.Id && h.Id != from.BossHoodId && h.Loyalty < 50)
-            .OrderBy(h => h.Loyalty).Take(2).ToList();
+            .Where(h => h.Id != leader.Id && h.Id != from.BossHoodId && h.Loyalty < 60)
+            .OrderBy(h => h.Loyalty).ThenBy(h => h.Id).Take(following).ToList();
 
         var gang = w.FoundGang(isPlayer: false, cash: stake + 400, hoods: 1, boss: leader);
         foreach (var f in friends) { f.GangId = gang.Id; f.Loyalty = 60; }
-        foreach (var biz in w.Businesses.Where(b => b.ProtectorGangId == from.Id && b.HandlerHoodId == leader.Id))
+        var defectors = friends.Select(f => f.Id).Append(leader.Id).ToHashSet();
+        foreach (var biz in w.Businesses.Where(b => b.ProtectorGangId == from.Id && defectors.Contains(b.HandlerHoodId)))
             biz.ProtectorGangId = gang.Id;
 
         w.Log(EventKind.Breakaway, from.Id,
@@ -468,10 +554,15 @@ public sealed class Simulation
         {
             var active = w.HoodsOf(gang.Id).ToList();
             bool broke = !w.AvailableHoodsOf(gang.Id).Any() && gang.Cash < Content.RecruitCost && !w.TurfOf(gang.Id).Any();
-            if (active.Count > 0 && !broke) continue;
+            // A boss with no men, no turf and no money to hire is just a man. Rival gangs in that
+            // state fold so they don't take up room in the district; the player decides for himself.
+            bool spent = !gang.IsPlayer && active.Count <= 1 && !w.TurfOf(gang.Id).Any()
+                && gang.Cash < Content.RecruitCost * 4 && w.Week - gang.FoundedWeek > 8;
+            if (active.Count > 0 && !broke && !spent) continue;
 
             gang.Alive = false;
             gang.DissolvedWeek = w.Week;
+            w.ReleaseHeadquarters(gang);
             foreach (var h in active) h.State = HoodState.Gone;
             foreach (var biz in w.TurfOf(gang.Id).ToList())
             {
@@ -485,14 +576,13 @@ public sealed class Simulation
 
     // ---- Violence and arrests ----------------------------------------------
 
-    private void KillOne(Gang gang, string where)
+    private Hood? PickVictim(Gang gang)
     {
         var victims = World.AvailableHoodsOf(gang.Id).ToList();
-        if (victims.Count == 0) return;
+        if (victims.Count == 0) return null;
         // Bosses are hard to reach while they have soldiers around them.
         var soldiers = victims.Where(h => h.Id != gang.BossHoodId).ToList();
-        var victim = soldiers.Count > 0 && !World.Rng.Chance(0.08) ? World.Rng.Pick(soldiers) : World.Rng.Pick(victims);
-        Kill(victim, where);
+        return soldiers.Count > 0 && !World.Rng.Chance(0.08) ? World.Rng.Pick(soldiers) : World.Rng.Pick(victims);
     }
 
     private void Kill(Hood hood, string where)

@@ -122,3 +122,93 @@ public class ShellTests
         Assert.Equal(auto.World.Events.Select(e => e.Text), shell.Sim.World.Events.Select(e => e.Text));
     }
 }
+
+public class Phase2Tests
+{
+    [Fact]
+    public void PlayerUsuallySurvivesTheFirstThreeYearsOnNormal()
+    {
+        int alive = 0;
+        for (ulong seed = 1; seed <= 20; seed++)
+        {
+            var sim = Simulation.New(new WorldSettings { Seed = seed });
+            for (int i = 0; i < 3 * Content.WeeksPerYear && sim.World.Player.Alive; i++) sim.AdvanceWeek(playerAutopilot: true);
+            if (sim.World.Player.Alive) alive++;
+        }
+        Assert.True(alive >= 15, $"only {alive}/20 player gangs survived three years");
+    }
+
+    [Fact]
+    public void WeekScriptIsInTimeOrderAndOnTheMap()
+    {
+        var sim = Simulation.New(new WorldSettings { Seed = 4 });
+        var w = sim.World;
+        for (int i = 0; i < 10; i++) sim.AdvanceWeek(playerAutopilot: true);
+        Assert.NotEmpty(w.Script);
+        Assert.Equal(w.Script.Select(a => a.Tick).OrderBy(t => t), w.Script.Select(a => a.Tick));
+        Assert.All(w.Script, a =>
+        {
+            Assert.InRange(a.Tick, 0, Content.HoursPerWeek - 1);
+            Assert.InRange(a.FromLot, 0, w.Map.Lots.Count - 1);
+            Assert.InRange(a.ToLot, 0, w.Map.Lots.Count - 1);
+        });
+        Assert.Contains(w.Script, a => a.Kind == ActionKind.Collect);
+    }
+
+    [Fact]
+    public void PathsFollowTheStreets()
+    {
+        var map = World.Create(new WorldSettings { Seed = 2 }).Map;
+        var a = map.Lots.First();
+        var b = map.Lots.Last();
+        var path = map.Path(a, b);
+        Assert.Equal((a.X, a.Y), path[0]);
+        Assert.Equal((b.X, b.Y), path[^1]);
+        foreach (var (x, y) in path.Skip(1).SkipLast(1)) Assert.True(CityMap.IsRoad(x, y), $"({x},{y}) is not a road");
+        for (int i = 1; i < path.Count; i++) Assert.True(path[i].X == path[i - 1].X || path[i].Y == path[i - 1].Y, "diagonal step");
+    }
+
+    [Fact]
+    public void EveryGangHasItsOwnHeadquarters()
+    {
+        var w = World.Create(new WorldSettings { Seed = 8 });
+        var hqs = w.LivingGangs.Select(g => g.HqLotId).ToList();
+        Assert.Equal(hqs.Count, hqs.Distinct().Count());
+        Assert.All(hqs, id => Assert.Equal(LotUse.Headquarters, w.Map.LotAt(id).Use));
+        Assert.All(w.Businesses, b => Assert.Equal(b.Id, w.Map.LotAt(b.LotId).BusinessId));
+    }
+
+    [Fact]
+    public void GuardDefendsHisPost()
+    {
+        // A strong guard should repel a weak attacker more often than an unguarded handler does.
+        int RepelledOutOf(bool guarded)
+        {
+            int repelled = 0;
+            for (ulong seed = 1; seed <= 30; seed++)
+            {
+                var sim = Simulation.New(new WorldSettings { Seed = seed, StartingGangs = 2, DirectorEnabled = false });
+                var w = sim.World;
+                var me = w.Player;
+                var rival = w.Gangs[1];
+                var biz = w.Businesses.First();
+                biz.ProtectorGangId = rival.Id;
+                var rivalHoods = w.HoodsOf(rival.Id).ToList();
+                biz.HandlerHoodId = rivalHoods[0].Id;
+                var guard = rivalHoods[1];
+                guard.Intimidation = guard.Muscle = 9;
+                var attacker = w.HoodsOf(me.Id).First(h => h.Id != me.BossHoodId);
+                attacker.Intimidation = attacker.Muscle = 6;
+                var orders = new Dictionary<int, List<Order>>
+                {
+                    [me.Id] = new() { new ExtortOrder(me.Id, attacker.Id, biz.Id) },
+                    [rival.Id] = guarded ? new() { new GuardOrder(rival.Id, guard.Id, biz.Id) } : new(),
+                };
+                sim.AdvanceWeek(orders);
+                if (biz.ProtectorGangId == rival.Id) repelled++;
+            }
+            return repelled;
+        }
+        Assert.True(RepelledOutOf(guarded: true) > RepelledOutOf(guarded: false));
+    }
+}

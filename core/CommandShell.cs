@@ -23,7 +23,7 @@ public sealed class CommandShell
     public const string Help =
         "gangs | hoods | turf | targets | log\n" +
         "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark>\n" +
-        "recruit | bribe <dollars> | rate <biz> <percent>\n" +
+        "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -43,6 +43,7 @@ public sealed class CommandShell
                 case "log": return string.Join("\n", W.Events.TakeLast(30).Select(e => $"  {e.Text}")) + "\n";
                 case "extort": return Queue(new ExtortOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "racket": return Queue(new RacketOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Enum.Parse<RacketKind>(p[3], true)));
+                case "guard": return Queue(new GuardOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "recruit": return Queue(new RecruitOrder(Me));
                 case "bribe": return Queue(new BribeOrder(Me, int.Parse(p[1])));
                 case "rate": return Queue(new SetRateOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
@@ -82,6 +83,8 @@ public sealed class CommandShell
                 ?? (W.BusinessById(r.BusinessId).ProtectorGangId != Me ? "You can only open a racket on your own turf." : null)
                 ?? (!Content.RacketsFor(W.BusinessById(r.BusinessId).Kind).Contains(r.Racket) ? "That business can't hide that racket." : null),
             SetRateOrder s => CheckBiz(s.BusinessId),
+            GuardOrder g => CheckHood(g.HoodId) ?? CheckBiz(g.BusinessId)
+                ?? (W.BusinessById(g.BusinessId).ProtectorGangId != Me ? "You can only guard your own turf." : null),
             _ => null,
         };
         if (problem != null) return problem + "\n";
@@ -93,6 +96,7 @@ public sealed class CommandShell
     {
         ExtortOrder e => $"{HoodName(e.HoodId)} leans on {BizName(e.BusinessId)}",
         RacketOrder r => $"{HoodName(r.HoodId)} opens a {Content.Rackets[r.Racket].Label} behind {BizName(r.BusinessId)}",
+        GuardOrder g => $"{HoodName(g.HoodId)} guards {BizName(g.BusinessId)} all week",
         RecruitOrder => $"recruit a new hood (${Content.RecruitCost})",
         BribeOrder b => $"pay the precinct ${b.Amount}",
         SetRateOrder s => $"set {BizName(s.BusinessId)} to {s.RatePercent}%",

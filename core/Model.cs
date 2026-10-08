@@ -54,6 +54,8 @@ public sealed class Business
     public RacketKind Racket { get; set; } = RacketKind.None;
     public int ShutWeeks { get; set; }
 
+    public int LotId { get; init; } = -1;
+
     public bool IsProtected => ProtectorGangId >= 0;
     public bool IsOpen => ShutWeeks == 0;
 }
@@ -77,6 +79,8 @@ public sealed class Gang
     public double Aggression { get; init; }
 
     public int ConsecutiveUnpaidWeeks { get; set; }
+
+    public int HqLotId { get; set; } = -1;
 }
 
 public sealed class WeekLedger
@@ -96,4 +100,31 @@ public enum EventKind
     Succession, Bribe, Era, Lapsed,
 }
 
-public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text);
+public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);
+
+public enum ActionKind
+{
+    /// <summary>A hood leans on a shopkeeper.</summary>
+    Extort,
+    /// <summary>A hood tries to take a business from a rival; the defender fights back.</summary>
+    Takeover,
+    /// <summary>A hood sets up a racket in a back room.</summary>
+    Racket,
+    /// <summary>A hood stands guard at a business all week.</summary>
+    Guard,
+    /// <summary>Police come from the precinct house.</summary>
+    Raid,
+    /// <summary>Collectors make the Sunday rounds.</summary>
+    Collect,
+}
+
+public enum ActionResult { None, Success, Failed, Won, Lost, BackedOff, Killed, Arrested }
+
+/// <summary>
+/// One thing that happened on the street, for the live view to animate. A hood walks from
+/// <see cref="FromLot"/> to <see cref="ToLot"/>, arriving at <see cref="Tick"/>.
+/// </summary>
+public sealed record ScriptAction(
+    ActionKind Kind, int GangId, int HoodId, int FromLot, int ToLot, int BusinessId,
+    ActionResult Result, string Text,
+    int DefenderGangId = -1, int DefenderHoodId = -1, int CasualtyHoodId = -1, int Tick = 0);

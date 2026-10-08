@@ -61,6 +61,21 @@ public static class AiPlanner
             }
         }
 
+        // Post the best man on the most valuable racket once there are hands to spare.
+        if (hoods.Count >= 5)
+        {
+            var prize = turf.Where(b => b.Racket != RacketKind.None && b.IsOpen).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault();
+            if (prize != null)
+            {
+                var guard = hoods[0];
+                orders.Add(new GuardOrder(g.Id, guard.Id, prize.Id));
+                hoods.Remove(guard);
+            }
+        }
+
+        // Score each target as about ten weeks of income, less the expected cost of losing the man.
+        // Small gangs value their men more and so pick fewer fights.
+        double manCost = (active <= 4 ? 900 : 450) * (1.3 - g.Aggression);
         var taken = new HashSet<int>();
         foreach (var hood in hoods)
         {
@@ -69,24 +84,26 @@ public static class AiPlanner
             foreach (var biz in w.Businesses)
             {
                 if (!biz.IsOpen || biz.ProtectorGangId == g.Id || taken.Contains(biz.Id)) continue;
-                double value = biz.Takings * 0.12 + (biz.Racket != RacketKind.None ? 80 : 0);
+                double value = (biz.Takings * 0.12 + (biz.Racket != RacketKind.None ? 80 : 0)) * 10;
                 double score;
                 if (!biz.IsProtected)
                 {
-                    score = value * Simulation.ExtortChance(hood, biz);
+                    score = value * Simulation.ExtortChance(w, g, hood, biz);
                 }
                 else
                 {
+                    if (hood.Id == g.BossHoodId) continue;
                     var rival = w.GangById(biz.ProtectorGangId);
                     double defence = Simulation.DefenceStrength(w, rival, biz);
                     double edge = (hood.Strength - defence) / 10.0;
                     double win = Math.Clamp(0.5 + edge, 0.05, 0.95);
-                    score = value * win * (0.4 + g.Aggression);
+                    score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost;
                     if (g.Heat > 60) score *= 0.3;
+                    if (rival.IsPlayer && !g.IsPlayer) score *= w.Settings.RivalWariness(w.Week / Content.WeeksPerYear);
                 }
                 if (score > bestScore) { bestScore = score; best = biz; }
             }
-            if (best == null || bestScore < 8) continue;
+            if (best == null || bestScore < 80) continue;
             taken.Add(best.Id);
             orders.Add(new ExtortOrder(g.Id, hood.Id, best.Id));
         }
