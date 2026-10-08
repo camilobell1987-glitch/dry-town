@@ -225,6 +225,16 @@ public sealed class Simulation
         }
     }
 
+    /// <summary>Exact chance an attacker of the given strength beats a defence, given both roll 0 to 6 on top.</summary>
+    public static double TakeoverChance(double attackerStrength, double defence)
+    {
+        int wins = 0;
+        for (int a = 0; a <= 6; a++)
+            for (int d = 0; d <= 6; d++)
+                if (attackerStrength + a > defence + d) wins++;
+        return wins / 49.0;
+    }
+
     /// <summary>
     /// How hard a business is to take. Mostly it's the hood who handles it; the rest of the gang
     /// only helps if it isn't spread thin, so sprawling gangs are easy to pick at around the edges.
