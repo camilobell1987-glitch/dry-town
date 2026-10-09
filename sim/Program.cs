@@ -8,6 +8,7 @@ string mode = args.Length > 0 ? args[0] : "play";
 ulong seed = ulong.Parse(Arg("--seed", "1"));
 int years = int.Parse(Arg("--years", "10"));
 int seeds = int.Parse(Arg("--seeds", "1"));
+var difficulty = Enum.Parse<Difficulty>(Arg("--difficulty", "Normal"), true);
 
 return mode switch
 {
@@ -30,10 +31,10 @@ int Usage()
 
 int Soak()
 {
-    int stalled = 0;
+    int stalled = 0, aliveAt3 = 0, aliveAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
     {
-        var sim = Simulation.New(new WorldSettings { Seed = s });
+        var sim = Simulation.New(new WorldSettings { Seed = s, Difficulty = difficulty });
         for (int week = 0; week < years * Content.WeeksPerYear; week++) sim.AdvanceWeek(playerAutopilot: true);
 
         Console.WriteLine($"--- seed {s}, {years} years ---");
@@ -42,8 +43,12 @@ int Soak()
         Console.WriteLine(report.Stalled ? $"STALLED: {string.Join("; ", report.Problems)}" : "OK: stayed contested every year");
         Console.WriteLine(Reports.Gangs(sim.World));
         if (report.Stalled) stalled++;
+        var samples = sim.Metrics.Samples;
+        if (samples[Math.Min(samples.Count, 3 * Content.WeeksPerYear) - 1].PlayerAlive) aliveAt3++;
+        if (samples[^1].PlayerAlive) aliveAtEnd++;
     }
     Console.WriteLine($"{seeds - stalled}/{seeds} runs stayed contested.");
+    Console.WriteLine($"Your gang on autopilot ({difficulty}): alive after 3 years in {aliveAt3}/{seeds}, after {years} years in {aliveAtEnd}/{seeds}.");
     return stalled == 0 ? 0 : 1;
 }
 

@@ -9,6 +9,9 @@ public sealed record ExtortOrder(int GangId, int HoodId, int BusinessId) : Order
 /// <summary>Open a racket behind a business the gang protects.</summary>
 public sealed record RacketOrder(int GangId, int HoodId, int BusinessId, RacketKind Racket) : Order(GangId);
 
+/// <summary>Station a hood at one of the gang's businesses for the week. He fights anyone who comes for it.</summary>
+public sealed record GuardOrder(int GangId, int HoodId, int BusinessId) : Order(GangId);
+
 /// <summary>Hire a new hood.</summary>
 public sealed record RecruitOrder(int GangId) : Order(GangId);
 

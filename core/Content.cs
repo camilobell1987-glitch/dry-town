@@ -82,6 +82,19 @@ public static class Content
         "Canal", "Halsted", "Mercer", "Larkin", "Foundry", "Orchard", "Tanner", "Vine", "Kessler", "Market",
     };
 
+    public static readonly string[] AvenueNames =
+    {
+        "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Railroad", "Lake",
+    };
+
+    public const int HoursPerWeek = 168;
+
+    /// <summary>Sunday morning: collectors make the rounds.</summary>
+    public const int CollectionTick = 6 * 24 + 10;
+
+    /// <summary>Sunday night: the police and the gangs settle the week's accounts.</summary>
+    public const int ReckoningTick = 6 * 24 + 21;
+
     public static string Label(BusinessKind kind) => kind switch
     {
         BusinessKind.PoolHall => "Pool Hall",

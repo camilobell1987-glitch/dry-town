@@ -39,6 +39,8 @@ public sealed class Director
         {
             _dominantWeeks = 0;
             StirDissent(top);
+            // A gang that owns most of the district has more than one lieutenant eyeing the chair.
+            if (share >= 0.7) StirDissent(top);
             if (living < Content.MaxGangs) Outsiders($"arrived to challenge {top.Name}");
         }
         else if (_quietWeeks >= QuietWeeks)
@@ -72,7 +74,8 @@ public sealed class Director
         var top = _w.LivingGangs.OrderByDescending(g => _w.HoodsOf(g.Id).Count()).FirstOrDefault();
         long cash = Math.Max(2500, (top?.Cash ?? 0) / 8);
         int hoods = Math.Clamp((top == null ? 0 : _w.HoodsOf(top.Id).Count()) * 2 / 3, 5, 12);
-        var gang = _w.FoundGang(isPlayer: false, cash: cash, hoods: hoods);
+        // Outsiders come looking for a fight, not to share.
+        var gang = _w.FoundGang(isPlayer: false, cash: cash, hoods: hoods, aggression: 1.0);
         _w.Log(EventKind.NewGang, gang.Id, $"{gang.Name} {why}.");
     }
 }
