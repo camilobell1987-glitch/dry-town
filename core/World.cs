@@ -2,11 +2,24 @@ namespace DryTown.Core;
 
 public enum Difficulty { Easy, Normal, Hard }
 
+public enum CitySize { Small, Medium, Large }
+
 public sealed class WorldSettings
 {
     public ulong Seed { get; init; } = 1;
-    public int Businesses { get; init; } = 48;
-    public int StartingGangs { get; init; } = 3;
+
+    /// <summary>Small is the first district of five blocks by four; Large is nine by seven with six wards.</summary>
+    public CitySize Size { get; init; } = CitySize.Small;
+
+    /// <summary>Businesses and starting gangs, or 0 to fit the city's size.</summary>
+    public int Businesses { get; init; }
+    public int StartingGangs { get; init; }
+
+    public Content.CityShape Shape => Content.Shape(Size);
+    public int BusinessCount => Businesses > 0 ? Businesses : Shape.Businesses;
+    public int StartingGangCount => StartingGangs > 0 ? StartingGangs : Shape.StartingGangs;
+    public int MaxGangs => Shape.MaxGangs;
+
     public int StartingHoods { get; init; } = 4;
     public long StartingCash { get; init; } = 1500;
     public Difficulty Difficulty { get; init; } = Difficulty.Normal;
@@ -23,6 +36,9 @@ public sealed class WorldSettings
         _ => yearsPlayed < 2 ? 0.3 : 0.7,
     };
 
+    /// <summary>When false, nobody buys aldermen or backs candidates, and the mayor never changes. For comparison runs.</summary>
+    public bool PoliticsEnabled { get; init; } = true;
+
     /// <summary>When true, the rival director seeds new gangs and splits when the district goes quiet.</summary>
     public bool DirectorEnabled { get; init; } = true;
 }
@@ -31,7 +47,7 @@ public sealed class WorldSettings
 public sealed class World
 {
     public WorldSettings Settings { get; }
-    public Rng Rng { get; }
+    public Rng Rng { get; private set; }
     public int Week { get; set; }
 
     /// <summary>Hour of the current week, 0 to 167. Everything logged is stamped with it.</summary>
@@ -46,6 +62,11 @@ public sealed class World
     public List<Hood> Hoods { get; } = new();
     public List<Business> Businesses { get; } = new();
     public List<GameEvent> Events { get; } = new();
+    public List<Crew> Crews { get; } = new();
+
+    /// <summary>The city's wards and their aldermen, and the mayor's office.</summary>
+    public List<Ward> Wards { get; } = new();
+    public CityHall Hall { get; set; } = new() { Mayor = "" };
 
     /// <summary>This week's books per gang, reset at the start of each week.</summary>
     public Dictionary<int, WeekLedger> LastLedger { get; } = new();
@@ -58,6 +79,7 @@ public sealed class World
 
     private int _nextHoodId;
     private int _nextGangId;
+    private int _nextCrewId;
 
     public World(WorldSettings settings)
     {
@@ -80,6 +102,55 @@ public sealed class World
     public IEnumerable<Hood> AvailableHoodsOf(int gangId) => Hoods.Where(h => h.GangId == gangId && h.IsAvailable);
     public IEnumerable<Business> TurfOf(int gangId) => Businesses.Where(b => b.ProtectorGangId == gangId);
 
+    // ---- Crews ----------------------------------------------------------------
+
+    public IEnumerable<Crew> CrewsOf(int gangId) => Crews.Where(c => c.GangId == gangId);
+    public Crew? CrewById(int id) => Crews.FirstOrDefault(c => c.Id == id);
+    public Crew? CrewOfHood(int hoodId) => Crews.FirstOrDefault(c => c.LieutenantHoodId == hoodId || c.MemberIds.Contains(hoodId));
+
+    /// <summary>Make a hood the lieutenant of a new crew. He leaves any crew he was in.</summary>
+    public Crew FormCrew(Hood lieutenant)
+    {
+        LeaveCrew(lieutenant.Id);
+        var crew = new Crew { Id = _nextCrewId++, GangId = lieutenant.GangId, LieutenantHoodId = lieutenant.Id };
+        Crews.Add(crew);
+        return crew;
+    }
+
+    /// <summary>Put a hood under a lieutenant. Returns false if the crew is full or he's in another gang.</summary>
+    public bool JoinCrew(Crew crew, Hood hood)
+    {
+        if (hood.GangId != crew.GangId || crew.MemberIds.Count >= Crew.MaxMembers || crew.LieutenantHoodId == hood.Id) return false;
+        if (crew.MemberIds.Contains(hood.Id)) return true;
+        LeaveCrew(hood.Id);
+        crew.MemberIds.Add(hood.Id);
+        return true;
+    }
+
+    /// <summary>Take a hood out of his crew. A lieutenant leaving breaks his crew up.</summary>
+    public void LeaveCrew(int hoodId)
+    {
+        var crew = CrewOfHood(hoodId);
+        if (crew == null) return;
+        if (crew.LieutenantHoodId == hoodId) Crews.Remove(crew);
+        else crew.MemberIds.Remove(hoodId);
+    }
+
+    /// <summary>Drop men who have died, gone or changed sides; a crew whose lieutenant is lost promotes its best man.</summary>
+    public void TidyCrews()
+    {
+        foreach (var crew in Crews.ToList())
+        {
+            crew.MemberIds.RemoveAll(id => HoodById(id) is var h && (h.GangId != crew.GangId || !h.IsActive));
+            var lt = HoodById(crew.LieutenantHoodId);
+            if (lt.GangId == crew.GangId && lt.IsActive) continue;
+            var next = crew.MemberIds.Select(HoodById).OrderByDescending(h => h.Brains + h.Strength).ThenBy(h => h.Id).FirstOrDefault();
+            if (next == null) { Crews.Remove(crew); continue; }
+            crew.MemberIds.Remove(next.Id);
+            crew.LieutenantHoodId = next.Id;
+        }
+    }
+
     public void Log(EventKind kind, int gangId, string text) => Events.Add(new GameEvent(Week, kind, gangId, text, Tick));
 
     public void Act(ScriptAction action) => Script.Add(action with { Tick = Tick });
@@ -88,6 +159,10 @@ public sealed class World
     public Lot HqOf(Gang g) => Map.LotAt(g.HqLotId);
     public Lot Precinct => Map.Lots.First(l => l.Use == LotUse.Precinct);
 
+    /// <summary>The precinct house closest to a lot: the one whose men answer a call there.</summary>
+    public Lot PrecinctNear(Lot lot) =>
+        Map.Lots.Where(l => l.Use == LotUse.Precinct).OrderBy(l => Map.Distance(l, lot)).ThenBy(l => l.Id).First();
+
     /// <summary>Walking distance in blocks from a gang's headquarters to a business.</summary>
     public double BlocksFromHq(Gang g, Business b) => Map.Distance(HqOf(g), LotOf(b)) / (double)CityMap.StrideX;
 
@@ -95,7 +170,8 @@ public sealed class World
     {
         var world = new World(settings);
         world.GenerateBusinesses();
-        for (int i = 0; i < settings.StartingGangs; i++)
+        Politics.Found(world);
+        for (int i = 0; i < settings.StartingGangCount; i++)
         {
             bool player = i == 0;
             world.FoundGang(player,
@@ -107,16 +183,25 @@ public sealed class World
 
     private void GenerateBusinesses()
     {
-        Map = CityMap.Generate(Rng);
+        var shape = Settings.Shape;
+        Map = CityMap.Generate(Rng, shape.BlocksX, shape.BlocksY);
+        Map.DrawWards(shape.WardsX, shape.WardsY);
 
-        // The precinct house sits near the middle of the district.
-        var precinct = Map.Lots.OrderBy(l => Math.Abs(l.X - CityMap.Width / 2) + Math.Abs(l.Y - CityMap.Height / 2)).ThenBy(l => l.Id).First();
-        precinct.Use = LotUse.Precinct;
+        // Precinct houses sit evenly across the city, the first near the middle.
+        for (int p = 0; p < shape.Precincts; p++)
+        {
+            float fx = shape.Precincts == 1 ? 0.5f : (p + 0.5f) / shape.Precincts;
+            float fy = shape.Precincts == 1 ? 0.5f : p % 2 == 0 ? 0.35f : 0.65f;
+            int cx = (int)(Map.Width * fx), cy = (int)(Map.Height * fy);
+            var precinct = Map.Lots.Where(l => l.Use == LotUse.Empty)
+                .OrderBy(l => Math.Abs(l.X - cx) + Math.Abs(l.Y - cy)).ThenBy(l => l.Id).First();
+            precinct.Use = LotUse.Precinct;
+        }
 
         var free = Map.Lots.Where(l => l.Use == LotUse.Empty).ToList();
         Rng.Shuffle(free);
         var kinds = Enum.GetValues<BusinessKind>();
-        int count = Math.Min(Settings.Businesses, free.Count - 8);
+        int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs);
         for (int i = 0; i < count; i++)
         {
             var lot = free[i];
@@ -184,7 +269,12 @@ public sealed class World
             boss.Loyalty = 100;
         }
         gang.BossHoodId = boss.Id;
-        gang.Name = string.Format(Rng.Pick(Content.GangPatterns), Surname(boss.Name));
+        // Two outfits with one name would confuse the papers: try the other patterns, then the boss's first name.
+        string surname = Surname(boss.Name);
+        var taken = LivingGangs.Where(g => g.Id != gang.Id).Select(g => g.Name).ToHashSet();
+        var patterns = Content.GangPatterns.OrderBy(_ => Rng.NextDouble()).ToList();
+        gang.Name = patterns.Select(p => string.Format(p, surname)).FirstOrDefault(n => !taken.Contains(n))
+                    ?? string.Format(patterns[0], boss.Name.Split(' ')[0] + " " + surname);
 
         for (int i = 1; i < hoods; i++) NewHood(gang.Id, bossQuality: false);
         return gang;
@@ -193,6 +283,7 @@ public sealed class World
     public Hood NewHood(int gangId, bool bossQuality)
     {
         int lo = bossQuality ? 4 : 1, hi = bossQuality ? 9 : 8;
+        int age = bossQuality ? Rng.Range(32, 50) : Rng.Range(18, 40);
         string first = Rng.Pick(Content.FirstNames);
         string last = Rng.Pick(Content.LastNames);
         string name = Rng.Chance(0.3) ? $"{first} \"{Rng.Pick(Content.Nicknames)}\" {last}" : $"{first} {last}";
@@ -208,10 +299,97 @@ public sealed class World
             Loyalty = bossQuality ? 100 : Rng.Range(40, 90),
             Ambition = Rng.Range(10, 90),
             JoinedWeek = Week,
+            BornWeek = Week - age * Content.WeeksPerYear - Rng.Range(0, Content.WeeksPerYear - 1),
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
         return hood;
+    }
+
+    /// <summary>A son or nephew of the boss: young, green, and loyal to the family.</summary>
+    public Hood NewRelative(Gang gang)
+    {
+        var boss = HoodById(gang.BossHoodId);
+        string first = Rng.Pick(Content.FirstNames);
+        string relation = Rng.Chance(0.5) ? "son" : "nephew";
+        var hood = new Hood
+        {
+            Id = _nextHoodId++,
+            Name = $"{first} {Surname(boss.Name)}",
+            GangId = gang.Id,
+            Intimidation = Rng.Range(1, 5),
+            Muscle = Rng.Range(2, 6),
+            Brains = Rng.Range(3, 7),
+            Stealth = Rng.Range(2, 6),
+            Loyalty = 95,
+            Ambition = Rng.Range(20, 60),
+            JoinedWeek = Week,
+            BornWeek = Week - Rng.Range(17, 22) * Content.WeeksPerYear - Rng.Range(0, Content.WeeksPerYear - 1),
+            Family = true,
+        };
+        hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
+        Hoods.Add(hood);
+        Log(EventKind.Family, gang.Id, $"{boss.Name} brought his {relation} {first} into {gang.Name}.");
+        return hood;
+    }
+
+    /// <summary>
+    /// Name the man who takes over. The rest of the outfit notices: the most ambitious man
+    /// passed over takes it badly.
+    /// </summary>
+    public void NameHeir(Gang gang, Hood heir, bool announce = true)
+    {
+        if (heir.GangId != gang.Id || !heir.IsActive || heir.Id == gang.BossHoodId || gang.HeirHoodId == heir.Id) return;
+        gang.HeirHoodId = heir.Id;
+        heir.Loyalty = Math.Max(heir.Loyalty, 70);
+        var passedOver = HoodsOf(gang.Id)
+            .Where(h => h.Id != heir.Id && h.Id != gang.BossHoodId && !h.Family && h.Ambition > 60)
+            .OrderByDescending(h => h.Ambition).ThenBy(h => h.Id).FirstOrDefault();
+        if (passedOver != null) passedOver.Loyalty = Math.Max(0, passedOver.Loyalty - 10);
+        if (announce) Log(EventKind.Heir, gang.Id, $"{HoodById(gang.BossHoodId).Name} named {heir.Name} to take over {gang.Name} after him.");
+    }
+
+    // ---- Saving ---------------------------------------------------------------
+
+    public SaveData ToSave() => new()
+    {
+        Settings = Settings,
+        RngState = Rng.State,
+        Week = Week,
+        NextHoodId = _nextHoodId,
+        NextGangId = _nextGangId,
+        NextCrewId = _nextCrewId,
+        StreetNames = Map.StreetNames,
+        AvenueNames = Map.AvenueNames,
+        BlocksX = Map.BlocksX,
+        BlocksY = Map.BlocksY,
+        WardsX = Map.WardsX,
+        WardsY = Map.WardsY,
+        Wards = Wards,
+        Hall = Hall,
+        Lots = Map.Lots,
+        Gangs = Gangs,
+        Hoods = Hoods,
+        Businesses = Businesses,
+        Crews = Crews,
+        Events = Events,
+        LastLedger = LastLedger,
+    };
+
+    public static World FromSave(SaveData d)
+    {
+        var w = new World(d.Settings) { Week = d.Week, _nextHoodId = d.NextHoodId, _nextGangId = d.NextGangId, _nextCrewId = d.NextCrewId };
+        w.Rng = Rng.FromState(d.RngState);
+        w.Map = CityMap.FromSave(d.Lots, d.StreetNames, d.AvenueNames, d.BlocksX, d.BlocksY, d.WardsX, d.WardsY);
+        w.Wards.AddRange(d.Wards);
+        if (d.Hall != null) w.Hall = d.Hall;
+        w.Gangs.AddRange(d.Gangs);
+        w.Hoods.AddRange(d.Hoods);
+        w.Businesses.AddRange(d.Businesses);
+        w.Crews.AddRange(d.Crews);
+        w.Events.AddRange(d.Events);
+        foreach (var (id, ledger) in d.LastLedger) w.LastLedger[id] = ledger;
+        return w;
     }
 
     public static string Surname(string fullName) => fullName.Split(' ').Last();

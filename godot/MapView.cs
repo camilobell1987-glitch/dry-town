@@ -13,10 +13,18 @@ public partial class MapView : Control
 {
     public event Action<int>? BusinessClicked;
 
+    /// <summary>Raised when a ward is clicked while wards are shown.</summary>
+    public event Action<int>? WardClicked;
+
     /// <summary>Raised once per script action as the live clock passes the moment it happens.</summary>
     public event Action<ScriptAction>? ActionHappened;
 
     public World? World { get; set; }
+
+    private static readonly CityMap NoMap = new();
+
+    /// <summary>The city being drawn; its size sets the grid.</summary>
+    private CityMap Map => World?.Map ?? NoMap;
     public int SelectedBusiness { get; set; } = -1;
 
     public bool Live { get; private set; }
@@ -26,7 +34,6 @@ public partial class MapView : Control
 
     /// <summary>During replay, who each business answers to as of the live clock.</summary>
     private Dictionary<int, (int Gang, RacketKind Racket)> _shown = new();
-    private int _nextAction;
     private List<Actor> _actors = new();
 
     /// <summary>Seconds of real time, for scenery that moves whether or not the week is running.</summary>
@@ -36,9 +43,9 @@ public partial class MapView : Control
     private Vector2 _pan;
     private bool _dragging;
 
-    private float FitTile => Mathf.Floor(Mathf.Min(Size.X / (CityMap.Width + 0.6f), Size.Y / (CityMap.Height + 0.6f)));
+    private float FitTile => Mathf.Floor(Mathf.Min(Size.X / (Map.Width + 0.6f), Size.Y / (Map.Height + 0.6f)));
     private float Tile => FitTile * _zoom;
-    private Vector2 Origin => (Size - new Vector2(CityMap.Width, CityMap.Height) * Tile) / 2 + _pan;
+    private Vector2 Origin => (Size - new Vector2(Map.Width, Map.Height) * Tile) / 2 + _pan;
 
     public override void _Ready()
     {
@@ -46,7 +53,6 @@ public partial class MapView : Control
         ClipContents = true;
         TooltipText = " "; // enables _GetTooltip
         Resized += QueueRedraw;
-        BuildTraffic();
     }
 
     public override void _Process(double delta)
@@ -55,13 +61,28 @@ public partial class MapView : Control
         QueueRedraw();
     }
 
+    /// <summary>Big cities draw small when fitted, so they can be zoomed in further.</summary>
+    private float MaxZoom => Mathf.Max(4, Map.Width / 6f);
+
     /// <summary>Zoom about a point on screen, keeping whatever is under it in place.</summary>
     private void ZoomAt(Vector2 screen, float factor)
     {
         var tileUnder = (screen - Origin) / Tile;
-        _zoom = Mathf.Clamp(_zoom * factor, 1, 4);
+        _zoom = Mathf.Clamp(_zoom * factor, 1, MaxZoom);
         if (_zoom <= 1.001f) { _pan = Vector2.Zero; return; }
         _pan += screen - (Origin + tileUnder * Tile);
+        ClampPan();
+    }
+
+    /// <summary>Fit the whole city, or on a big one, start zoomed in on a lot (usually your headquarters).</summary>
+    public void ResetView(Lot? focus)
+    {
+        _zoom = 1;
+        _pan = Vector2.Zero;
+        if (focus == null || Map.BlocksX <= 5 || Size.X <= 0) return;
+        ZoomAt(Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile, 2);
+        // Bring the lot towards the middle of the view.
+        _pan += Size / 2 - (Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile);
         ClampPan();
     }
 
@@ -70,7 +91,7 @@ public partial class MapView : Control
 
     private void ClampPan()
     {
-        var excess = (new Vector2(CityMap.Width, CityMap.Height) * Tile - Size) / 2 + Vector2.One * Tile;
+        var excess = (new Vector2(Map.Width, Map.Height) * Tile - Size) / 2 + Vector2.One * Tile;
         excess = excess.Max(Vector2.Zero);
         _pan = _pan.Clamp(-excess, excess);
     }
@@ -79,37 +100,63 @@ public partial class MapView : Control
 
     private sealed record Actor(ScriptAction Action, List<Vector2> Path, float Depart, float Arrive, float Leave, float Home, Color Colour, int Order);
 
-    /// <summary>Start replaying the week that just ran. The map shows the state at the start of that week until each change happens.</summary>
-    public void BeginReplay(Dictionary<int, (int Gang, RacketKind Racket)> startOfWeek)
+    /// <summary>The simulation running the week, which the map steps forward as the clock moves.</summary>
+    private Simulation? _sim;
+
+    private readonly List<bool> _fired = new();
+    private int _collectIndex;
+
+    /// <summary>The live clock hands the week over to Sunday's reckoning a little before collection, so collectors set out on time.</summary>
+    public const int FinishTick = Content.CollectionTick - 3;
+
+    /// <summary>
+    /// Start the live week. The map shows the state at the start of the week until each change
+    /// happens, and runs the simulation forward hour by hour as the clock moves.
+    /// </summary>
+    public void BeginReplay(Dictionary<int, (int Gang, RacketKind Racket)> startOfWeek, Simulation sim)
     {
         if (World == null) return;
+        _sim = sim;
         _shown = new Dictionary<int, (int, RacketKind)>(startOfWeek);
         Live = true;
         Clock = 0;
-        _nextAction = 0;
         _actors = new List<Actor>();
-        int collectIndex = 0;
-        for (int i = 0; i < World.Script.Count; i++)
+        _fired.Clear();
+        _collectIndex = 0;
+        Step();
+        QueueRedraw();
+    }
+
+    private List<Vector2> StreetPath(int fromLot, int toLot)
+    {
+        var from = World!.Map.LotAt(fromLot);
+        var to = World.Map.LotAt(toLot);
+        var path = World.Map.Path(from, to).Select(p => new Vector2(p.X + 0.5f, p.Y + 0.5f)).ToList();
+        // Men leave from one front door and stand at another, out on the pavement.
+        path[0] = Doorstep(from);
+        path[^1] = Doorstep(to);
+        return path;
+    }
+
+    /// <summary>Turn any new lines of the week's script into people on the street.</summary>
+    private void SyncScript()
+    {
+        for (int i = _actors.Count; i < World!.Script.Count; i++)
         {
             var a = World.Script[i];
-            var from = World.Map.LotAt(a.FromLot);
-            var to = World.Map.LotAt(a.ToLot);
-            var path = World.Map.Path(from, to).Select(p => new Vector2(p.X + 0.5f, p.Y + 0.5f)).ToList();
-            // Men leave from one front door and stand at another, out on the pavement.
-            path[0] = Doorstep(from);
-            path[^1] = Doorstep(to);
-            float hours = Mathf.Clamp(World.Map.Distance(from, to) / 7f, 0.75f, 3f);
+            var path = StreetPath(a.FromLot, a.ToLot);
+            float hours = Simulation.WalkHours(World, a.FromLot, a.ToLot);
             float arrive = a.Tick;
             // Sunday collectors set out in waves rather than all at once.
-            if (a.Kind == ActionKind.Collect) arrive += (collectIndex++ % 10) * 0.6f;
+            if (a.Kind == ActionKind.Collect) arrive += (_collectIndex++ % 10) * 0.6f;
             float linger = a.Kind switch { ActionKind.Takeover => 1.5f, ActionKind.Raid => 2f, ActionKind.Collect => 0.4f, _ => 1f };
             float leave = a.Kind == ActionKind.Guard ? Content.HoursPerWeek : arrive + linger;
-            bool comesHome = a.Result is not (ActionResult.Killed or ActionResult.Arrested) && a.CasualtyHoodId != a.HoodId;
+            bool comesHome = (a.Result is not (ActionResult.Killed or ActionResult.Arrested) && a.CasualtyHoodId != a.HoodId) || a.Backup.Count > 0;
             float home = comesHome ? leave + hours : leave;
             var colour = a.Kind == ActionKind.Raid ? Palette.Police : Palette.Gang(World, a.GangId);
             _actors.Add(new Actor(a, path, arrive - hours, arrive, leave, home, colour, i));
+            _fired.Add(false);
         }
-        QueueRedraw();
     }
 
     private static Vector2 Doorstep(Lot lot) => new(lot.X + 0.5f, lot.FrontY < lot.Y ? lot.Y - 0.1f : lot.Y + 1.1f);
@@ -117,7 +164,9 @@ public partial class MapView : Control
     public void EndReplay()
     {
         Live = false;
+        _sim = null;
         _actors.Clear();
+        _fired.Clear();
         QueueRedraw();
     }
 
@@ -126,27 +175,41 @@ public partial class MapView : Control
     {
         if (!Live) return;
         Clock = Mathf.Min(Clock + hours, Content.HoursPerWeek);
-        while (_nextAction < _actors.Count && ArrivalOf(_nextAction) <= Clock)
+        Step();
+        QueueRedraw();
+    }
+
+    /// <summary>Run the simulation up to the clock, then show whatever has happened by now.</summary>
+    private void Step()
+    {
+        if (_sim is { WeekRunning: true })
         {
-            var a = _actors[_nextAction].Action;
+            if (Clock >= FinishTick) _sim.FinishWeek();
+            else _sim.RunUntil((int)Clock);
+        }
+        SyncScript();
+        for (int i = 0; i < _actors.Count; i++)
+        {
+            if (_fired[i] || _actors[i].Arrive > Clock) continue;
+            _fired[i] = true;
+            var a = _actors[i].Action;
             if (a.BusinessId >= 0 && _shown.TryGetValue(a.BusinessId, out var was))
             {
                 _shown[a.BusinessId] = a switch
                 {
                     { Kind: ActionKind.Extort, Result: ActionResult.Success } => (a.GangId, was.Racket),
                     { Kind: ActionKind.Takeover, Result: ActionResult.Won } => (a.GangId, was.Racket),
-                    { Kind: ActionKind.Racket, Result: ActionResult.Success } => (was.Gang, World.BusinessById(a.BusinessId).Racket is var k and not RacketKind.None ? k : RacketKind.Numbers),
+                    { Kind: ActionKind.Racket, Result: ActionResult.Success } => (was.Gang, World!.BusinessById(a.BusinessId).Racket is var k and not RacketKind.None ? k : RacketKind.Numbers),
                     { Kind: ActionKind.Raid } => (was.Gang, RacketKind.None),
                     _ => was,
                 };
             }
             ActionHappened?.Invoke(a);
-            _nextAction++;
         }
-        QueueRedraw();
     }
 
-    private float ArrivalOf(int index) => _actors[index].Arrive;
+    /// <summary>Who answers to whom as the live map shows it, which may run behind the simulation.</summary>
+    public int ShownProtector(Business b) => ShownState(b).Gang;
 
     public bool ReplayFinished => Live && Clock >= Content.HoursPerWeek;
 
@@ -165,9 +228,11 @@ public partial class MapView : Control
             if (_dragging) { _pan += motion.Relative; ClampPan(); }
             int lot = LotUnder(motion.Position);
             if (lot != _hoverLot) { _hoverLot = lot; QueueRedraw(); }
+            HoverWard = ShowWards ? WardAtTile((motion.Position - Origin) / Tile) : -1;
         }
         else if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } click)
         {
+            if (ShowWards && WardAtTile((click.Position - Origin) / Tile) is int ward and >= 0) WardClicked?.Invoke(ward);
             int lotId = LotUnder(click.Position);
             if (lotId >= 0 && World.Map.LotAt(lotId).BusinessId is int biz and >= 0)
             {
@@ -199,15 +264,23 @@ public partial class MapView : Control
                 string owner = b.IsProtected ? World.GangById(b.ProtectorGangId).Name : "Nobody's paying anyone";
                 string racket = b.Racket != RacketKind.None ? $"\nBack room: {Content.Rackets[b.Racket].Label}" : "";
                 string shut = b.IsOpen ? "" : $"\nClosed by police for {b.ShutWeeks} more weeks";
-                return $"{b.Name}\nTakes ${b.Takings} a week · owner toughness {b.Toughness}/10\n{owner}{racket}{shut}";
+                return $"{b.Name}\nTakes ${b.Takings} a week · owner toughness {b.Toughness}/10\n{owner}{racket}{shut}{WardLine(lot)}";
             case LotUse.Headquarters:
                 var g = World.Gangs.First(x => x.Id == lot.GangId);
                 return $"Headquarters of {g.Name}";
             case LotUse.Precinct:
-                return "Precinct house";
+                return "Precinct house" + WardLine(lot);
             default:
                 return "";
         }
+    }
+
+    private string WardLine(Lot lot)
+    {
+        if (World == null || lot.WardId >= World.Wards.Count) return "";
+        var ward = World.Wards[lot.WardId];
+        string whose = ward.Reformer ? "a reformer" : ward.OwnerGangId >= 0 ? $"on {World.GangById(ward.OwnerGangId).Name}'s payroll" : "a party man";
+        return $"\n{ward.Name}: Alderman {ward.Alderman}, {whose}";
     }
 
     // ---- Drawing --------------------------------------------------------------
@@ -231,6 +304,7 @@ public partial class MapView : Control
         DrawPassersBy();
         DrawNight(night);
         foreach (var lot in w.Map.Lots) DrawLotOutline(lot);
+        DrawWards(font);
 
         if (Live) DrawActors(font);
     }
@@ -379,8 +453,12 @@ public partial class MapView : Control
                     Star(pos.Lerp(defPos, Hash((int)(_anim * 8), a.HoodId) < 0.5f ? 0.3f : 0.7f), radius * 0.7f, new Color("ffe28a"), 6, 0.4f);
             }
 
+            // Backup walks a step behind the man in front, and fans out round him on the job.
+            int backup = a.Backup.Count - (now >= actor.Arrive && a.CasualtyHoodId >= 0 && a.Backup.Contains(a.CasualtyHoodId) ? 1 : 0);
+            DrawBackup(pos, ahead, radius, actor.Colour, backup, walking);
+
             bool fallen = a.CasualtyHoodId >= 0 && a.CasualtyHoodId == a.HoodId && now >= actor.Arrive;
-            if (fallen) continue; // drawn below as a cross
+            if (fallen || (now > actor.Leave && a.Result is ActionResult.Killed or ActionResult.Arrested && a.CasualtyHoodId == a.HoodId)) continue; // drawn below as a cross
 
             if (a.Kind == ActionKind.Raid)
                 DrawFigure(pos, ahead, radius, Palette.Police, new Color("1b2a4a"), Palette.Police.Lightened(0.3f), walking);
@@ -388,6 +466,8 @@ public partial class MapView : Control
                 DrawFigure(pos, ahead, radius, actor.Colour, new Color("1c1a19"), actor.Colour.Lightened(0.25f), walking);
             if (a.Kind == ActionKind.Guard && atScene) DrawArc(pos, radius + 3, 0, Mathf.Tau, 16, actor.Colour with { A = 0.6f }, 1.5f);
         }
+
+        DrawOnTheirWay(now, o, t);
 
         // Where someone died this week, a cross stays on the pavement.
         foreach (var actor in _actors)
@@ -399,6 +479,42 @@ public partial class MapView : Control
             float s = t * 0.14f;
             DrawLine(c - new Vector2(s, s), c + new Vector2(s, s), Palette.Bad, 2.5f);
             DrawLine(c - new Vector2(s, -s), c + new Vector2(s, -s), Palette.Bad, 2.5f);
+        }
+    }
+
+    private void DrawBackup(Vector2 pos, Vector2 ahead, float radius, Color colour, int count, bool walking)
+    {
+        var back = ahead.LengthSquared() > 0.0001f ? -ahead.Normalized() : Vector2.Down;
+        for (int i = 0; i < count; i++)
+        {
+            var at = walking
+                ? pos + back * radius * 1.7f * (i + 1) + back.Orthogonal() * radius * 0.5f * (i % 2 == 0 ? 1 : -1)
+                : pos + back.Rotated(Mathf.Pi / 2 + i * 1.1f - 1.1f) * radius * 1.9f;
+            DrawFigure(at, ahead, radius * 0.92f, colour, new Color("1c1a19"), colour.Lightened(0.25f), walking);
+        }
+    }
+
+    /// <summary>Men already on their way to a job that hasn't happened yet: rivals' as well as yours.</summary>
+    private void DrawOnTheirWay(float now, Vector2 o, float t)
+    {
+        if (_sim is not { WeekRunning: true }) return;
+        foreach (var job in _sim.Upcoming)
+        {
+            if (job.Order is not (ExtortOrder or GuardOrder or RacketOrder)) continue;
+            var gang = World!.GangById(job.GangId);
+            int bizId = job.Order switch { ExtortOrder e => e.BusinessId, GuardOrder g => g.BusinessId, RacketOrder r => r.BusinessId, _ => -1 };
+            int toLot = World.BusinessById(bizId).LotId;
+            float hours = Simulation.WalkHours(World, gang.HqLotId, toLot);
+            if (now < job.Tick - hours || now >= job.Tick) continue;
+            var path = StreetPath(gang.HqLotId, toLot);
+            float f = (now - (job.Tick - hours)) / hours;
+            var at = Along(path, f);
+            var pos = o + at * t;
+            var ahead = Along(path, f + 0.02f) - at;
+            float radius = Mathf.Max(5.5f, t * 0.24f);
+            var colour = Palette.Gang(World, gang.Id);
+            DrawBackup(pos, ahead, radius, colour, Simulation.TeamOf(job.Order).Count() - 1, true);
+            DrawFigure(pos, ahead, radius, colour, new Color("1c1a19"), colour.Lightened(0.25f), true);
         }
     }
 

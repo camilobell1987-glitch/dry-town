@@ -27,6 +27,14 @@ public sealed class Hood
     public int JailWeeks { get; set; }
     public int JoinedWeek { get; set; }
 
+    /// <summary>The game week he was born, counted from the start of 1920, so usually negative.</summary>
+    public int BornWeek { get; set; }
+
+    /// <summary>Family of the boss who brought him in: they start green and loyal.</summary>
+    public bool Family { get; set; }
+
+    public int Age(int week) => (week - BornWeek) / Content.WeeksPerYear;
+
     public bool IsAvailable => State == HoodState.Free;
     public bool IsActive => State is HoodState.Free or HoodState.Jailed;
     public int Strength => Intimidation + Muscle;
@@ -80,7 +88,32 @@ public sealed class Gang
 
     public int ConsecutiveUnpaidWeeks { get; set; }
 
+    /// <summary>Who takes over when the boss dies or goes away for a long stretch, if he's still around and willing.</summary>
+    public int HeirHoodId { get; set; } = -1;
+
+    /// <summary>The week the gang last brought a relative into the business.</summary>
+    public int LastFamilyWeek { get; set; } = -1000;
+
     public int HqLotId { get; set; } = -1;
+}
+
+/// <summary>
+/// A lieutenant and the men who answer to him. A crew can be sent as one team: it hits harder
+/// and guards better than one man, but every member is tied up for the week. Lieutenants set
+/// the mood of their crew, and an ambitious one who breaks away takes his crew with him.
+/// </summary>
+public sealed class Crew
+{
+    public const int MaxMembers = 3;
+
+    public int Id { get; init; }
+    public int GangId { get; set; }
+    public int LieutenantHoodId { get; set; }
+
+    /// <summary>The men under the lieutenant, not counting him.</summary>
+    public List<int> MemberIds { get; init; } = new();
+
+    public IEnumerable<int> Everyone => MemberIds.Prepend(LieutenantHoodId);
 }
 
 public sealed class WeekLedger
@@ -97,7 +130,7 @@ public enum EventKind
 {
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
-    Succession, Bribe, Era, Lapsed,
+    Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);
@@ -127,4 +160,8 @@ public enum ActionResult { None, Success, Failed, Won, Lost, BackedOff, Killed, 
 public sealed record ScriptAction(
     ActionKind Kind, int GangId, int HoodId, int FromLot, int ToLot, int BusinessId,
     ActionResult Result, string Text,
-    int DefenderGangId = -1, int DefenderHoodId = -1, int CasualtyHoodId = -1, int Tick = 0);
+    int DefenderGangId = -1, int DefenderHoodId = -1, int CasualtyHoodId = -1, int Tick = 0)
+{
+    /// <summary>Men who went along as backup, not counting <see cref="HoodId"/>.</summary>
+    public IReadOnlyList<int> Backup { get; init; } = Array.Empty<int>();
+}

@@ -115,53 +115,53 @@ public partial class MapView
 
     private void DrawGround()
     {
-        var full = R(0, 0, CityMap.Width, CityMap.Height);
+        var full = R(0, 0, Map.Width, Map.Height);
         DrawRect(full.Grow(_t * 0.25f), Pavement.Darkened(0.3f));
         DrawRect(full, Asphalt);
 
         // Patches of worn tarmac so the streets aren't one flat colour.
         for (int i = 0; i < 70; i++)
         {
-            float x = Hash(i, 1) * CityMap.Width, y = Hash(i, 2) * CityMap.Height;
+            float x = Hash(i, 1) * Map.Width, y = Hash(i, 2) * Map.Height;
             if (!CityMap.IsRoad((int)x, (int)y)) continue;
             Ellipse(P(x, y), new Vector2(0.3f + Hash(i, 3) * 0.3f, 0.12f + Hash(i, 4) * 0.12f) * _t, AsphaltWorn with { A = 0.6f });
         }
 
         // Centre lines, broken at the crossings.
         float dash = 0.32f, gap = 0.28f, lw = Mathf.Max(1, _t * 0.035f);
-        for (int row = 0; row <= CityMap.BlocksY; row++)
+        for (int row = 0; row <= Map.BlocksY; row++)
         {
             float y = row * CityMap.StrideY + 0.5f;
-            for (int bx = 0; bx < CityMap.BlocksX; bx++)
+            for (int bx = 0; bx < Map.BlocksX; bx++)
                 for (float x = bx * CityMap.StrideX + 1.25f; x < bx * CityMap.StrideX + CityMap.StrideX - 0.25f; x += dash + gap)
                     DrawLine(P(x, y), P(Mathf.Min(x + dash, bx * CityMap.StrideX + CityMap.StrideX - 0.25f), y), RoadPaint with { A = 0.45f }, lw);
         }
-        for (int col = 0; col <= CityMap.BlocksX; col++)
+        for (int col = 0; col <= Map.BlocksX; col++)
         {
             float x = col * CityMap.StrideX + 0.5f;
-            for (int by = 0; by < CityMap.BlocksY; by++)
+            for (int by = 0; by < Map.BlocksY; by++)
                 for (float y = by * CityMap.StrideY + 1.25f; y < by * CityMap.StrideY + CityMap.StrideY - 0.25f; y += dash + gap)
                     DrawLine(P(x, y), P(x, Mathf.Min(y + dash, by * CityMap.StrideY + CityMap.StrideY - 0.25f)), RoadPaint with { A = 0.45f }, lw);
         }
 
         // Zebra crossings on each side of every junction.
-        for (int row = 0; row <= CityMap.BlocksY; row++)
-        for (int col = 0; col <= CityMap.BlocksX; col++)
+        for (int row = 0; row <= Map.BlocksY; row++)
+        for (int col = 0; col <= Map.BlocksX; col++)
         {
             float cx = col * CityMap.StrideX, cy = row * CityMap.StrideY;
             for (int s = 0; s < 5; s++)
             {
                 float k = 0.12f + s * 0.17f;
                 if (col > 0) DrawRect(R(cx - 0.16f, cy + k, 0.12f, 0.08f), RoadPaint with { A = 0.35f });
-                if (col < CityMap.BlocksX) DrawRect(R(cx + 1.04f, cy + k, 0.12f, 0.08f), RoadPaint with { A = 0.35f });
+                if (col < Map.BlocksX) DrawRect(R(cx + 1.04f, cy + k, 0.12f, 0.08f), RoadPaint with { A = 0.35f });
                 if (row > 0) DrawRect(R(cx + k, cy - 0.16f, 0.08f, 0.12f), RoadPaint with { A = 0.35f });
-                if (row < CityMap.BlocksY) DrawRect(R(cx + k, cy + 1.04f, 0.08f, 0.12f), RoadPaint with { A = 0.35f });
+                if (row < Map.BlocksY) DrawRect(R(cx + k, cy + 1.04f, 0.08f, 0.12f), RoadPaint with { A = 0.35f });
             }
         }
 
         // Pavements round each block, with a kerb edge and paving joints.
-        for (int by = 0; by < CityMap.BlocksY; by++)
-        for (int bx = 0; bx < CityMap.BlocksX; bx++)
+        for (int by = 0; by < Map.BlocksY; by++)
+        for (int bx = 0; bx < Map.BlocksX; bx++)
         {
             var block = BlockRect(bx, by);
             var pave = block.Grow(_t * 0.2f);
@@ -181,8 +181,8 @@ public partial class MapView
 
     private IEnumerable<Vector2> LampPosts()
     {
-        for (int by = 0; by < CityMap.BlocksY; by++)
-        for (int bx = 0; bx < CityMap.BlocksX; bx++)
+        for (int by = 0; by < Map.BlocksY; by++)
+        for (int bx = 0; bx < Map.BlocksX; bx++)
         {
             float x0 = bx * CityMap.StrideX + 1 - 0.1f, x1 = x0 + CityMap.LotsPerBlockX + 0.2f;
             float y0 = by * CityMap.StrideY + 1 - 0.1f, y1 = y0 + CityMap.LotsPerBlockY + 0.2f;
@@ -211,14 +211,14 @@ public partial class MapView
         for (int i = 0; i < w.Map.StreetNames.Length; i++)
         {
             float y = i * CityMap.StrideY + 0.5f;
-            for (int bx = 0; bx < CityMap.BlocksX; bx += 2)
+            for (int bx = 0; bx < Map.BlocksX; bx += 2)
                 DrawString(font, P(bx * CityMap.StrideX + 1.3f, y) + new Vector2(0, size * 0.35f),
                     $"{w.Map.StreetNames[i].ToUpperInvariant()} ST", HorizontalAlignment.Left, -1, size, ink);
         }
         for (int i = 0; i < w.Map.AvenueNames.Length; i++)
         {
             float x = i * CityMap.StrideX + 0.5f;
-            for (int by = 1; by < CityMap.BlocksY; by += 2)
+            for (int by = 1; by < Map.BlocksY; by += 2)
             {
                 DrawSetTransform(P(x, by * CityMap.StrideY + CityMap.StrideY - 0.3f) + new Vector2(size * 0.35f, 0), -Mathf.Pi / 2);
                 DrawString(font, Vector2.Zero, $"{w.Map.AvenueNames[i].ToUpperInvariant()} AVE", HorizontalAlignment.Left, -1, size, ink);
@@ -562,13 +562,17 @@ public partial class MapView
 
     private List<Traffic> _traffic = new();
 
+    private CityMap? _trafficFor;
+
     private void BuildTraffic()
     {
+        _trafficFor = Map;
         _traffic = new List<Traffic>();
-        for (int i = 0; i < 14; i++)
+        int cars = 14 * (Map.BlocksX * Map.BlocksY) / 20;
+        for (int i = 0; i < cars; i++)
         {
             bool horizontal = Hash(i, 200) < 0.6f;
-            int line = (int)(Hash(i, 201) * ((horizontal ? CityMap.BlocksY : CityMap.BlocksX) + 1));
+            int line = (int)(Hash(i, 201) * ((horizontal ? Map.BlocksY : Map.BlocksX) + 1));
             int heading = Hash(i, 202) < 0.5f ? 1 : -1;
             _traffic.Add(new Traffic(horizontal, line, heading, 0.6f + Hash(i, 203) * 0.7f, Hash(i, 204) * 40, CarPaint[(int)(Hash(i, 205) * CarPaint.Length)]));
         }
@@ -576,16 +580,17 @@ public partial class MapView
 
     private void DrawTraffic(float night)
     {
+        if (_trafficFor != Map) BuildTraffic();
         foreach (var car in _traffic)
         {
-            float length = car.Horizontal ? CityMap.Width : CityMap.Height;
+            float length = car.Horizontal ? Map.Width : Map.Height;
             float pos = ((car.Phase + _anim * car.Speed) % (length + 2)) - 1;
             if (car.Heading < 0) pos = length - pos;
             // Keep to the right: eastbound and southbound in the lower or left lane.
             float lane = car.Horizontal ? car.Line * CityMap.StrideY + 0.5f + 0.2f * car.Heading
                                         : car.Line * CityMap.StrideX + 0.5f - 0.2f * car.Heading;
             var centre = car.Horizontal ? new Vector2(pos, lane) : new Vector2(lane, pos);
-            if (centre.X < 0.2f || centre.X > CityMap.Width - 0.2f || centre.Y < 0.2f || centre.Y > CityMap.Height - 0.2f) continue;
+            if (centre.X < 0.2f || centre.X > Map.Width - 0.2f || centre.Y < 0.2f || centre.Y > Map.Height - 0.2f) continue;
             DrawCar(centre, car.Horizontal, car.Paint, night, 0.9f, heading: car.Heading);
         }
     }
@@ -594,9 +599,9 @@ public partial class MapView
     private void DrawPassersBy()
     {
         var coats = new[] { new Color("6a6258"), new Color("4e4a46"), new Color("7a6a58"), new Color("5a5f66"), new Color("8a7a66") };
-        for (int i = 0; i < 26; i++)
+        for (int i = 0; i < 26 * Map.BlocksX * Map.BlocksY / 20; i++)
         {
-            int bx = (int)(Hash(i, 300) * CityMap.BlocksX), by = (int)(Hash(i, 301) * CityMap.BlocksY);
+            int bx = (int)(Hash(i, 300) * Map.BlocksX), by = (int)(Hash(i, 301) * Map.BlocksY);
             float x0 = bx * CityMap.StrideX + 1 - 0.11f, y0 = by * CityMap.StrideY + 1 - 0.11f;
             float w = CityMap.LotsPerBlockX + 0.22f, h = CityMap.LotsPerBlockY + 0.22f;
             float perimeter = 2 * (w + h);
@@ -620,7 +625,7 @@ public partial class MapView
     private void DrawNight(float night)
     {
         if (night <= 0.01f) return;
-        DrawRect(R(0, 0, CityMap.Width, CityMap.Height).Grow(_t * 0.25f), NightTint with { A = 0.55f * night });
+        DrawRect(R(0, 0, Map.Width, Map.Height).Grow(_t * 0.25f), NightTint with { A = 0.55f * night });
 
         foreach (var l in LampPosts()) Glow(P(l.X, l.Y), _t * 0.5f, Lamplight, night * 0.9f);
 

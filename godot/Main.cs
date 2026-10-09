@@ -5,8 +5,8 @@ using DryTown.Core;
 using Godot;
 
 /// <summary>
-/// Phase 2 screen. Plan the week on the map and the side panel, press End week, and watch
-/// the week play out on the streets before the Sunday report.
+/// The game screen. Plan the week on the map and the side panel, press End week, and watch
+/// the week play out on the streets before the Sunday report. You can step in mid-week.
 /// </summary>
 public partial class Main : Control
 {
@@ -25,7 +25,14 @@ public partial class Main : Control
     private readonly List<Button> _speedButtons = new();
     private RichTextLabel _ticker = null!;
     private TabContainer _tabs = null!;
-    private VBoxContainer _businessPanel = null!, _ordersPanel = null!;
+    private VBoxContainer _businessPanel = null!, _ordersPanel = null!, _crewsPanel = null!, _hallPanel = null!;
+    private int _selectedWard;
+
+    /// <summary>The size of city a new game starts in.</summary>
+    private CitySize _citySize = CitySize.Large;
+    private MenuButton _gameMenu = null!;
+    private Button _soundButton = null!;
+    private ulong _lastCashSound;
     private Tree _menTree = null!, _gangsTree = null!;
     private RichTextLabel _news = null!, _console = null!;
     private LineEdit _consoleInput = null!;
@@ -37,8 +44,12 @@ public partial class Main : Control
     public override void _Ready()
     {
         Theme = BuildTheme();
+        AddChild(new Audio());
         BuildLayout();
-        NewGame(1920UL + (ulong)GD.Randi() % 100000);
+        // Carry on from the last autosave; the city is meant to go on and on.
+        if (OS.GetCmdlineUserArgs().Length > 0 || !FileAccess.FileExists(SlotPath(0)) || !LoadGame(0))
+            NewGame(1920UL + (ulong)GD.Randi() % 100000);
+        Audio.Instance?.StartLoops();
         RunCommandLine();
     }
 
@@ -47,9 +58,11 @@ public partial class Main : Control
     private void NewGame(ulong seed)
     {
         Palette.Reset();
-        _shell = new CommandShell(Simulation.New(new WorldSettings { Seed = seed }));
+        _shell = new CommandShell(Simulation.New(new WorldSettings { Seed = seed, Size = _citySize }));
         _map.World = W;
         _map.SelectedBusiness = -1;
+        _selectedWard = W.HqOf(W.Player).WardId;
+        _map.ResetView(W.HqOf(W.Player));
         _ticker.Clear();
         _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]You run {W.Player.Name} out of a back room on {W.Map.StreetOf(W.HqOf(W.Player))} St. " +
                            "Click a business on the map to give orders, or press Plan for me. Then End week.[/color]\n");
@@ -57,16 +70,21 @@ public partial class Main : Control
         RefreshAll();
     }
 
+    private int _bossAtStartOfWeek = -1;
+
     private void EndWeek()
     {
-        if (_map.Live) return;
+        if (_map.Live || !W.Player.Alive) return;
+        _bossAtStartOfWeek = W.Player.BossHoodId;
         var snapshot = W.Businesses.ToDictionary(b => b.Id, b => (b.ProtectorGangId, b.Racket));
         _replayWeek = W.Week;
-        _shell.EndWeek();
         _ticker.Clear();
-        _map.BeginReplay(snapshot);
-        _playing = true;
+        _shell.StartWeek();
         SetLive(true);
+        _map.BeginReplay(snapshot, _shell.Sim);
+        _playing = true;
+        Audio.Instance?.Play("horn", 0.35f);
+        RefreshAll();
     }
 
     private void FinishReplay()
@@ -74,10 +92,15 @@ public partial class Main : Control
         _map.EndReplay();
         _playing = false;
         SetLive(false);
-        foreach (var e in W.Events.Where(e => e.Week == _replayWeek && e.Tick >= Content.ReckoningTick && Reports.IsHeadline(e)))
+        // Raids were already shown as the police reached them.
+        var shown = W.Script.Where(a => a.Kind == ActionKind.Raid).Select(a => a.Text).ToHashSet();
+        foreach (var e in W.Events.Where(e => e.Week == _replayWeek && e.Tick >= Content.ReckoningTick && Reports.IsHeadline(e) && !shown.Contains(e.Text)))
             AppendTicker(e.Tick, e.GangId, e.Text);
         _news.Text = WeekReport(_replayWeek);
         _tabs.CurrentTab = TabIndex("Report");
+        Audio.Instance?.Play("paper");
+        SaveGameTo(0);
+        AnnounceNewBoss();
         RefreshAll();
     }
 
@@ -91,6 +114,8 @@ public partial class Main : Control
 
     private void OnAction(ScriptAction a)
     {
+        PlaySound(a);
+        if (a.BusinessId >= 0 && a.BusinessId == _map.SelectedBusiness) RefreshBusiness();
         if (a.Kind == ActionKind.Collect) return;
         int gang = a.Kind == ActionKind.Raid ? a.DefenderGangId : a.GangId;
         AppendTicker(a.Tick, gang, a.Text, a.DefenderGangId == Me);
@@ -103,6 +128,50 @@ public partial class Main : Control
         string time = MapView.ClockText(tick);
         string swatch = gangId >= 0 ? $"[color=#{Palette.Hex(Palette.Gang(W, gangId))}]■[/color] " : "";
         _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]{time}[/color]  {swatch}[color=#{Palette.Hex(colour)}]{Escape(text)}[/color]\n");
+    }
+
+    /// <summary>When the chair changes hands, say so plainly: it's the biggest thing that happens to the player.</summary>
+    private void AnnounceNewBoss()
+    {
+        var p = W.Player;
+        if (_bossAtStartOfWeek < 0 || p.BossHoodId == _bossAtStartOfWeek) return;
+        var old = W.HoodById(_bossAtStartOfWeek);
+        string fate = old.State switch
+        {
+            HoodState.Dead => $"{old.Name} is dead at {old.Age(W.Week)}.",
+            HoodState.Jailed => $"{old.Name} is going away for {old.JailWeeks} weeks.",
+            _ => $"{old.Name} is out.",
+        };
+        string text = p.Alive
+            ? $"{fate}\n\n{W.HoodById(p.BossHoodId).Name} runs {p.Name} now. The outfit is yours to carry on."
+            : $"{fate}\n\nThere was nobody left to take over. {p.Name} is finished, but the city goes on. Start a new outfit from the Game menu.";
+        var dialog = new AcceptDialog { Title = "The chair changes hands", DialogText = text, OkButtonText = "Carry on" };
+        dialog.Confirmed += dialog.QueueFree;
+        dialog.Canceled += dialog.QueueFree;
+        AddChild(dialog);
+        dialog.PopupCentered(new Vector2I(440, 0));
+        _bossAtStartOfWeek = -1;
+    }
+
+    private void PlaySound(ScriptAction a)
+    {
+        var audio = Audio.Instance;
+        if (audio == null) return;
+        bool near = a.GangId == Me || a.DefenderGangId == Me;
+        float v = near ? 1f : 0.55f;
+        switch (a.Kind)
+        {
+            case ActionKind.Extort when a.Result == ActionResult.Success: audio.Play("bell", v * 0.8f); break;
+            case ActionKind.Extort when a.Result == ActionResult.Failed: audio.Play("door", v * 0.7f); break;
+            case ActionKind.Extort when a.Result == ActionResult.Arrested: audio.Play("whistle", v * 0.6f); break;
+            case ActionKind.Takeover: audio.Play(a.CasualtyHoodId >= 0 ? "gunshots" : "gunshot", v * 0.8f); break;
+            case ActionKind.Racket: audio.Play("knock", v * 0.8f); break;
+            case ActionKind.Raid: audio.Play("whistle", v * 0.6f); break;
+            case ActionKind.Collect when a.GangId == Me && Time.GetTicksMsec() - _lastCashSound > 350:
+                _lastCashSound = Time.GetTicksMsec();
+                audio.Play("cash", 0.45f, 0.08f);
+                break;
+        }
     }
 
     private static string Escape(string s) => s.Replace("[", "[lb]");
@@ -152,13 +221,14 @@ public partial class Main : Control
         RefreshAll();
     }
 
-    private static int HoodOf(Order o) => o switch
+    /// <summary>Give an order in the middle of the week: the men set out now.</summary>
+    private void OrderNow(Order order)
     {
-        ExtortOrder e => e.HoodId,
-        RacketOrder r => r.HoodId,
-        GuardOrder g => g.HoodId,
-        _ => -1,
-    };
+        int? tick = _shell.Sim.OrderNow(order, _map.Clock);
+        if (tick == null) AppendTicker((int)_map.Clock, Me, "Too late in the week for that. It'll have to wait for Monday.", true);
+        else AppendTicker((int)_map.Clock, Me, $"{_shell.Describe(order)}: setting out now, there by {MapView.ClockText(tick.Value)}.", true);
+        RefreshAll();
+    }
 
     private static int BusinessOf(Order o) => o switch
     {
@@ -169,11 +239,20 @@ public partial class Main : Control
         _ => -1,
     };
 
+    /// <summary>Men who have a job: queued for next week while planning, or done or under way while the week runs.</summary>
+    private HashSet<int> BusyHoods() =>
+        _map.Live ? _shell.Sim.CommittedHoods(Me) : _shell.Pending.SelectMany(Simulation.TeamOf).ToHashSet();
+
     private List<Hood> FreeHoods()
     {
-        var busy = _shell.Pending.Select(HoodOf).ToHashSet();
+        var busy = BusyHoods();
         return W.AvailableHoodsOf(Me).Where(h => !busy.Contains(h.Id)).OrderByDescending(h => h.Strength).ToList();
     }
+
+    /// <summary>A crew order with everyone in the crew who is free.</summary>
+    private Order? CrewOrder(Crew crew, int businessId, bool guard) => _shell.CrewOrderFor(crew.Id, businessId, guard, BusyHoods());
+
+    private string CrewName(Crew c) => $"{W.HoodById(c.LieutenantHoodId).Name}'s crew";
 
     // ---- Refresh --------------------------------------------------------------
 
@@ -183,18 +262,26 @@ public partial class Main : Control
         _gangName.Text = p.Alive ? p.Name : $"{p.Name} (finished)";
         _gangName.AddThemeColorOverride("font_color", Palette.Player);
         _date.Text = Reports.Date(W) + (W.Prohibition ? "" : " · after repeal");
+        if (p.Alive)
+        {
+            var boss = W.HoodById(p.BossHoodId);
+            _date.Text += $" · {boss.Name}, {boss.Age(W.Week)}";
+        }
         _cash.Text = $"${p.Cash:N0}";
         _heat.Text = $"Heat {p.Heat}";
         _heat.AddThemeColorOverride("font_color", p.Heat > 60 ? Palette.Bad : p.Heat > 35 ? Palette.Player : Palette.Ink);
         _turf.Text = $"Turf {W.TurfOf(Me).Count()}/{W.Businesses.Count}";
         _men.Text = $"Men {W.HoodsOf(Me).Count()}";
-        _endWeek.Text = _shell.Pending.Count > 0 ? $"End week  ({_shell.Pending.Count} orders)" : "End week";
-        _endWeek.Disabled = !p.Alive;
+        if (_map.Live) _endWeek.Text = "Week in progress";
+        else _endWeek.Text = _shell.Pending.Count > 0 ? $"End week  ({_shell.Pending.Count} order{(_shell.Pending.Count == 1 ? "" : "s")})" : "End week";
+        _endWeek.Disabled = !p.Alive || _map.Live;
 
         RefreshBusiness();
         RefreshMen();
         RefreshOrders();
+        RefreshCrews();
         RefreshGangs();
+        RefreshCityHall();
         _map.QueueRedraw();
     }
 
@@ -205,7 +292,8 @@ public partial class Main : Control
         if (id < 0)
         {
             AddLabel(_businessPanel, "Click a business on the map.", Palette.InkQuiet);
-            AddLabel(_businessPanel, "Your turf is outlined in brass. Rival gangs have their own colours. Grey shops pay nobody yet. A red dot means a racket in the back room.", Palette.InkQuiet, wrap: true);
+            AddLabel(_businessPanel, "A shop's awning is striped in the colours of the gang it pays; yours are brass. Plain awnings pay nobody yet. A red badge on the roof means a racket in the back room.", Palette.InkQuiet, wrap: true);
+            AddLabel(_businessPanel, "Scroll to zoom the map. Drag with the right mouse button to move it.", Palette.InkQuiet, wrap: true);
             return;
         }
 
@@ -214,6 +302,12 @@ public partial class Main : Control
         AddLabel(_businessPanel, b.Name, Palette.Ink, 18);
         AddLabel(_businessPanel, $"{Content.Label(b.Kind)} · takes ${b.Takings} a week · owner toughness {b.Toughness}/10", Palette.InkQuiet);
         AddLabel(_businessPanel, $"{W.BlocksFromHq(W.Player, b):0.#} blocks from your HQ", Palette.InkQuiet);
+        if (lot.WardId < W.Wards.Count)
+        {
+            var ward = W.Wards[lot.WardId];
+            string whose = ward.Reformer ? "a reformer who can't be bought" : ward.OwnerGangId == Me ? "on your payroll" : ward.OwnerGangId >= 0 ? $"on {W.GangById(ward.OwnerGangId).Name}'s payroll" : "a party man, for sale";
+            AddLabel(_businessPanel, $"In {ward.Name}. Alderman {ward.Alderman} is {whose}.", ward.OwnerGangId >= 0 ? Palette.Gang(W, ward.OwnerGangId) : Palette.InkQuiet, wrap: true);
+        }
 
         if (b.IsProtected)
         {
@@ -227,39 +321,79 @@ public partial class Main : Control
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {Content.Rackets[b.Racket].Label}", Palette.Bad);
         if (!b.IsOpen) AddLabel(_businessPanel, $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
 
-        foreach (var o in _shell.Pending.Where(o => BusinessOf(o) == id))
-            AddLabel(_businessPanel, "Queued: " + _shell.Describe(o), Palette.Player, wrap: true);
+        if (_map.Live)
+            foreach (var job in _shell.Sim.Upcoming.Where(j => j.GangId == Me && BusinessOf(j.Order) == id))
+                AddLabel(_businessPanel, $"On the way: {_shell.Describe(job.Order)}, there by {MapView.ClockText(job.Tick)}", Palette.Player, wrap: true);
+        else
+            foreach (var o in _shell.Pending.Where(o => BusinessOf(o) == id))
+                AddLabel(_businessPanel, "Queued: " + _shell.Describe(o), Palette.Player, wrap: true);
 
         _businessPanel.AddChild(new HSeparator());
         if (!W.Player.Alive) return;
 
+        if (_map.Live)
+        {
+            if (_map.Clock >= Simulation.LastOrderTick - 1) { AddLabel(_businessPanel, "It's too late in the week to send anyone. Orders resume Monday.", Palette.InkQuiet, wrap: true); return; }
+            AddLabel(_businessPanel, "The week is under way. Men you send now set out from headquarters straight away.", Palette.InkQuiet, wrap: true);
+        }
         if (b.ProtectorGangId == Me) OwnBusinessActions(b);
         else if (b.IsOpen) TargetActions(b);
+    }
+
+    /// <summary>Queue an order while planning, or send the men at once during the live week.</summary>
+    private void Give(Order? order)
+    {
+        if (order == null) return;
+        if (_map.Live) OrderNow(order);
+        else Queue(order);
     }
 
     private void TargetActions(Business b)
     {
         var hoods = FreeHoods().Where(h => h.Id != W.Player.BossHoodId || W.AvailableHoodsOf(Me).Count() < 3).ToList();
-        if (hoods.Count == 0) { AddLabel(_businessPanel, "All your men have jobs this week. Cancel one on the Orders tab to free him.", Palette.InkQuiet, wrap: true); return; }
+        var crews = W.CrewsOf(Me).Select(c => (Crew: c, Order: CrewOrder(c, b.Id, guard: false) as ExtortOrder)).Where(x => x.Order != null).ToList();
+        if (hoods.Count == 0 && crews.Count == 0) { AddLabel(_businessPanel, _map.Live ? "All your men are busy this week." : "All your men have jobs this week. Cancel one on the Orders tab to free him.", Palette.InkQuiet, wrap: true); return; }
 
         bool rival = b.IsProtected;
-        string Odds(Hood h)
+        string Odds(Hood h, IReadOnlyList<Hood> backup)
         {
-            if (!rival) return $"{Simulation.ExtortChance(W, W.Player, h, b):P0} chance";
+            if (!rival) return $"{Simulation.ExtortChance(W, W.Player, h, b, backup.Count):P0} chance";
             double defence = Simulation.DefenceStrength(W, W.GangById(b.ProtectorGangId), b);
-            return $"{Simulation.TakeoverChance(h.Strength, defence):P0} to win if unguarded";
+            return $"{Simulation.TakeoverChance(h.Strength + Simulation.BackupStrength(backup), defence):P0} to win if unguarded";
         }
 
         AddLabel(_businessPanel, rival ? $"Take it from {W.GangById(b.ProtectorGangId).Name}. Expect a fight; men can die." : "Lean on the owner for protection money.", Palette.Ink, wrap: true);
-        var pick = new OptionButton();
-        foreach (var h in hoods) pick.AddItem($"{h.Name} · {Odds(h)}", h.Id);
-        _businessPanel.AddChild(pick);
-        AddButton(_businessPanel, rival ? "Send him to take it" : "Send him", () => Queue(new ExtortOrder(Me, pick.GetSelectedId(), b.Id)));
+        string verb = _map.Live ? "now" : "";
+        if (hoods.Count > 0)
+        {
+            var pick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
+            foreach (var h in hoods) pick.AddItem($"{h.Name} · {Odds(h, Array.Empty<Hood>())}", h.Id);
+            _businessPanel.AddChild(pick);
+            AddButton(_businessPanel, (rival ? "Send him to take it " : "Send him ") + verb, () => Give(new ExtortOrder(Me, pick.GetSelectedId(), b.Id)));
+        }
+        if (crews.Count > 0)
+        {
+            var crewPick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
+            foreach (var (crew, order) in crews)
+            {
+                var team = order!.Team.Select(W.HoodById).ToList();
+                crewPick.AddItem($"{CrewName(crew)} ({team.Count} men) · {Odds(team[0], team.Skip(1).ToList())}", crew.Id);
+            }
+            _businessPanel.AddChild(crewPick);
+            AddButton(_businessPanel, "Send the crew " + verb, () => Give(CrewOrder(W.CrewById(crewPick.GetSelectedId())!, b.Id, guard: false)));
+        }
     }
 
     private void OwnBusinessActions(Business b)
     {
         var hoods = FreeHoods();
+        var crews = W.CrewsOf(Me).Where(c => CrewOrder(c, b.Id, guard: true) != null).ToList();
+        if (_map.Live)
+        {
+            if (hoods.Count == 0 && crews.Count == 0) { AddLabel(_businessPanel, "All your men are busy this week.", Palette.InkQuiet, wrap: true); return; }
+            GuardActions(b, hoods, crews);
+            return;
+        }
 
         AddLabel(_businessPanel, "Protection rate", Palette.Ink);
         var rateRow = new HBoxContainer();
@@ -269,32 +403,51 @@ public partial class Main : Control
         _businessPanel.AddChild(rateRow);
         AddLabel(_businessPanel, "Above 12% the owner grows resentful; below it he warms to you.", Palette.InkQuiet, wrap: true);
 
-        if (hoods.Count == 0) { AddLabel(_businessPanel, "All your men have jobs this week. Cancel one on the Orders tab to free him.", Palette.InkQuiet, wrap: true); return; }
+        if (hoods.Count == 0 && crews.Count == 0) { AddLabel(_businessPanel, "All your men have jobs this week. Cancel one on the Orders tab to free him.", Palette.InkQuiet, wrap: true); return; }
 
         var rackets = Content.RacketsFor(b.Kind)
             .Select(k => Content.Rackets[k])
             .Where(r => !r.NeedsProhibition || W.Prohibition)
             .ToList();
-        if (b.Racket == RacketKind.None && rackets.Count > 0)
+        if (b.Racket == RacketKind.None && rackets.Count > 0 && hoods.Count > 0)
         {
             _businessPanel.AddChild(new HSeparator());
             AddLabel(_businessPanel, "Open a racket in the back room", Palette.Ink);
-            var racketPick = new OptionButton();
+            var racketPick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
             foreach (var r in rackets) racketPick.AddItem($"{r.Label} · costs ${r.SetupCost}, pays ~${r.WeeklyIncome}/week, +{r.WeeklyHeat} heat", (int)r.Kind);
             _businessPanel.AddChild(racketPick);
             var who = HoodPicker(hoods, h => $"brains {h.Brains}");
             AddButton(_businessPanel, "Open it", () => Queue(new RacketOrder(Me, who.GetSelectedId(), b.Id, (RacketKind)racketPick.GetSelectedId())));
         }
 
+        GuardActions(b, hoods, crews);
+    }
+
+    private void GuardActions(Business b, List<Hood> hoods, List<Crew> crews)
+    {
         _businessPanel.AddChild(new HSeparator());
-        AddLabel(_businessPanel, "Post a guard for the week", Palette.Ink);
-        var guard = HoodPicker(hoods, h => $"strength {h.Strength}");
-        AddButton(_businessPanel, "Post him", () => Queue(new GuardOrder(Me, guard.GetSelectedId(), b.Id)));
+        AddLabel(_businessPanel, _map.Live ? "Post a guard for the rest of the week" : "Post a guard for the week", Palette.Ink);
+        if (hoods.Count > 0)
+        {
+            var guard = HoodPicker(hoods, h => $"strength {h.Strength}");
+            AddButton(_businessPanel, _map.Live ? "Post him now" : "Post him", () => Give(new GuardOrder(Me, guard.GetSelectedId(), b.Id)));
+        }
+        if (crews.Count > 0)
+        {
+            var crewPick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
+            foreach (var c in crews)
+            {
+                var team = Simulation.TeamOf(CrewOrder(c, b.Id, guard: true)!).Select(W.HoodById).ToList();
+                crewPick.AddItem($"{CrewName(c)} ({team.Count} men) · strength {team[0].Strength}+{Simulation.BackupStrength(team.Skip(1)):0}", c.Id);
+            }
+            _businessPanel.AddChild(crewPick);
+            AddButton(_businessPanel, _map.Live ? "Post the crew now" : "Post the crew", () => Give(CrewOrder(W.CrewById(crewPick.GetSelectedId())!, b.Id, guard: true)));
+        }
     }
 
     private OptionButton HoodPicker(List<Hood> hoods, Func<Hood, string> note)
     {
-        var pick = new OptionButton();
+        var pick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
         foreach (var h in hoods) pick.AddItem($"{h.Name} · {note(h)}", h.Id);
         _businessPanel.AddChild(pick);
         return pick;
@@ -304,25 +457,42 @@ public partial class Main : Control
     {
         _menTree.Clear();
         var root = _menTree.CreateItem();
-        var jobs = _shell.Pending.Where(o => HoodOf(o) >= 0).ToDictionary(HoodOf, o => _shell.Describe(o));
+        var jobs = new Dictionary<int, string>();
+        var orders = _map.Live ? _shell.Sim.Upcoming.Where(j => j.GangId == Me).Select(j => j.Order) : _shell.Pending;
+        foreach (var o in orders)
+            foreach (var id in Simulation.TeamOf(o)) jobs.TryAdd(id, _shell.Describe(o));
+        var busy = BusyHoods();
         foreach (var h in W.HoodsOf(Me).OrderBy(h => h.Id))
         {
             var it = _menTree.CreateItem(root);
             jobs.TryGetValue(h.Id, out var job);
-            string state = h.Id == W.Player.BossHoodId ? "Boss" : h.State == HoodState.Jailed ? $"Jail {h.JailWeeks}w" : job != null ? "Job" : "Free";
-            string[] cols = { h.Name, $"{h.Intimidation}", $"{h.Muscle}", $"{h.Brains}", $"{h.Stealth}", $"{h.Loyalty}", $"${h.Wage}", state };
+            string state = h.Id == W.Player.BossHoodId ? "Boss" : h.State == HoodState.Jailed ? $"Jail {h.JailWeeks}w" : busy.Contains(h.Id) ? "Job" : "Free";
+            if (h.Id == W.Player.HeirHoodId) state = h.State == HoodState.Jailed ? state : "Heir";
+            var crew = W.CrewOfHood(h.Id);
+            string crewText = crew == null ? "" : crew.LieutenantHoodId == h.Id ? "Lt" : World.Surname(W.HoodById(crew.LieutenantHoodId).Name);
+            string[] cols = { h.Name, $"{h.Age(W.Week)}", $"{h.Intimidation}", $"{h.Muscle}", $"{h.Brains}", $"{h.Stealth}", $"{h.Loyalty}", crewText, state };
             for (int i = 0; i < cols.Length; i++) it.SetText(i, cols[i]);
-            string tip = $"{h.Name}\nIntimidation {h.Intimidation}, Muscle {h.Muscle}, Brains {h.Brains}, Stealth {h.Stealth}\nLoyalty {h.Loyalty}/100, ambition {h.Ambition}/100, wage ${h.Wage}/week" + (job != null ? $"\nThis week: {job}" : "");
+            string tip = $"{h.Name}, {h.Age(W.Week)}" + (h.Family ? ", family" : "") + $"\nIntimidation {h.Intimidation}, Muscle {h.Muscle}, Brains {h.Brains}, Stealth {h.Stealth}\nLoyalty {h.Loyalty}/100, ambition {h.Ambition}/100, wage ${h.Wage}/week" + (job != null ? $"\nThis week: {job}" : "");
             for (int i = 0; i < cols.Length; i++) it.SetTooltipText(i, tip);
-            if (h.Loyalty < 30) it.SetCustomColor(5, Palette.Bad);
-            if (h.State == HoodState.Jailed) it.SetCustomColor(7, Palette.Police);
-            else if (jobs.ContainsKey(h.Id)) it.SetCustomColor(7, Palette.Player);
+            if (h.Loyalty < 30) it.SetCustomColor(6, Palette.Bad);
+            if (h.Age(W.Week) >= 65) it.SetCustomColor(1, Palette.Bad);
+            if (h.Family) it.SetCustomColor(0, Palette.Player);
+            if (h.State == HoodState.Jailed) it.SetCustomColor(8, Palette.Police);
+            else if (busy.Contains(h.Id)) it.SetCustomColor(8, Palette.Player);
         }
     }
 
     private void RefreshOrders()
     {
         Clear(_ordersPanel);
+        if (_map.Live)
+        {
+            AddLabel(_ordersPanel, "The week is under way. Your men still to do their jobs:", Palette.InkQuiet, wrap: true);
+            foreach (var job in _shell.Sim.Upcoming.Where(j => j.GangId == Me))
+                AddLabel(_ordersPanel, $"{MapView.ClockText(job.Tick)}: {_shell.Describe(job.Order)}", Palette.Ink, wrap: true);
+            AddLabel(_ordersPanel, "To send more men, pause and click a business on the map.", Palette.InkQuiet, wrap: true);
+            return;
+        }
         var buttons = new HBoxContainer();
         AddButton(buttons, "Plan for me", () => { _shell.Execute("auto"); RefreshAll(); });
         AddButton(buttons, "Clear all", () => { _shell.Pending.Clear(); RefreshAll(); });
@@ -344,6 +514,94 @@ public partial class Main : Control
         }
     }
 
+    private void RefreshCrews()
+    {
+        Clear(_crewsPanel);
+        SuccessionSection();
+        AddLabel(_crewsPanel, "A crew is a lieutenant and up to three men. Send a crew and they go as one team: they lean harder and fight better, but every man is tied up for the week. A crew takes its mood from its lieutenant, and an ambitious lieutenant who breaks away takes his crew with him.", Palette.InkQuiet, wrap: true);
+        if (!W.Player.Alive) return;
+        var loose = W.HoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId && W.CrewOfHood(h.Id) == null).OrderByDescending(h => h.Brains + h.Strength).ToList();
+
+        foreach (var crew in W.CrewsOf(Me).ToList())
+        {
+            _crewsPanel.AddChild(new HSeparator());
+            var lt = W.HoodById(crew.LieutenantHoodId);
+            var head = new HBoxContainer();
+            var title = AddLabel(head, $"{CrewName(crew)}", Palette.Player, 17);
+            title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            var disband = AddButton(head, "Break up", () => { W.LeaveCrew(lt.Id); RefreshAll(); });
+            disband.TooltipText = "The men go back to working alone";
+            _crewsPanel.AddChild(head);
+            AddLabel(_crewsPanel, $"Lieutenant {lt.Name} · strength {lt.Strength}, brains {lt.Brains}, loyalty {lt.Loyalty}, ambition {lt.Ambition}",
+                lt.Loyalty < 30 ? Palette.Bad : Palette.InkQuiet, wrap: true);
+            foreach (var member in crew.MemberIds.Select(W.HoodById).ToList())
+            {
+                var row = new HBoxContainer();
+                var name = AddLabel(row, $"{member.Name} · strength {member.Strength}, loyalty {member.Loyalty}", member.Loyalty < 30 ? Palette.Bad : Palette.Ink);
+                name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+                var remove = AddButton(row, "✕", () => { W.LeaveCrew(member.Id); RefreshAll(); });
+                remove.TooltipText = "Take him out of the crew";
+                _crewsPanel.AddChild(row);
+            }
+            if (crew.MemberIds.Count < Crew.MaxMembers && loose.Count > 0)
+            {
+                var row = new HBoxContainer();
+                var pick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
+                foreach (var h in loose) pick.AddItem($"{h.Name} · strength {h.Strength}", h.Id);
+                row.AddChild(pick);
+                AddButton(row, "Add", () => { W.JoinCrew(crew, W.HoodById(pick.GetSelectedId())); RefreshAll(); });
+                _crewsPanel.AddChild(row);
+            }
+        }
+
+        _crewsPanel.AddChild(new HSeparator());
+        if (loose.Count == 0) { AddLabel(_crewsPanel, "Every man is already in a crew.", Palette.InkQuiet); return; }
+        AddLabel(_crewsPanel, "Make a man a lieutenant", Palette.Ink);
+        var newRow = new HBoxContainer();
+        var lieutenant = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
+        foreach (var h in loose) lieutenant.AddItem($"{h.Name} · brains {h.Brains}, loyalty {h.Loyalty}", h.Id);
+        newRow.AddChild(lieutenant);
+        AddButton(newRow, "Form crew", () => { W.FormCrew(W.HoodById(lieutenant.GetSelectedId())); RefreshAll(); });
+        _crewsPanel.AddChild(newRow);
+    }
+
+    /// <summary>The boss, who follows him, and bringing the family in.</summary>
+    private void SuccessionSection()
+    {
+        var p = W.Player;
+        if (!p.Alive) return;
+        var boss = W.HoodById(p.BossHoodId);
+        AddLabel(_crewsPanel, "The family", Palette.Player, 17);
+        int age = boss.Age(W.Week);
+        AddLabel(_crewsPanel, $"{boss.Name} runs the outfit. He is {age}" + (age >= 60 ? ", and not getting any younger." : "."), age >= 65 ? Palette.Bad : Palette.Ink, wrap: true);
+        var heir = W.Hoods.FirstOrDefault(h => h.Id == p.HeirHoodId);
+        AddLabel(_crewsPanel, heir != null
+            ? $"Heir: {heir.Name}, {heir.Age(W.Week)} · brains {heir.Brains}, strength {heir.Strength}, loyalty {heir.Loyalty}. He learns the business while he waits."
+            : "No heir named. If the boss dies or goes away for long, the outfit picks whoever seems strongest, and a rival may split off.",
+            Palette.InkQuiet, wrap: true);
+
+        var candidates = W.HoodsOf(Me).Where(h => h.Id != boss.Id && h.Id != p.HeirHoodId).OrderByDescending(h => h.Family).ThenByDescending(h => h.Brains * 2 + h.Strength).ToList();
+        if (candidates.Count > 0)
+        {
+            var row = new HBoxContainer();
+            var pick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
+            foreach (var h in candidates) pick.AddItem($"{h.Name}, {h.Age(W.Week)}{(h.Family ? " (family)" : "")} · brains {h.Brains}", h.Id);
+            row.AddChild(pick);
+            var name = AddButton(row, "Name heir", () => { _shell.Execute($"heir {pick.GetSelectedId()}"); RefreshAll(); });
+            name.TooltipText = "The most ambitious man passed over will take it badly";
+            _crewsPanel.AddChild(row);
+        }
+
+        if (!_map.Live)
+        {
+            bool queued = _shell.Pending.Any(o => o is RecruitOrder { Family: true });
+            var family = AddButton(_crewsPanel, queued ? "Family arrives this week" : $"Bring a son or nephew into the business (${Content.FamilyCost})",
+                () => { _shell.Execute("family"); RefreshAll(); });
+            family.Disabled = queued || !Simulation.CanBringInFamily(W, p);
+            family.TooltipText = "Family starts young and green, but loyal, and grows into the job. Once a year.";
+        }
+    }
+
     private void RefreshGangs()
     {
         _gangsTree.Clear();
@@ -352,10 +610,119 @@ public partial class Main : Control
         {
             var it = _gangsTree.CreateItem(root);
             var boss = W.HoodById(g.BossHoodId);
-            string[] cols = { g.IsPlayer ? $"{g.Name} (you)" : g.Name, $"{W.TurfOf(g.Id).Count()}", $"{W.HoodsOf(g.Id).Count()}", $"${g.Cash:N0}", $"{g.Heat}" };
-            for (int i = 0; i < cols.Length; i++) { it.SetText(i, cols[i]); it.SetTooltipText(i, $"{g.Name}, run by {boss.Name}"); }
+            int wards = W.Wards.Count(x => x.OwnerGangId == g.Id);
+            string[] cols = { g.IsPlayer ? $"{g.Name} (you)" : g.Name, $"{W.TurfOf(g.Id).Count()}", $"{W.HoodsOf(g.Id).Count()}", $"{wards}", $"${g.Cash:N0}", $"{g.Heat}" };
+            string tip = $"{g.Name}, run by {boss.Name}" + (wards > 0 ? $"\nAldermen on the payroll: {string.Join(", ", W.Wards.Where(x => x.OwnerGangId == g.Id).Select(x => x.Name))}" : "")
+                + (W.Hall.FriendGangId == g.Id ? $"\nMayor {W.Hall.Mayor} owes them" : "");
+            for (int i = 0; i < cols.Length; i++) { it.SetText(i, cols[i]); it.SetTooltipText(i, tip); }
             it.SetCustomColor(0, Palette.Gang(W, g.Id));
         }
+    }
+
+    // ---- Saving ---------------------------------------------------------------
+
+    public override void _Notification(int what)
+    {
+        // Quitting while planning keeps this week's orders for next time.
+        if (what == NotificationWMCloseRequest && _shell != null && !_map.Live && W.Player.Alive && OS.GetCmdlineUserArgs().Length == 0) SaveGameTo(0);
+    }
+
+    private const int Slots = 3;
+
+    /// <summary>Slot 0 is the autosave written every Sunday.</summary>
+    private static string SlotPath(int slot) => slot == 0 ? "user://saves/autosave.json" : $"user://saves/slot{slot}.json";
+
+    private static string? SlotLabel(int slot)
+    {
+        if (!FileAccess.FileExists(SlotPath(slot))) return null;
+        try { var d = SaveGame.Read(FileAccess.GetFileAsString(SlotPath(slot))); return $"{d.Label} ({d.SavedAt:d MMM, HH:mm})"; }
+        catch (Exception) { return "unreadable"; }
+    }
+
+    private void SaveGameTo(int slot)
+    {
+        if (_map.Live) return;
+        DirAccess.MakeDirRecursiveAbsolute("user://saves");
+        using var file = FileAccess.Open(SlotPath(slot), FileAccess.ModeFlags.Write);
+        if (file == null) { GD.PushWarning($"Couldn't write {SlotPath(slot)}: {FileAccess.GetOpenError()}"); return; }
+        file.StoreString(SaveGame.Write(_shell.Sim, _shell.Pending));
+        if (slot > 0) _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]Saved to slot {slot}.[/color]\n");
+    }
+
+    private bool LoadGame(int slot)
+    {
+        try
+        {
+            var data = SaveGame.Read(FileAccess.GetFileAsString(SlotPath(slot)));
+            Palette.Reset();
+            _shell = new CommandShell(SaveGame.Restore(data), data.Pending);
+        }
+        catch (Exception e)
+        {
+            GD.PushWarning($"Couldn't load {SlotPath(slot)}: {e.Message}");
+            return false;
+        }
+        _map.EndReplay();
+        _map.World = W;
+        _map.SelectedBusiness = -1;
+        _selectedWard = W.HqOf(W.Player).WardId;
+        _map.ResetView(W.HqOf(W.Player));
+        _ticker.Clear();
+        _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]Back in {W.Map.StreetOf(W.HqOf(W.Player))} St. {Reports.Date(W)}. Click a business to give orders, then End week.[/color]\n");
+        _news.Text = W.Week > 0 ? WeekReport(W.Week - 1) : "No reports yet.";
+        RefreshAll();
+        return true;
+    }
+
+    private void FillGameMenu()
+    {
+        var menu = _gameMenu.GetPopup();
+        menu.Clear();
+        menu.AddItem("New small city: one district, three outfits", 2);
+        menu.AddItem("New medium city: four wards, four outfits", 3);
+        menu.AddItem("New large city: six wards, five outfits", 4);
+        menu.AddSeparator();
+        for (int i = 1; i <= Slots; i++) menu.AddItem($"Save to slot {i}" + (SlotLabel(i) is string l ? $": {l}" : ""), 10 + i);
+        menu.AddSeparator();
+        for (int i = 0; i <= Slots; i++)
+        {
+            string? label = SlotLabel(i);
+            menu.AddItem((i == 0 ? "Load autosave" : $"Load slot {i}") + (label != null ? $": {label}" : ": empty"), 20 + i);
+            menu.SetItemDisabled(menu.ItemCount - 1, label == null);
+        }
+    }
+
+    private void OnGameMenu(long id)
+    {
+        if (id is >= 2 and <= 4) { _citySize = (CitySize)(id - 2); NewGame(GD.Randi()); }
+        else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
+        else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
+    }
+
+    private void ShowSoundPanel()
+    {
+        var audio = Audio.Instance;
+        if (audio == null) return;
+        var popup = new PopupPanel();
+        var box = new VBoxContainer { CustomMinimumSize = new Vector2(240, 0) };
+        box.AddThemeConstantOverride("separation", 6);
+        HSlider Slider(string label, float value, Action<float> set)
+        {
+            AddLabel(box, label, Palette.InkQuiet);
+            var slider = new HSlider { MinValue = 0, MaxValue = 1, Step = 0.05, Value = value };
+            slider.ValueChanged += v => set((float)v);
+            box.AddChild(slider);
+            return slider;
+        }
+        Slider("Music", audio.MusicVolume, v => audio.MusicVolume = v);
+        Slider("Street and effects", audio.EffectsVolume, v => { audio.EffectsVolume = v; audio.Play("click"); });
+        var mute = new CheckBox { Text = "Mute everything", ButtonPressed = audio.Muted };
+        mute.Toggled += on => audio.Muted = on;
+        box.AddChild(mute);
+        popup.AddChild(box);
+        popup.PopupHide += popup.QueueFree;
+        AddChild(popup);
+        popup.Popup(new Rect2I((Vector2I)(_soundButton.GlobalPosition + new Vector2(-150, _soundButton.Size.Y + 4)), new Vector2I(260, 0)));
     }
 
     // ---- Layout ---------------------------------------------------------------
@@ -391,9 +758,13 @@ public partial class Main : Control
         _endWeek = new Button { Text = "End week", CustomMinimumSize = new Vector2(190, 0) };
         _endWeek.Pressed += EndWeek;
         top.AddChild(_endWeek);
-        var newCity = new Button { Text = "New city", TooltipText = "Start again in a new district" };
-        newCity.Pressed += () => NewGame(GD.Randi());
-        top.AddChild(newCity);
+        _gameMenu = new MenuButton { Text = "Game", Flat = false, TooltipText = "New city, save and load" };
+        _gameMenu.GetPopup().AboutToPopup += FillGameMenu;
+        _gameMenu.GetPopup().IdPressed += OnGameMenu;
+        top.AddChild(_gameMenu);
+        _soundButton = new Button { Text = "Sound", TooltipText = "Music and effects volume" };
+        _soundButton.Pressed += ShowSoundPanel;
+        top.AddChild(_soundButton);
         rows.AddChild(top);
 
         var body = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
@@ -403,8 +774,14 @@ public partial class Main : Control
         // Left: the map, the live controls and the street ticker.
         var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         left.AddThemeConstantOverride("separation", 6);
-        _map = new MapView { SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsStretchRatio = 2.2f, CustomMinimumSize = new Vector2(780, 400) };
-        _map.BusinessClicked += _ => { _tabs.CurrentTab = TabIndex("Business"); RefreshBusiness(); };
+        _map = new MapView { SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsStretchRatio = 2.2f, CustomMinimumSize = new Vector2(640, 400) };
+        _map.BusinessClicked += _ =>
+        {
+            // Clicking a shop mid-week stops the clock so you can decide what to do.
+            if (_map.Live && _playing) { _playing = false; _pause.Text = "Play"; }
+            _tabs.CurrentTab = TabIndex("Business");
+            RefreshBusiness();
+        };
         _map.ActionHappened += OnAction;
         left.AddChild(_map);
 
@@ -434,13 +811,34 @@ public partial class Main : Control
         // Right: tabs for planning.
         _tabs = new TabContainer { CustomMinimumSize = new Vector2(420, 0), SizeFlagsHorizontal = SizeFlags.ShrinkEnd };
         _businessPanel = ScrollTab("Business");
-        _menTree = TreeTab("Men", "Name", "Int", "Mus", "Brn", "Stl", "Loy", "Wage", "Now");
+        // The Men tab: the roster on top, crews underneath.
+        var menTab = new VSplitContainer { Name = "Men" };
+        _tabs.AddChild(menTab);
+        _menTree = TreeTab("Men", "Name", "Age", "Int", "Mus", "Brn", "Stl", "Loy", "Crew", "Now");
+        _menTree.GetParent().RemoveChild(_menTree);
+        _menTree.Name = "Roster";
+        _menTree.CustomMinimumSize = new Vector2(0, 200);
+        _menTree.SizeFlagsVertical = SizeFlags.ExpandFill;
+        _menTree.Visible = true; // the tab container hid it while it was a tab of its own
+        menTab.AddChild(_menTree);
+        _crewsPanel = ScrollTab("Crews");
+        var crewsScroll = (Control)_crewsPanel.GetParent().GetParent();
+        crewsScroll.GetParent().RemoveChild(crewsScroll);
+        crewsScroll.CustomMinimumSize = new Vector2(0, 160);
+        crewsScroll.SizeFlagsVertical = SizeFlags.ExpandFill;
+        crewsScroll.SizeFlagsStretchRatio = 1.4f;
+        crewsScroll.Visible = true;
+        menTab.AddChild(crewsScroll);
         _ordersPanel = ScrollTab("Orders");
-        _gangsTree = TreeTab("Gangs", "Gang", "Turf", "Men", "Cash", "Heat");
+        _hallPanel = ScrollTab("City Hall");
+        _gangsTree = TreeTab("Gangs", "Gang", "Turf", "Men", "Wards", "Cash", "Heat");
         _news = new RichTextLabel { Name = "Report", SelectionEnabled = true, BbcodeEnabled = true };
         _tabs.AddChild(_news);
         _tabs.AddChild(BuildConsole());
         body.AddChild(_tabs);
+        // The map shows the wards while City Hall is open.
+        _tabs.TabChanged += _ => { _map.ShowWards = _tabs.GetCurrentTabControl()?.Name == "City Hall"; };
+        _map.WardClicked += ward => { _selectedWard = ward; RefreshCityHall(); };
 
         SetSpeed(1);
     }
@@ -458,10 +856,7 @@ public partial class Main : Control
         _endWeek.Disabled = live;
         if (live) _endWeek.Text = "Week in progress";
         _pause.Text = "Pause";
-        _tabs.Modulate = live ? new Color(1, 1, 1, 0.45f) : Colors.White;
-        _tabs.MouseFilter = live ? MouseFilterEnum.Ignore : MouseFilterEnum.Stop;
-        SetProcessInput(!live);
-        foreach (var child in _tabs.GetChildren().OfType<Control>()) child.ProcessMode = live ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
+        _gameMenu.Disabled = live;
     }
 
     private VBoxContainer ScrollTab(string name)
@@ -484,7 +879,7 @@ public partial class Main : Control
         {
             tree.SetColumnTitle(i, columns[i]);
             tree.SetColumnExpand(i, i == 0);
-            if (i > 0) tree.SetColumnCustomMinimumWidth(i, columns[i] is "Cash" ? 80 : columns[i] is "Now" ? 64 : columns[i] is "Wage" ? 50 : 36);
+            if (i > 0) tree.SetColumnCustomMinimumWidth(i, columns[i] is "Cash" ? 80 : columns[i] is "Now" ? 50 : columns[i] is "Crew" or "Wards" ? 50 : 34);
             if (i > 0) tree.SetColumnTitleAlignment(i, HorizontalAlignment.Center);
         }
         _tabs.AddChild(tree);
@@ -533,6 +928,7 @@ public partial class Main : Control
     private static Button AddButton(Container parent, string text, Action onPressed)
     {
         var b = new Button { Text = text };
+        b.Pressed += () => Audio.Instance?.Play("click", 0.5f, 0.1f);
         b.Pressed += onPressed;
         parent.AddChild(b);
         return b;
@@ -582,7 +978,9 @@ public partial class Main : Control
         bool Flag(string name) => Array.IndexOf(args, name) >= 0;
         if (args.Length == 0) return;
 
+        if (Arg("--size") is string size) _citySize = Enum.Parse<CitySize>(size, true);
         if (Arg("--seed") is string seed) NewGame(ulong.Parse(seed));
+        if (Arg("--load") is string slot) GD.Print(LoadGame(int.Parse(slot)) ? $"Loaded {SlotPath(int.Parse(slot))}" : "Load failed");
         int weeks = int.Parse(Arg("--weeks") ?? "0");
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
         if (Flag("--plan")) _shell.Execute("auto");
@@ -590,14 +988,30 @@ public partial class Main : Control
         if (Flag("--select-mine")) _map.SelectedBusiness = W.TurfOf(Me).First().Id;
         if (Flag("--select-rival")) _map.SelectedBusiness = W.Businesses.First(b => b.IsProtected && b.ProtectorGangId != Me).Id;
         if (Flag("--clear")) _shell.Pending.Clear();
+        if (Arg("--exec") is string commands)
+            foreach (var c in commands.Split(';')) GD.Print(_shell.Execute(c.Trim()));
         RefreshAll();
+        if (Arg("--ward") is string wardArg) _selectedWard = int.Parse(wardArg);
+        if (Flag("--whole-map")) _map.ResetView(null);
+        RefreshCityHall();
         if (Arg("--tab") is string tab) _tabs.CurrentTab = TabIndex(tab);
+        if (Arg("--save") is string saveSlot) SaveGameTo(int.Parse(saveSlot));
         if (Arg("--live") is string live)
         {
             EndWeek();
+            if (Flag("--kill-boss")) W.HoodById(W.Player.BossHoodId).State = HoodState.Dead;
             _playing = false;
             _map.Advance(float.Parse(live));
+            if (Flag("--send-now"))
+            {
+                var hood = FreeHoods().First();
+                var biz = W.Businesses.Where(b => !b.IsProtected && b.IsOpen).OrderBy(b => W.BlocksFromHq(W.Player, b)).First();
+                _map.SelectedBusiness = biz.Id;
+                OrderNow(new ExtortOrder(Me, hood.Id, biz.Id));
+            }
+            if (Arg("--then") is string then) _map.Advance(float.Parse(then));
             _clock.Text = MapView.ClockText(_map.Clock);
+            RefreshAll();
         }
         if (Arg("--shot") is string shot)
         {

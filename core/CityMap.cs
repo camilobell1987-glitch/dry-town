@@ -15,6 +15,9 @@ public sealed class Lot
     public LotUse Use { get; set; }
     public int BusinessId { get; set; } = -1;
     public int GangId { get; set; } = -1;
+
+    /// <summary>The ward the lot votes in.</summary>
+    public int WardId { get; set; }
 }
 
 /// <summary>
@@ -24,22 +27,50 @@ public sealed class Lot
 /// </summary>
 public sealed class CityMap
 {
-    public const int BlocksX = 5, BlocksY = 4;
     public const int LotsPerBlockX = 4, LotsPerBlockY = 2;
     public const int StrideX = LotsPerBlockX + 1, StrideY = LotsPerBlockY + 1;
-    public const int Width = BlocksX * StrideX + 1, Height = BlocksY * StrideY + 1;
+
+    /// <summary>Blocks across and down. The first district was five by four.</summary>
+    public int BlocksX { get; }
+    public int BlocksY { get; }
+    public int Width => BlocksX * StrideX + 1;
+    public int Height => BlocksY * StrideY + 1;
+
+    /// <summary>How the blocks are split into wards: this many across and down.</summary>
+    public int WardsX { get; private set; } = 1;
+    public int WardsY { get; private set; } = 1;
+    public int WardCount => WardsX * WardsY;
 
     public List<Lot> Lots { get; } = new();
-    public string[] StreetNames { get; } = new string[BlocksY + 1];
-    public string[] AvenueNames { get; } = new string[BlocksX + 1];
+    public string[] StreetNames { get; }
+    public string[] AvenueNames { get; }
+
+    public CityMap(int blocksX = 5, int blocksY = 4)
+    {
+        BlocksX = blocksX;
+        BlocksY = blocksY;
+        StreetNames = new string[BlocksY + 1];
+        AvenueNames = new string[BlocksX + 1];
+    }
+
+    /// <summary>The ward a block belongs to.</summary>
+    public int WardOfBlock(int bx, int by) => by * WardsY / BlocksY * WardsX + bx * WardsX / BlocksX;
+
+    /// <summary>Assign every lot to a ward, splitting the blocks into an even grid.</summary>
+    public void DrawWards(int wardsX, int wardsY)
+    {
+        WardsX = Math.Clamp(wardsX, 1, BlocksX);
+        WardsY = Math.Clamp(wardsY, 1, BlocksY);
+        foreach (var lot in Lots) lot.WardId = WardOfBlock((lot.X - 1) / StrideX, (lot.Y - 1) / StrideY);
+    }
 
     public static bool IsStreetRow(int y) => y % StrideY == 0;
     public static bool IsAvenue(int x) => x % StrideX == 0;
     public static bool IsRoad(int x, int y) => IsStreetRow(y) || IsAvenue(x);
 
-    public static CityMap Generate(Rng rng)
+    public static CityMap Generate(Rng rng, int blocksX = 5, int blocksY = 4)
     {
-        var map = new CityMap();
+        var map = new CityMap(blocksX, blocksY);
         var streets = Content.StreetNames.ToList();
         rng.Shuffle(streets);
         for (int i = 0; i < map.StreetNames.Length; i++) map.StreetNames[i] = streets[i % streets.Count];
@@ -47,8 +78,8 @@ public sealed class CityMap
         rng.Shuffle(avenues);
         for (int i = 0; i < map.AvenueNames.Length; i++) map.AvenueNames[i] = avenues[i % avenues.Count];
 
-        for (int by = 0; by < BlocksY; by++)
-        for (int bx = 0; bx < BlocksX; bx++)
+        for (int by = 0; by < map.BlocksY; by++)
+        for (int bx = 0; bx < map.BlocksX; bx++)
         for (int ly = 0; ly < LotsPerBlockY; ly++)
         for (int lx = 0; lx < LotsPerBlockX; lx++)
         {
@@ -61,6 +92,15 @@ public sealed class CityMap
                 FrontY = ly == 0 ? by * StrideY : (by + 1) * StrideY,
             });
         }
+        return map;
+    }
+
+    public static CityMap FromSave(List<Lot> lots, string[] streets, string[] avenues, int blocksX, int blocksY, int wardsX, int wardsY)
+    {
+        var map = new CityMap(blocksX, blocksY) { WardsX = Math.Max(1, wardsX), WardsY = Math.Max(1, wardsY) };
+        map.Lots.AddRange(lots.OrderBy(l => l.Id));
+        Array.Copy(streets, map.StreetNames, Math.Min(streets.Length, map.StreetNames.Length));
+        Array.Copy(avenues, map.AvenueNames, Math.Min(avenues.Length, map.AvenueNames.Length));
         return map;
     }
 
@@ -92,7 +132,7 @@ public sealed class CityMap
         return d;
     }
 
-    private static int NearestAvenue(int x1, int x2)
+    private int NearestAvenue(int x1, int x2)
     {
         int best = 0, bestCost = int.MaxValue;
         for (int a = 0; a <= BlocksX; a++)

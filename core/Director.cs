@@ -17,6 +17,13 @@ public sealed class Director
 
     public Director(World world) => _w = world;
 
+    /// <summary>The director's counters, for saving and loading.</summary>
+    public (int DominantWeeks, int QuietWeeks) State
+    {
+        get => (_dominantWeeks, _quietWeeks);
+        set => (_dominantWeeks, _quietWeeks) = value;
+    }
+
     public void Step()
     {
         if (!_w.Settings.DirectorEnabled) return;
@@ -41,12 +48,13 @@ public sealed class Director
             StirDissent(top);
             // A gang that owns most of the district has more than one lieutenant eyeing the chair.
             if (share >= 0.7) StirDissent(top);
-            if (living < Content.MaxGangs) Outsiders($"arrived to challenge {top.Name}");
+            // A full city still gets a challenger when one outfit owns most of it.
+            if (living < _w.Settings.MaxGangs || share >= 0.7) Outsiders($"arrived to challenge {top.Name}");
         }
         else if (_quietWeeks >= QuietWeeks)
         {
             _quietWeeks = 0;
-            if (living < Content.MaxGangs) Outsiders("smelled easy money in a quiet district");
+            if (living < _w.Settings.MaxGangs) Outsiders("smelled easy money in a quiet district");
             else StirDissent(top);
         }
         else if (living < 3 && _w.Rng.Chance(0.01))

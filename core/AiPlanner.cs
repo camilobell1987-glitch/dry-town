@@ -27,6 +27,15 @@ public static class AiPlanner
             cash -= Content.RecruitCost;
         }
 
+        // An aging boss with money to spare brings his family into the business.
+        if (w.HoodById(g.BossHoodId).Age(w.Week) >= 45 && cash > Content.FamilyCost * 5 && Simulation.CanBringInFamily(w, g))
+        {
+            orders.Add(new RecruitOrder(g.Id, Family: true));
+            cash -= Content.FamilyCost;
+        }
+
+        cash -= PlanPolitics(w, g, turf, cash, orders);
+
         foreach (var biz in turf)
         {
             int rate = biz.Resentment > 55 ? 8 : biz.Resentment < 20 ? 15 : Content.DefaultRatePercent;
@@ -77,37 +86,93 @@ public static class AiPlanner
         // Small gangs value their men more and so pick fewer fights.
         double manCost = (active <= 4 ? 900 : 450) * (1.3 - g.Aggression);
         var taken = new HashSet<int>();
+        var assigned = new HashSet<int>();
         foreach (var hood in hoods)
         {
+            if (assigned.Contains(hood.Id)) continue;
+            // Spare hands, weakest first, who could go along as backup on a hard job.
+            var spare = hoods.Where(h => h.Id != hood.Id && !assigned.Contains(h.Id)).Reverse().ToList();
             Business? best = null;
+            List<Hood> bestBackup = new();
             double bestScore = 0;
             foreach (var biz in w.Businesses)
             {
                 if (!biz.IsOpen || biz.ProtectorGangId == g.Id || taken.Contains(biz.Id)) continue;
                 double value = (biz.Takings * 0.12 + (biz.Racket != RacketKind.None ? 80 : 0)) * 10;
-                double score;
                 if (!biz.IsProtected)
                 {
-                    score = value * Simulation.ExtortChance(w, g, hood, biz);
+                    double score = value * Simulation.ExtortChance(w, g, hood, biz);
+                    if (score > bestScore) { bestScore = score; best = biz; bestBackup = new(); }
+                    continue;
                 }
-                else
+                if (hood.Id == g.BossHoodId) continue;
+                var rival = w.GangById(biz.ProtectorGangId);
+                double defence = Simulation.DefenceStrength(w, rival, biz);
+                // Alone, or with up to two men behind him if the gang has hands to spare. Gangs that
+                // already run much of the district are spread too thin to send men in pairs.
+                bool canBackUp = spare.Count >= 4 && turf.Count < w.Businesses.Count * 0.35;
+                for (int extra = 0; extra <= (canBackUp ? 2 : 0); extra++)
                 {
-                    if (hood.Id == g.BossHoodId) continue;
-                    var rival = w.GangById(biz.ProtectorGangId);
-                    double defence = Simulation.DefenceStrength(w, rival, biz);
-                    double edge = (hood.Strength - defence) / 10.0;
+                    var backup = spare.Take(extra).ToList();
+                    double edge = (hood.Strength + Simulation.BackupStrength(backup) - defence) / 10.0;
                     double win = Math.Clamp(0.5 + edge, 0.05, 0.95);
-                    score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost;
+                    double score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost - extra * 150;
                     if (g.Heat > 60) score *= 0.3;
                     if (rival.IsPlayer && !g.IsPlayer) score *= w.Settings.RivalWariness(w.Week / Content.WeeksPerYear);
+                    if (score > bestScore) { bestScore = score; best = biz; bestBackup = backup; }
                 }
-                if (score > bestScore) { bestScore = score; best = biz; }
             }
             if (best == null || bestScore < 80) continue;
             taken.Add(best.Id);
-            orders.Add(new ExtortOrder(g.Id, hood.Id, best.Id));
+            assigned.Add(hood.Id);
+            foreach (var b in bestBackup) assigned.Add(b.Id);
+            orders.Add(new ExtortOrder(g.Id, hood.Id, best.Id, bestBackup.Count > 0 ? bestBackup.Select(b => b.Id).ToArray() : null));
         }
 
         return orders;
+    }
+
+    /// <summary>
+    /// Buy the alderman where the gang does most of its business, and put money into elections
+    /// once it can afford to. Returns what it plans to spend.
+    /// </summary>
+    private static long PlanPolitics(World w, Gang g, List<Business> turf, long cash, List<Order> orders)
+    {
+        if (w.Wards.Count == 0 || !w.Settings.PoliticsEnabled || turf.Count < 4) return 0;
+        var home = turf.GroupBy(b => w.LotOf(b).WardId)
+            .Select(x => (Ward: w.Wards[x.Key], Count: x.Count()))
+            .OrderByDescending(x => x.Count).ThenBy(x => x.Ward.Id).ToList();
+
+        var due = Politics.Campaigning(w);
+        // Each race gets one budget, spent over a couple of weeks.
+        if (due is { Kind: ElectionKind.Mayor } && cash > 5000 && w.Hall.Campaign.GetValueOrDefault(g.Id) < 3000)
+        {
+            int amount = (int)Math.Min(1500, cash / 10);
+            orders.Add(new CampaignOrder(g.Id, -1, amount));
+            return amount;
+        }
+        if (due is { Kind: ElectionKind.Alderman } && cash > 4000)
+        {
+            // Defend a bought alderman first, then try for the home ward.
+            var target = home.FirstOrDefault(x => x.Ward.OwnerGangId == g.Id && x.Count >= 3).Ward ?? home[0].Ward;
+            if (target.Campaign.GetValueOrDefault(g.Id) < 1500)
+            {
+                int amount = (int)Math.Min(750, cash / 12);
+                orders.Add(new CampaignOrder(g.Id, target.Id, amount));
+                return amount;
+            }
+        }
+
+        foreach (var (ward, count) in home)
+        {
+            if (count < 3 || ward.OwnerGangId == g.Id || ward.Reformer || Politics.StaysBought(w, ward, g)) continue;
+            long cost = Politics.PayoffCost(w, ward, g);
+            if (cost > cash / 4 || cash - cost < 2500) continue;
+            // Rivals' aldermen are only worth stealing where the gang clearly runs the ward.
+            if (ward.OwnerGangId >= 0 && count < Politics.BusinessesIn(w, ward).Count(b => b.ProtectorGangId == ward.OwnerGangId) + 2) continue;
+            orders.Add(new PayoffOrder(g.Id, ward.Id));
+            return cost;
+        }
+        return 0;
     }
 }
