@@ -25,7 +25,11 @@ public partial class Main : Control
     private readonly List<Button> _speedButtons = new();
     private RichTextLabel _ticker = null!;
     private TabContainer _tabs = null!;
-    private VBoxContainer _businessPanel = null!, _ordersPanel = null!, _crewsPanel = null!;
+    private VBoxContainer _businessPanel = null!, _ordersPanel = null!, _crewsPanel = null!, _hallPanel = null!;
+    private int _selectedWard;
+
+    /// <summary>The size of city a new game starts in.</summary>
+    private CitySize _citySize = CitySize.Large;
     private MenuButton _gameMenu = null!;
     private Button _soundButton = null!;
     private ulong _lastCashSound;
@@ -54,9 +58,11 @@ public partial class Main : Control
     private void NewGame(ulong seed)
     {
         Palette.Reset();
-        _shell = new CommandShell(Simulation.New(new WorldSettings { Seed = seed }));
+        _shell = new CommandShell(Simulation.New(new WorldSettings { Seed = seed, Size = _citySize }));
         _map.World = W;
         _map.SelectedBusiness = -1;
+        _selectedWard = W.HqOf(W.Player).WardId;
+        _map.ResetView(W.HqOf(W.Player));
         _ticker.Clear();
         _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]You run {W.Player.Name} out of a back room on {W.Map.StreetOf(W.HqOf(W.Player))} St. " +
                            "Click a business on the map to give orders, or press Plan for me. Then End week.[/color]\n");
@@ -275,6 +281,7 @@ public partial class Main : Control
         RefreshOrders();
         RefreshCrews();
         RefreshGangs();
+        RefreshCityHall();
         _map.QueueRedraw();
     }
 
@@ -295,6 +302,12 @@ public partial class Main : Control
         AddLabel(_businessPanel, b.Name, Palette.Ink, 18);
         AddLabel(_businessPanel, $"{Content.Label(b.Kind)} · takes ${b.Takings} a week · owner toughness {b.Toughness}/10", Palette.InkQuiet);
         AddLabel(_businessPanel, $"{W.BlocksFromHq(W.Player, b):0.#} blocks from your HQ", Palette.InkQuiet);
+        if (lot.WardId < W.Wards.Count)
+        {
+            var ward = W.Wards[lot.WardId];
+            string whose = ward.Reformer ? "a reformer who can't be bought" : ward.OwnerGangId == Me ? "on your payroll" : ward.OwnerGangId >= 0 ? $"on {W.GangById(ward.OwnerGangId).Name}'s payroll" : "a party man, for sale";
+            AddLabel(_businessPanel, $"In {ward.Name}. Alderman {ward.Alderman} is {whose}.", ward.OwnerGangId >= 0 ? Palette.Gang(W, ward.OwnerGangId) : Palette.InkQuiet, wrap: true);
+        }
 
         if (b.IsProtected)
         {
@@ -597,8 +610,11 @@ public partial class Main : Control
         {
             var it = _gangsTree.CreateItem(root);
             var boss = W.HoodById(g.BossHoodId);
-            string[] cols = { g.IsPlayer ? $"{g.Name} (you)" : g.Name, $"{W.TurfOf(g.Id).Count()}", $"{W.HoodsOf(g.Id).Count()}", $"${g.Cash:N0}", $"{g.Heat}" };
-            for (int i = 0; i < cols.Length; i++) { it.SetText(i, cols[i]); it.SetTooltipText(i, $"{g.Name}, run by {boss.Name}"); }
+            int wards = W.Wards.Count(x => x.OwnerGangId == g.Id);
+            string[] cols = { g.IsPlayer ? $"{g.Name} (you)" : g.Name, $"{W.TurfOf(g.Id).Count()}", $"{W.HoodsOf(g.Id).Count()}", $"{wards}", $"${g.Cash:N0}", $"{g.Heat}" };
+            string tip = $"{g.Name}, run by {boss.Name}" + (wards > 0 ? $"\nAldermen on the payroll: {string.Join(", ", W.Wards.Where(x => x.OwnerGangId == g.Id).Select(x => x.Name))}" : "")
+                + (W.Hall.FriendGangId == g.Id ? $"\nMayor {W.Hall.Mayor} owes them" : "");
+            for (int i = 0; i < cols.Length; i++) { it.SetText(i, cols[i]); it.SetTooltipText(i, tip); }
             it.SetCustomColor(0, Palette.Gang(W, g.Id));
         }
     }
@@ -649,6 +665,8 @@ public partial class Main : Control
         _map.EndReplay();
         _map.World = W;
         _map.SelectedBusiness = -1;
+        _selectedWard = W.HqOf(W.Player).WardId;
+        _map.ResetView(W.HqOf(W.Player));
         _ticker.Clear();
         _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]Back in {W.Map.StreetOf(W.HqOf(W.Player))} St. {Reports.Date(W)}. Click a business to give orders, then End week.[/color]\n");
         _news.Text = W.Week > 0 ? WeekReport(W.Week - 1) : "No reports yet.";
@@ -660,7 +678,9 @@ public partial class Main : Control
     {
         var menu = _gameMenu.GetPopup();
         menu.Clear();
-        menu.AddItem("New city", 1);
+        menu.AddItem("New small city: one district, three outfits", 2);
+        menu.AddItem("New medium city: four wards, four outfits", 3);
+        menu.AddItem("New large city: six wards, five outfits", 4);
         menu.AddSeparator();
         for (int i = 1; i <= Slots; i++) menu.AddItem($"Save to slot {i}" + (SlotLabel(i) is string l ? $": {l}" : ""), 10 + i);
         menu.AddSeparator();
@@ -674,7 +694,7 @@ public partial class Main : Control
 
     private void OnGameMenu(long id)
     {
-        if (id == 1) NewGame(GD.Randi());
+        if (id is >= 2 and <= 4) { _citySize = (CitySize)(id - 2); NewGame(GD.Randi()); }
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
         else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
     }
@@ -810,11 +830,15 @@ public partial class Main : Control
         crewsScroll.Visible = true;
         menTab.AddChild(crewsScroll);
         _ordersPanel = ScrollTab("Orders");
-        _gangsTree = TreeTab("Gangs", "Gang", "Turf", "Men", "Cash", "Heat");
+        _hallPanel = ScrollTab("City Hall");
+        _gangsTree = TreeTab("Gangs", "Gang", "Turf", "Men", "Wards", "Cash", "Heat");
         _news = new RichTextLabel { Name = "Report", SelectionEnabled = true, BbcodeEnabled = true };
         _tabs.AddChild(_news);
         _tabs.AddChild(BuildConsole());
         body.AddChild(_tabs);
+        // The map shows the wards while City Hall is open.
+        _tabs.TabChanged += _ => { _map.ShowWards = _tabs.GetCurrentTabControl()?.Name == "City Hall"; };
+        _map.WardClicked += ward => { _selectedWard = ward; RefreshCityHall(); };
 
         SetSpeed(1);
     }
@@ -855,7 +879,7 @@ public partial class Main : Control
         {
             tree.SetColumnTitle(i, columns[i]);
             tree.SetColumnExpand(i, i == 0);
-            if (i > 0) tree.SetColumnCustomMinimumWidth(i, columns[i] is "Cash" ? 80 : columns[i] is "Now" ? 50 : columns[i] is "Crew" ? 64 : 34);
+            if (i > 0) tree.SetColumnCustomMinimumWidth(i, columns[i] is "Cash" ? 80 : columns[i] is "Now" ? 50 : columns[i] is "Crew" or "Wards" ? 50 : 34);
             if (i > 0) tree.SetColumnTitleAlignment(i, HorizontalAlignment.Center);
         }
         _tabs.AddChild(tree);
@@ -954,6 +978,7 @@ public partial class Main : Control
         bool Flag(string name) => Array.IndexOf(args, name) >= 0;
         if (args.Length == 0) return;
 
+        if (Arg("--size") is string size) _citySize = Enum.Parse<CitySize>(size, true);
         if (Arg("--seed") is string seed) NewGame(ulong.Parse(seed));
         if (Arg("--load") is string slot) GD.Print(LoadGame(int.Parse(slot)) ? $"Loaded {SlotPath(int.Parse(slot))}" : "Load failed");
         int weeks = int.Parse(Arg("--weeks") ?? "0");
@@ -966,6 +991,9 @@ public partial class Main : Control
         if (Arg("--exec") is string commands)
             foreach (var c in commands.Split(';')) GD.Print(_shell.Execute(c.Trim()));
         RefreshAll();
+        if (Arg("--ward") is string wardArg) _selectedWard = int.Parse(wardArg);
+        if (Flag("--whole-map")) _map.ResetView(null);
+        RefreshCityHall();
         if (Arg("--tab") is string tab) _tabs.CurrentTab = TabIndex(tab);
         if (Arg("--save") is string saveSlot) SaveGameTo(int.Parse(saveSlot));
         if (Arg("--live") is string live)

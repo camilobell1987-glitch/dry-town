@@ -103,6 +103,8 @@ public sealed class Simulation
                     break;
                 case BribeOrder o: Bribe(gang, o.Amount); break;
                 case SetRateOrder o: SetRate(gang, o); break;
+                case PayoffOrder o when o.WardId >= 0 && o.WardId < w.Wards.Count: Politics.Payoff(w, gang, w.Wards[o.WardId]); break;
+                case CampaignOrder o: Politics.Campaign(w, gang, o.WardId, o.Amount); break;
             }
         }
         w.Tick = Math.Max(w.Tick, Math.Min(tick, Content.HoursPerWeek - 1));
@@ -168,6 +170,7 @@ public sealed class Simulation
         PayWages();
         w.Tick = Content.ReckoningTick;
         Police();
+        Politics.Step(w, w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.HoodKilled));
         Feds();
         Loyalty();
         Aging();
@@ -201,7 +204,8 @@ public sealed class Simulation
         {
             SetRateOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
-            BribeOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
+            BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
+            CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
             RecruitOrder => rng.Range(0, 5) * 24 + rng.Range(10, 17),
             _ => rng.Range(0, 5) * 24 + rng.Range(9, 22),
         };
@@ -482,9 +486,17 @@ public sealed class Simulation
 
             if (biz.Resentment > 60 && w.Rng.Chance((biz.Resentment - 60) / 150.0))
             {
-                gang.Heat = Math.Min(100, gang.Heat + 6);
                 biz.Resentment -= 20;
-                w.Log(EventKind.Squeal, gang.Id, $"The owner of {biz.Name} talked to the police about {gang.Name}.");
+                if (Politics.Covered(w, gang, biz))
+                {
+                    gang.Heat = Math.Min(100, gang.Heat + 2);
+                    w.Log(EventKind.Squeal, gang.Id, $"The owner of {biz.Name} complained about {gang.Name}, and Alderman {Politics.WardOf(w, biz).Alderman} made it go away.");
+                }
+                else
+                {
+                    gang.Heat = Math.Min(100, gang.Heat + 6);
+                    w.Log(EventKind.Squeal, gang.Id, $"The owner of {biz.Name} talked to the police about {gang.Name}.");
+                }
             }
         }
     }
@@ -573,12 +585,18 @@ public sealed class Simulation
         {
             // Big organisations are hard to hide.
             int size = w.TurfOf(gang.Id).Count();
-            gang.Heat = Math.Clamp(gang.Heat - 2 + size / 10, 0, 100);
-            if (gang.Heat <= 35 || !w.Rng.Chance((gang.Heat - 35) / 120.0)) continue;
+            // Friends at City Hall cool things down; a reform mayor keeps the precincts on their toes.
+            int aldermen = Math.Min(2, w.Wards.Count(x => x.OwnerGangId == gang.Id));
+            int cooling = 2 + aldermen + (w.Hall.FriendGangId == gang.Id ? 2 : 0);
+            gang.Heat = Math.Clamp(gang.Heat - cooling + size / 10, 0, 100);
+            int threshold = w.Hall.Reform ? 30 : 35;
+            if (gang.Heat <= threshold || !w.Rng.Chance((gang.Heat - threshold) / 120.0)) continue;
 
             var ledger = w.Ledger(gang.Id);
-            var racketSite = w.TurfOf(gang.Id).Where(b => b.Racket != RacketKind.None).ToList();
-            string what = "";
+            var rackets = w.TurfOf(gang.Id).Where(b => b.Racket != RacketKind.None).ToList();
+            // An alderman on the payroll tips off the rackets in his ward before the wagons roll.
+            var racketSite = rackets.Where(b => !Politics.Covered(w, gang, b)).ToList();
+            string what = rackets.Count > racketSite.Count && racketSite.Count == 0 ? ", but the rackets had been tipped off" : "";
             int targetLot = gang.HqLotId, targetBiz = -1;
             if (racketSite.Count > 0)
             {
@@ -602,7 +620,7 @@ public sealed class Simulation
                 var hood = w.Rng.Pick(suspects);
                 if (!w.Rng.Chance(hood.Stealth * 0.05)) { Jail(hood, w.Rng.Range(6, 30), "after a raid"); arrested = hood.Id; }
             }
-            w.Act(new ScriptAction(ActionKind.Raid, -1, -1, w.Precinct.Id, targetLot, targetBiz,
+            w.Act(new ScriptAction(ActionKind.Raid, -1, -1, w.PrecinctNear(w.Map.LotAt(targetLot)).Id, targetLot, targetBiz,
                 arrested >= 0 ? ActionResult.Arrested : ActionResult.Success, text, gang.Id, -1, arrested));
             gang.Heat = Math.Max(0, gang.Heat - 15);
         }
@@ -644,7 +662,7 @@ public sealed class Simulation
 
                 if (!hood.IsAvailable || hood.Loyalty >= 20 || !w.Rng.Chance(0.12)) continue;
 
-                if (hood.Ambition > 65 && w.LivingGangs.Count() < Content.MaxGangs)
+                if (hood.Ambition > 65 && w.LivingGangs.Count() < w.Settings.MaxGangs)
                     Breakaway(gang, hood);
                 else
                 {
@@ -777,7 +795,7 @@ public sealed class Simulation
             w.Log(EventKind.Succession, gang.Id, named ? $"{heir.Name} takes over {gang.Name}, as {boss.Name} wanted." : $"{heir.Name} takes over {gang.Name}.");
 
             var rival = heirs.Skip(1).FirstOrDefault(h => h.Ambition > 70 && h.Loyalty < 55 && h.IsAvailable);
-            if (rival != null && w.LivingGangs.Count() < Content.MaxGangs) Breakaway(gang, rival);
+            if (rival != null && w.LivingGangs.Count() < w.Settings.MaxGangs) Breakaway(gang, rival);
         }
     }
 
@@ -797,6 +815,7 @@ public sealed class Simulation
             gang.Alive = false;
             gang.DissolvedWeek = w.Week;
             w.ReleaseHeadquarters(gang);
+            Politics.Forget(w, gang);
             foreach (var h in active) h.State = HoodState.Gone;
             foreach (var biz in w.TurfOf(gang.Id).ToList())
             {

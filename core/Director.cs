@@ -48,12 +48,12 @@ public sealed class Director
             StirDissent(top);
             // A gang that owns most of the district has more than one lieutenant eyeing the chair.
             if (share >= 0.7) StirDissent(top);
-            if (living < Content.MaxGangs) Outsiders($"arrived to challenge {top.Name}");
+            if (living < _w.Settings.MaxGangs) Outsiders($"arrived to challenge {top.Name}");
         }
         else if (_quietWeeks >= QuietWeeks)
         {
             _quietWeeks = 0;
-            if (living < Content.MaxGangs) Outsiders("smelled easy money in a quiet district");
+            if (living < _w.Settings.MaxGangs) Outsiders("smelled easy money in a quiet district");
             else StirDissent(top);
         }
         else if (living < 3 && _w.Rng.Chance(0.01))
