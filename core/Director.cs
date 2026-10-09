@@ -48,7 +48,8 @@ public sealed class Director
             StirDissent(top);
             // A gang that owns most of the district has more than one lieutenant eyeing the chair.
             if (share >= 0.7) StirDissent(top);
-            if (living < _w.Settings.MaxGangs) Outsiders($"arrived to challenge {top.Name}");
+            // A full city still gets a challenger when one outfit owns most of it.
+            if (living < _w.Settings.MaxGangs || share >= 0.7) Outsiders($"arrived to challenge {top.Name}");
         }
         else if (_quietWeeks >= QuietWeeks)
         {

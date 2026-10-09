@@ -119,16 +119,16 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 
 All gangs, including the player's, were run by the AI planner. A city counts as stalled if, in any year, it has fewer than two gangs at some point, one gang holds over 75% of the district all year, or fewer than 3 businesses change hands.
 
-| Check | Result |
-| --- | --- |
-| 10-year cities contested, seeds 1–80 (Normal) | 80/80 |
-| 10-year cities contested, seeds 1–40 (Hard) | 40/40 |
-| 50-year cities contested, seeds 1–10 | 10/10 |
-| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 71/80 / 55/80 |
-| Player's gang alive after 3 / 10 years, seeds 1–40 (Hard) | 27/40 / 25/40 |
-| Player's gang alive after 50 years, seeds 1–10 (Normal) | 3/10 |
+| Check | Small | Medium | Large |
+| --- | --- | --- | --- |
+| 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 |
+| 10-year cities contested, seeds 1–40 (Hard) | 40/40 | 40/40 | 40/40 |
+| 50-year cities contested, seeds 1–10 | 10/10 | | 10/10 |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 71/80 / 58/80 | 70/80 / 46/80 | 68/80 / 36/80 |
+| Player's gang alive after 3 / 10 years, seeds 1–40 (Hard) | 26/40 / 22/40 | 20/40 / 9/40 | 21/40 / 12/40 |
+| Player's gang alive after 50 years, seeds 1–10 (Normal) | 1/10 | | 1/10 |
 
-Phase 3 on the same 80 Normal seeds kept the player's gang alive in 69/80 after 3 years and 58/80 after 10, and in 1/10 after 50 years. The game now loses some bosses to old age, but heirs and family make up for it, and long games survive more often.
+Phase 4's small city kept the player's gang alive in 71/80 after 3 years and 55/80 after 10, so politics hasn't made the small city harder. Bigger cities are harder to last in: there are more rivals, and the autopilot doesn't pick its fights by ward. With politics turned off (`--no-politics`), the small city gives 68/80 after 3 years on the same build.
 
 The AI is a cautious but simple player; a person paying attention should do better.
 
