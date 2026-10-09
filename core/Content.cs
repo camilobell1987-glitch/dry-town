@@ -24,7 +24,56 @@ public static class Content
     public static double YearlyDeathChance(int age) => age < 30 ? 0.001 : Math.Min(0.6, 0.005 * Math.Exp((age - 40) / 9.0));
     public const int BribeUnit = 100;
     public const int HeatPerBribeUnit = 4;
-    public const int MaxGangs = 6;
+
+    /// <summary>The city's shape for each size: blocks, wards, precinct houses, businesses and how many gangs it holds.</summary>
+    public record CityShape(int BlocksX, int BlocksY, int WardsX, int WardsY, int Precincts, int Businesses, int StartingGangs, int MaxGangs);
+
+    public static CityShape Shape(CitySize size) => size switch
+    {
+        CitySize.Medium => new(7, 5, 2, 2, 2, 90, 4, 8),
+        CitySize.Large => new(9, 7, 3, 2, 3, 150, 5, 10),
+        _ => new(5, 4, 2, 1, 1, 48, 3, 6),
+    };
+
+    // ---- Politics -----------------------------------------------------------
+
+    /// <summary>Aldermen are elected every second November, the first in 1920.</summary>
+    public const int AldermanElectionWeek = 45;
+
+    /// <summary>The mayor is elected every fourth April, the first in 1923.</summary>
+    public const int MayorElectionWeek = 14;
+
+    /// <summary>Weeks of campaigning before an election, when money can be put behind a candidate.</summary>
+    public const int CampaignWeeks = 8;
+
+    public static bool IsAldermanYear(int year) => year % 2 == 0;
+    public static bool IsMayorYear(int year) => year % 4 == 3;
+
+    /// <summary>A ward boss's weekly envelope: a base plus a cut for every business in his ward.</summary>
+    public static int AldermanRetainer(int businessesInWard) => 25 + businessesInWard * 3;
+
+    /// <summary>One-off payment to get an alderman on the payroll, as a multiple of his retainer. Twice that if another outfit owns him.</summary>
+    public const int PayoffWeeks = 5;
+
+    /// <summary>A newly bought alderman won't hear another outfit's offer for half a year.</summary>
+    public const int AldermanLoyalWeeks = 26;
+
+    public static readonly string[] WardNames =
+    {
+        "the Levee", "Tannery Row", "Goat Hill", "the Flats", "Little Palermo", "Canal Bend",
+        "Kerry Patch", "Dutch Hollow", "the Stockyards", "Gaslight Square", "Shantytown", "the Bottoms",
+    };
+
+    public static readonly string[] PoliticianFirstNames =
+    {
+        "Ambrose", "Cornelius", "Thaddeus", "Horace", "Bartholomew", "Ignatius", "Lucius", "Mortimer",
+        "Percival", "Rufus", "Silas", "Wendell", "Clarence", "Elmer", "Virgil", "Otis",
+    };
+
+    public static readonly string[] PoliticianNicknames =
+    {
+        "Bathhouse", "Hinky Dink", "Big Bill", "Honest", "Silver Tongue", "Diamond", "Smiling", "Deacon",
+    };
     public const int DefaultRatePercent = 12;
 
     public record RacketInfo(RacketKind Kind, string Label, int SetupCost, int WeeklyIncome, int WeeklyHeat, bool NeedsProhibition);
@@ -89,11 +138,13 @@ public static class Content
     public static readonly string[] StreetNames =
     {
         "Canal", "Halsted", "Mercer", "Larkin", "Foundry", "Orchard", "Tanner", "Vine", "Kessler", "Market",
+        "Rook", "Ashby", "Pullman", "Weller",
     };
 
     public static readonly string[] AvenueNames =
     {
         "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Railroad", "Lake",
+        "Seventh", "Eighth", "Union", "Grand",
     };
 
     public const int HoursPerWeek = 168;

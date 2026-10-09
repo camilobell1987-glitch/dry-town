@@ -194,7 +194,10 @@ public class Phase2Tests
                 var biz = w.Businesses.First();
                 biz.ProtectorGangId = rival.Id;
                 var rivalHoods = w.HoodsOf(rival.Id).ToList();
-                biz.HandlerHoodId = rivalHoods[0].Id;
+                // An ordinary man on the door, not the boss.
+                var handler = rivalHoods[2];
+                handler.Intimidation = handler.Muscle = 4;
+                biz.HandlerHoodId = handler.Id;
                 var guard = rivalHoods[1];
                 guard.Intimidation = guard.Muscle = 9;
                 var attacker = w.HoodsOf(me.Id).First(h => h.Id != me.BossHoodId);
@@ -227,7 +230,7 @@ public class Phase3Tests
     {
         var original = Run(11, 40);
         var w = original.World;
-        var crew = w.FormCrew(w.AvailableHoodsOf(w.Player.Id).First());
+        var crew = w.FormCrew(w.HoodsOf(w.Player.Id).First());
         var pending = new List<Order> { new RecruitOrder(w.Player.Id), new BribeOrder(w.Player.Id, 200) };
 
         string json = SaveGame.Write(original, pending);
@@ -281,7 +284,7 @@ public class Phase3Tests
         Assert.True(tick > 40);
         Assert.Contains(hood.Id, sim.CommittedHoods(w.Player.Id));
         sim.FinishWeek();
-        var done = w.Script.Single(s => s.HoodId == hood.Id && s.BusinessId == target.Id);
+        var done = w.Script.Single(s => s.HoodId == hood.Id && s.BusinessId == target.Id && s.Kind != ActionKind.Collect);
         Assert.Equal(tick, done.Tick);
         Assert.Null(NewOrderAfterHours(Run(9, 4)));
     }
@@ -403,4 +406,164 @@ public class Phase4Tests
         var loaded = SaveGame.Restore(SaveGame.Read(json.ToJsonString()));
         foreach (var h in loaded.World.Hoods) Assert.InRange(h.Age(loaded.World.Week), 18, 60);
     }
+}
+
+public class Phase5Tests
+{
+    private static Simulation Run(ulong seed, int weeks, CitySize size = CitySize.Small)
+    {
+        var sim = Simulation.New(new WorldSettings { Seed = seed, Size = size });
+        for (int i = 0; i < weeks; i++) sim.AdvanceWeek(playerAutopilot: true);
+        return sim;
+    }
+
+    [Theory]
+    [InlineData(CitySize.Small, 5, 4, 2, 1, 3)]
+    [InlineData(CitySize.Medium, 7, 5, 4, 2, 4)]
+    [InlineData(CitySize.Large, 9, 7, 6, 3, 5)]
+    public void CitiesComeInThreeSizes(CitySize size, int blocksX, int blocksY, int wards, int precincts, int gangs)
+    {
+        var w = World.Create(new WorldSettings { Seed = 3, Size = size });
+        Assert.Equal(blocksX, w.Map.BlocksX);
+        Assert.Equal(blocksY, w.Map.BlocksY);
+        Assert.Equal(wards, w.Wards.Count);
+        Assert.Equal(precincts, w.Map.Lots.Count(l => l.Use == LotUse.Precinct));
+        Assert.Equal(gangs, w.LivingGangs.Count());
+        Assert.Equal(Content.Shape(size).Businesses, w.Businesses.Count);
+        // Every ward has shops in it, and every walk stays on the streets.
+        foreach (var ward in w.Wards) Assert.True(Politics.BusinessesIn(w, ward).Count() >= 10);
+        var a = w.Map.Lots.First();
+        var b = w.Map.Lots.Last();
+        foreach (var (x, y) in w.Map.Path(a, b).Skip(1).SkipLast(1)) Assert.True(CityMap.IsRoad(x, y));
+    }
+
+    [Fact]
+    public void BigCitiesStayContestedAndRunFast()
+    {
+        var sim = Run(4, 3 * Content.WeeksPerYear, CitySize.Large);
+        Assert.True(sim.World.LivingGangs.Count() >= 3);
+        Assert.False(sim.Metrics.Check().Stalled);
+    }
+
+    [Fact]
+    public void AnAldermanOnThePayrollTipsOffRacketsInHisWard()
+    {
+        int raids = 0;
+        for (ulong seed = 1; seed <= 20; seed++)
+        {
+            var sim = Simulation.New(new WorldSettings { Seed = seed, StartingGangs = 2, DirectorEnabled = false });
+            var w = sim.World;
+            var me = w.Player;
+            var ward = w.Wards[0];
+            ward.OwnerGangId = me.Id;
+            var site = Politics.BusinessesIn(w, ward).First(b => b.IsOpen);
+            site.ProtectorGangId = me.Id;
+            site.HandlerHoodId = w.HoodsOf(me.Id).First().Id;
+            site.ProtectionRate = 12;
+            site.Racket = RacketKind.Numbers;
+            me.Heat = 100;
+            me.Cash = 50_000;
+            sim.AdvanceWeek(new Dictionary<int, List<Order>> { [me.Id] = new() });
+            if (w.Events.Any(e => e.Kind == EventKind.Raid && e.GangId == me.Id && e.Text.Contains("tipped off"))) raids++;
+            Assert.Equal(RacketKind.Numbers, site.Racket);
+        }
+        Assert.True(raids > 0);
+    }
+
+    [Fact]
+    public void ABoughtAldermanStaysBoughtForAWhile()
+    {
+        var sim = Run(6, 2);
+        var w = sim.World;
+        var me = w.Player;
+        var rival = w.LivingGangs.First(g => !g.IsPlayer);
+        var ward = w.Wards[0];
+        me.Cash = rival.Cash = 20_000;
+        var shell = new CommandShell(sim);
+        long cost = Politics.PayoffCost(w, ward, me);
+        Assert.StartsWith("Queued", shell.Execute($"payoff {ward.Id}"));
+        shell.EndWeek();
+        Assert.Equal(me.Id, ward.OwnerGangId);
+        Assert.True(Politics.StaysBought(w, ward, rival));
+        Assert.False(Politics.Payoff(w, rival, ward));
+        Assert.Equal(cost * 2, Politics.PayoffCost(w, ward, rival));
+        w.Week += Content.AldermanLoyalWeeks;
+        Assert.True(Politics.Payoff(w, rival, ward));
+        Assert.Equal(rival.Id, ward.OwnerGangId);
+    }
+
+    [Fact]
+    public void ReformersWontTakeTheMoney()
+    {
+        var sim = Run(7, 1);
+        var w = sim.World;
+        w.Wards[1].Reformer = true;
+        w.Player.Cash = 20_000;
+        int heat = w.Player.Heat;
+        Assert.False(Politics.Payoff(w, w.Player, w.Wards[1]));
+        Assert.Equal(-1, w.Wards[1].OwnerGangId);
+        Assert.Equal(20_000, w.Player.Cash);
+        Assert.True(w.Player.Heat > heat);
+    }
+
+    [Fact]
+    public void ElectionsComeOnScheduleAndCampaignsOnlyBeforeThem()
+    {
+        var sim = Simulation.New(new WorldSettings { Seed = 8 });
+        var w = sim.World;
+        Assert.Equal(Content.AldermanElectionWeek - 1, Politics.NextElection(w, ElectionKind.Alderman));
+        Assert.Equal(3 * Content.WeeksPerYear + Content.MayorElectionWeek - 1, Politics.NextElection(w, ElectionKind.Mayor));
+        w.Player.Cash = 5000;
+        Assert.Equal(0, Politics.Campaign(w, w.Player, 0, 500));
+        Assert.Contains("no election", new CommandShell(sim).Execute("campaign 0 500"));
+
+        while (w.Week < Content.AldermanElectionWeek - Content.CampaignWeeks) sim.AdvanceWeek(playerAutopilot: true);
+        Assert.Equal(ElectionKind.Alderman, Politics.Campaigning(w)!.Value.Kind);
+        w.Player.Cash = 5000;
+        Assert.Equal(0, Politics.Campaign(w, w.Player, -1, 500)); // not a mayor's year
+        Assert.Equal(500, Politics.Campaign(w, w.Player, 0, 500));
+        while (w.Week < Content.AldermanElectionWeek) sim.AdvanceWeek(playerAutopilot: true);
+        Assert.Contains(w.Events, e => e.Kind == EventKind.Politics && e.Week == Content.AldermanElectionWeek - 1 && (e.Text.Contains(" won ") || e.Text.Contains(" held ")));
+        Assert.All(w.Wards, x => Assert.Empty(x.Campaign));
+
+        int mayorWeek = Politics.NextElection(w, ElectionKind.Mayor);
+        while (w.Week <= mayorWeek) sim.AdvanceWeek(playerAutopilot: true);
+        Assert.Contains(w.Events, e => e.Kind == EventKind.Politics && e.Text.Contains("mayor", StringComparison.OrdinalIgnoreCase) && e.Year(w) == 1923);
+    }
+
+    [Fact]
+    public void SavesFromBeforePoliticsGetWards()
+    {
+        var sim = Run(5, 20);
+        var json = System.Text.Json.Nodes.JsonNode.Parse(SaveGame.Write(sim, new List<Order>()))!;
+        json["Version"] = 2;
+        json.AsObject().Remove("Wards");
+        json.AsObject().Remove("Hall");
+        json.AsObject().Remove("WardsX");
+        json.AsObject().Remove("WardsY");
+        foreach (var l in json["Lots"]!.AsArray()) l!.AsObject().Remove("WardId");
+        var loaded = SaveGame.Restore(SaveGame.Read(json.ToJsonString())).World;
+        Assert.Equal(2, loaded.Wards.Count);
+        Assert.False(string.IsNullOrEmpty(loaded.Hall.Mayor));
+        Assert.Contains(loaded.Map.Lots, l => l.WardId == 1);
+        Assert.Contains(loaded.Map.Lots, l => l.WardId == 0);
+    }
+
+    [Fact]
+    public void PoliticsSurviveASave()
+    {
+        var sim = Run(9, 30);
+        var w = sim.World;
+        w.Wards[0].OwnerGangId = w.Player.Id;
+        w.Hall.Outrage = 42;
+        var loaded = SaveGame.Restore(SaveGame.Read(SaveGame.Write(sim, new List<Order>()))).World;
+        Assert.Equal(w.Player.Id, loaded.Wards[0].OwnerGangId);
+        Assert.Equal(42, loaded.Hall.Outrage);
+        Assert.Equal(w.Wards.Select(x => x.Alderman), loaded.Wards.Select(x => x.Alderman));
+    }
+}
+
+internal static class EventYear
+{
+    public static int Year(this GameEvent e, World w) => Content.StartYear + e.Week / Content.WeeksPerYear;
 }

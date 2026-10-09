@@ -10,6 +10,8 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(RecruitOrder), "recruit")]
 [JsonDerivedType(typeof(BribeOrder), "bribe")]
 [JsonDerivedType(typeof(SetRateOrder), "rate")]
+[JsonDerivedType(typeof(PayoffOrder), "payoff")]
+[JsonDerivedType(typeof(CampaignOrder), "campaign")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -38,3 +40,9 @@ public sealed record BribeOrder(int GangId, int Amount) : Order(GangId);
 
 /// <summary>Change the weekly protection rate (percent of takings) on one business.</summary>
 public sealed record SetRateOrder(int GangId, int BusinessId, int RatePercent) : Order(GangId);
+
+/// <summary>Put a ward's alderman on the payroll: a one-off sweetener, then his envelope every Sunday.</summary>
+public sealed record PayoffOrder(int GangId, int WardId) : Order(GangId);
+
+/// <summary>Put money behind a candidate while an election is coming. WardId -1 is the mayor's race.</summary>
+public sealed record CampaignOrder(int GangId, int WardId, int Amount) : Order(GangId);

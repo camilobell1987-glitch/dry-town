@@ -31,6 +31,7 @@ public sealed class CommandShell
         "crews | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
         "heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
+        "wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -55,6 +56,9 @@ public sealed class CommandShell
                 case "bribe": return Queue(new BribeOrder(Me, int.Parse(p[1])));
                 case "rate": return Queue(new SetRateOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "crews": return Reports.Crews(W, Me);
+                case "wards": return Reports.Wards(W, Me);
+                case "payoff": return Queue(new PayoffOrder(Me, int.Parse(p[1])));
+                case "campaign": return Queue(new CampaignOrder(Me, p[1].ToLowerInvariant() == "mayor" ? -1 : int.Parse(p[1]), int.Parse(p[2])));
                 case "heir": return NameHeir(int.Parse(p[1]));
                 case "family": return Queue(new RecruitOrder(Me, Family: true));
                 case "crew": return CrewCommand(p);
@@ -167,6 +171,8 @@ public sealed class CommandShell
                 : !Simulation.CanBringInFamily(W, W.Player) ? $"You can bring family in once a year, for ${Content.FamilyCost}." : null,
             GuardOrder g => g.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null) ?? CheckBiz(g.BusinessId)
                 ?? (W.BusinessById(g.BusinessId).ProtectorGangId != Me ? "You can only guard your own turf." : null),
+            PayoffOrder po => CheckPayoff(po),
+            CampaignOrder co => CheckCampaign(co),
             _ => null,
         };
         if (problem != null) return problem + "\n";
@@ -183,6 +189,10 @@ public sealed class CommandShell
         RecruitOrder => $"recruit a new hood (${Content.RecruitCost})",
         BribeOrder b => $"pay the precinct ${b.Amount}",
         SetRateOrder s => $"set {BizName(s.BusinessId)} to {s.RatePercent}%",
+        PayoffOrder po when po.WardId >= 0 && po.WardId < W.Wards.Count =>
+            $"put Alderman {W.Wards[po.WardId].Alderman} of {W.Wards[po.WardId].Name} on the payroll (${Politics.PayoffCost(W, W.Wards[po.WardId], W.Player)})",
+        CampaignOrder co => co.WardId < 0 ? $"put ${co.Amount} behind the machine's man for mayor"
+            : $"put ${co.Amount} behind your man in {(co.WardId < W.Wards.Count ? W.Wards[co.WardId].Name : "ward " + co.WardId)}",
         _ => o.ToString(),
     };
 
@@ -193,6 +203,32 @@ public sealed class CommandShell
         var hood = W.Hoods.FirstOrDefault(h => h.Id == id);
         if (hood == null || hood.GangId != Me || !hood.IsActive) return $"Hood {id} isn't one of yours. Type 'hoods'.";
         if (!hood.IsAvailable && !allowJailed) return $"{hood.Name} is in jail.";
+        return null;
+    }
+
+    /// <summary>Why the player can't buy this alderman now, or null.</summary>
+    public string? CheckPayoff(PayoffOrder o)
+    {
+        if (o.WardId < 0 || o.WardId >= W.Wards.Count) return "There's no such ward. Type 'wards'.";
+        var ward = W.Wards[o.WardId];
+        if (ward.OwnerGangId == Me) return $"Alderman {ward.Alderman} is already on your payroll.";
+        if (ward.Reformer) return $"Alderman {ward.Alderman} is a reformer. He won't take an envelope.";
+        if (Politics.StaysBought(W, ward, W.Player)) return $"Alderman {ward.Alderman} has just taken {W.GangById(ward.OwnerGangId).Name}'s money and won't hear offers yet.";
+        if (Pending.Any(p => p is PayoffOrder q && q.WardId == o.WardId)) return "You're already sending him an envelope this week.";
+        long cost = Politics.PayoffCost(W, ward, W.Player);
+        return W.Player.Cash < cost + Pending.OfType<PayoffOrder>().Sum(q => q.WardId < W.Wards.Count ? Politics.PayoffCost(W, W.Wards[q.WardId], W.Player) : 0)
+            ? $"Alderman {ward.Alderman} costs ${cost} to start with." : null;
+    }
+
+    /// <summary>Why the player can't back a candidate in this race now, or null.</summary>
+    public string? CheckCampaign(CampaignOrder o)
+    {
+        var due = Politics.Campaigning(W);
+        if (due == null) return "There's no election coming up yet.";
+        if (o.Amount <= 0) return "Put some money in.";
+        if (o.WardId < 0 && due.Value.Kind != ElectionKind.Mayor) return "The mayor isn't up for election this time; back an alderman.";
+        if (o.WardId >= 0 && due.Value.Kind != ElectionKind.Alderman) return "This is the mayor's race; back the machine's man.";
+        if (o.WardId >= W.Wards.Count) return "There's no such ward. Type 'wards'.";
         return null;
     }
 

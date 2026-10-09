@@ -2,7 +2,7 @@
 
 An open-ended Prohibition-era crime strategy game, inspired by how *Gangsters: Organized Crime* (1998) plays. It is a new game. It uses none of the original's art, audio, text, code, data or name.
 
-There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4, the current state, lets the game outlive your boss. Men grow old and die, and the outfit passes to an heir, so one game can run through generations of a family.
+There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5, the current state, adds politics and a bigger city. The city now comes in three sizes, the largest with six wards and five outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out.
 
 ![Planning a week](docs/screenshots/planning.png)
 
@@ -20,10 +20,11 @@ There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). To play the game, install the **.NET edition** of Godot 4.7, open `godot/project.godot` and press Play. If your editor is a different 4.x version, it updates the version in `DryTown.csproj` when it opens the project.
 
 ```sh
-dotnet test tests                                                    # 34 tests
+dotnet test tests                                                    # 44 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
+dotnet run --project sim -- soak --seeds 40 --years 10 --size Large   # Small, Medium or Large
 ```
 
 ## How a week works
@@ -34,6 +35,33 @@ dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
 3. **Report (Sunday).** Collectors make their rounds, then the police, the Treasury and the gangs settle up. The **Report** tab shows the books and the week's headlines, with your own in bold.
 
 ![The live week on Sunday morning](docs/screenshots/live-week.png)
+
+## City Hall
+
+The city is split into wards, and each ward has an alderman. Open the **City Hall** tab and the map shows the wards, each washed in the colour of the outfit that owns its alderman. Click a ward on the map or in the list to see who runs it.
+
+- **Aldermen.** A party man can be put on your payroll for a one-off envelope, then a weekly one that grows with the number of shops in his ward. While he's yours, he tips off your rackets in his ward before the police arrive, makes shopkeepers' complaints go away, and cools your heat a little every week. A man who just took one outfit's money won't hear another offer for half a year; after that a rival can turn him for double. Miss a Sunday envelope and he stops taking your calls.
+- **Reformers.** A reformer won't take an envelope, and offering one gets you in the papers. The only way to be rid of him is to beat him at the polls.
+- **Elections.** Aldermen are elected every second November and the mayor every fourth April. For eight weeks before each vote you can put money behind your man. Money counts, so do the shops you run in his ward, and so does a sitting alderman's machine. Every $400 you spend on the street draws a little heat.
+- **The mayor.** A machine mayor leaves the town wide open, and the outfit that paid most for his win has the police go easy on it. A reform mayor's police raid sooner and his aldermen cost twice as much to buy. Killings in the papers drive up public outrage, and outrage wins elections for reformers.
+
+Rival outfits play too. They buy the alderman where they do most of their business, defend him at election time, and back the machine's man for mayor when they can afford to.
+
+![City Hall during the aldermen's campaign](docs/screenshots/city-hall.png)
+
+## City sizes
+
+**Game → New city** offers three sizes. A new game starts in a large city, zoomed in on your headquarters; scroll out to see all of it.
+
+| Size | Blocks | Wards | Precincts | Businesses | Outfits at the start / at most |
+| --- | --- | --- | --- | --- | --- |
+| Small | 5 × 4 | 2 | 1 | 48 | 3 / 6 |
+| Medium | 7 × 5 | 4 | 2 | 90 | 4 / 8 |
+| Large | 9 × 7 | 6 | 3 | 150 | 5 / 10 |
+
+Police answer a raid from the nearest precinct house. Saves from earlier versions load as a small city split into two wards.
+
+![A large city](docs/screenshots/large-city.png)
 
 ## Bosses grow old
 
@@ -55,7 +83,7 @@ Rival gangs send men in pairs and threes too, but only while they are small. A g
 
 ## Saving
 
-The game saves itself every Sunday and when you close the window. Next time you open it, you carry on where you left off. The **Game** menu has three save slots, loading, and **New city**. Saves are JSON files in Godot's user folder, under `saves/`.
+The game saves itself every Sunday and when you close the window. Next time you open it, you carry on where you left off. The **Game** menu has three save slots, loading, and a new city in any of the three sizes. Saves are JSON files in Godot's user folder, under `saves/`.
 
 ## Sound
 
@@ -73,15 +101,15 @@ Scroll to zoom, and drag with the right or middle mouse button to pan. Trackpad 
 ![Sending a man mid-week](docs/screenshots/mid-week.png)
 ![Saturday night](docs/screenshots/night.png)
 
-The **Console** tab and `sim play` take the same text orders: `extort <hood> <business>`, `racket <hood> <business> <kind>`, `guard <hood> <business>`, `recruit`, `bribe <dollars>`, `rate <business> <percent>`, `crews`, `crew new <hood>`, `crew add <crew> <hood>`, `send <crew> <business>`, `post <crew> <business>`, `auto`, `end`.
+The **Console** tab and `sim play` take the same text orders: `extort <hood> <business>`, `racket <hood> <business> <kind>`, `guard <hood> <business>`, `recruit`, `bribe <dollars>`, `rate <business> <percent>`, `crews`, `crew new <hood>`, `crew add <crew> <hood>`, `send <crew> <business>`, `post <crew> <business>`, `wards`, `payoff <ward>`, `campaign <ward|mayor> <dollars>`, `auto`, `end`.
 
 ## Systems
 
-- **The district.** It is a grid of 20 blocks and 160 lots. 48 of them are businesses, and the rest are empty lots, gang headquarters and the precinct house. Owners take a gang less seriously the further its headquarters is: each block beyond the second costs a few points of extortion chance.
+- **The city.** It is a grid of blocks, four lots wide and two deep, in one of three sizes (see above). Most lots are businesses; the rest are empty lots, gang headquarters and precinct houses. Owners take a gang less seriously the further its headquarters is: each block beyond the second costs a few points of extortion chance.
 - **Protection.** A hood leans on a shop. Success depends on his Intimidation against the owner's toughness. Higher rates pay more but build resentment, and resentful owners talk to the police.
 - **Rackets.** These hide behind protected businesses: speakeasies, stills, numbers games and loan books. Liquor rackets only pay well until repeal in 1934.
 - **Turf wars and guards.** A hood sent at a rival's business fights whoever answers the door. That is the guard posted there, otherwise the business's handler. A guard fights harder than a handler who gets called in. The rest of the rival gang only backs him up if it isn't spread thin. Losers can die.
-- **Heat.** Rackets, violence and sheer size draw police attention. High heat brings raids, fines, closed rackets and arrests. Bribes cool it.
+- **Heat.** Rackets, violence and sheer size draw police attention. High heat brings raids, fines, closed rackets and arrests. Bribes cool it, and so do aldermen on the payroll and a mayor who owes you.
 - **Feds.** Treasury tax cases hit gangs holding large amounts of cash. They can't be bribed, they seize money, and they can send the boss away.
 - **Loyalty.** Unpaid wages and big gangs breed restless lieutenants. An ambitious one can break away with a faction and the businesses its members handle. A boss who dies or gets a long sentence is succeeded, and a rival heir may split the gang.
 - **The rival director.** If one gang holds most of the district, the director sows dissent in that gang and brings in an aggressive outside syndicate sized to challenge it. It also steps in if the district goes quiet or if fewer than two gangs are left. Rival gangs with no men, turf or money fold to make room.
@@ -91,16 +119,16 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 
 All gangs, including the player's, were run by the AI planner. A city counts as stalled if, in any year, it has fewer than two gangs at some point, one gang holds over 75% of the district all year, or fewer than 3 businesses change hands.
 
-| Check | Result |
-| --- | --- |
-| 10-year cities contested, seeds 1–80 (Normal) | 80/80 |
-| 10-year cities contested, seeds 1–40 (Hard) | 40/40 |
-| 50-year cities contested, seeds 1–10 | 10/10 |
-| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 71/80 / 55/80 |
-| Player's gang alive after 3 / 10 years, seeds 1–40 (Hard) | 27/40 / 25/40 |
-| Player's gang alive after 50 years, seeds 1–10 (Normal) | 3/10 |
+| Check | Small | Medium | Large |
+| --- | --- | --- | --- |
+| 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 |
+| 10-year cities contested, seeds 1–40 (Hard) | 40/40 | 40/40 | 40/40 |
+| 50-year cities contested, seeds 1–10 | 10/10 | | 10/10 |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 71/80 / 58/80 | 70/80 / 46/80 | 68/80 / 36/80 |
+| Player's gang alive after 3 / 10 years, seeds 1–40 (Hard) | 26/40 / 22/40 | 20/40 / 9/40 | 21/40 / 12/40 |
+| Player's gang alive after 50 years, seeds 1–10 (Normal) | 1/10 | | 1/10 |
 
-Phase 3 on the same 80 Normal seeds kept the player's gang alive in 69/80 after 3 years and 58/80 after 10, and in 1/10 after 50 years. The game now loses some bosses to old age, but heirs and family make up for it, and long games survive more often.
+Phase 4's small city kept the player's gang alive in 71/80 after 3 years and 55/80 after 10, so politics hasn't made the small city harder. Bigger cities are harder to last in: there are more rivals, and the autopilot doesn't pick its fights by ward. With politics turned off (`--no-politics`), the small city gives 68/80 after 3 years on the same build.
 
 The AI is a cautious but simple player; a person paying attention should do better.
 

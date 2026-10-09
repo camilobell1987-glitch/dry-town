@@ -130,7 +130,7 @@ public enum EventKind
 {
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
-    Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family,
+    Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

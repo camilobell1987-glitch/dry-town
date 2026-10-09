@@ -2,11 +2,24 @@ namespace DryTown.Core;
 
 public enum Difficulty { Easy, Normal, Hard }
 
+public enum CitySize { Small, Medium, Large }
+
 public sealed class WorldSettings
 {
     public ulong Seed { get; init; } = 1;
-    public int Businesses { get; init; } = 48;
-    public int StartingGangs { get; init; } = 3;
+
+    /// <summary>Small is the first district of five blocks by four; Large is nine by seven with six wards.</summary>
+    public CitySize Size { get; init; } = CitySize.Small;
+
+    /// <summary>Businesses and starting gangs, or 0 to fit the city's size.</summary>
+    public int Businesses { get; init; }
+    public int StartingGangs { get; init; }
+
+    public Content.CityShape Shape => Content.Shape(Size);
+    public int BusinessCount => Businesses > 0 ? Businesses : Shape.Businesses;
+    public int StartingGangCount => StartingGangs > 0 ? StartingGangs : Shape.StartingGangs;
+    public int MaxGangs => Shape.MaxGangs;
+
     public int StartingHoods { get; init; } = 4;
     public long StartingCash { get; init; } = 1500;
     public Difficulty Difficulty { get; init; } = Difficulty.Normal;
@@ -22,6 +35,9 @@ public sealed class WorldSettings
         Difficulty.Normal => yearsPlayed < 1 ? 0.35 : yearsPlayed < 2 ? 0.7 : 1.0,
         _ => yearsPlayed < 2 ? 0.3 : 0.7,
     };
+
+    /// <summary>When false, nobody buys aldermen or backs candidates, and the mayor never changes. For comparison runs.</summary>
+    public bool PoliticsEnabled { get; init; } = true;
 
     /// <summary>When true, the rival director seeds new gangs and splits when the district goes quiet.</summary>
     public bool DirectorEnabled { get; init; } = true;
@@ -47,6 +63,10 @@ public sealed class World
     public List<Business> Businesses { get; } = new();
     public List<GameEvent> Events { get; } = new();
     public List<Crew> Crews { get; } = new();
+
+    /// <summary>The city's wards and their aldermen, and the mayor's office.</summary>
+    public List<Ward> Wards { get; } = new();
+    public CityHall Hall { get; set; } = new() { Mayor = "" };
 
     /// <summary>This week's books per gang, reset at the start of each week.</summary>
     public Dictionary<int, WeekLedger> LastLedger { get; } = new();
@@ -139,6 +159,10 @@ public sealed class World
     public Lot HqOf(Gang g) => Map.LotAt(g.HqLotId);
     public Lot Precinct => Map.Lots.First(l => l.Use == LotUse.Precinct);
 
+    /// <summary>The precinct house closest to a lot: the one whose men answer a call there.</summary>
+    public Lot PrecinctNear(Lot lot) =>
+        Map.Lots.Where(l => l.Use == LotUse.Precinct).OrderBy(l => Map.Distance(l, lot)).ThenBy(l => l.Id).First();
+
     /// <summary>Walking distance in blocks from a gang's headquarters to a business.</summary>
     public double BlocksFromHq(Gang g, Business b) => Map.Distance(HqOf(g), LotOf(b)) / (double)CityMap.StrideX;
 
@@ -146,7 +170,8 @@ public sealed class World
     {
         var world = new World(settings);
         world.GenerateBusinesses();
-        for (int i = 0; i < settings.StartingGangs; i++)
+        Politics.Found(world);
+        for (int i = 0; i < settings.StartingGangCount; i++)
         {
             bool player = i == 0;
             world.FoundGang(player,
@@ -158,16 +183,25 @@ public sealed class World
 
     private void GenerateBusinesses()
     {
-        Map = CityMap.Generate(Rng);
+        var shape = Settings.Shape;
+        Map = CityMap.Generate(Rng, shape.BlocksX, shape.BlocksY);
+        Map.DrawWards(shape.WardsX, shape.WardsY);
 
-        // The precinct house sits near the middle of the district.
-        var precinct = Map.Lots.OrderBy(l => Math.Abs(l.X - CityMap.Width / 2) + Math.Abs(l.Y - CityMap.Height / 2)).ThenBy(l => l.Id).First();
-        precinct.Use = LotUse.Precinct;
+        // Precinct houses sit evenly across the city, the first near the middle.
+        for (int p = 0; p < shape.Precincts; p++)
+        {
+            float fx = shape.Precincts == 1 ? 0.5f : (p + 0.5f) / shape.Precincts;
+            float fy = shape.Precincts == 1 ? 0.5f : p % 2 == 0 ? 0.35f : 0.65f;
+            int cx = (int)(Map.Width * fx), cy = (int)(Map.Height * fy);
+            var precinct = Map.Lots.Where(l => l.Use == LotUse.Empty)
+                .OrderBy(l => Math.Abs(l.X - cx) + Math.Abs(l.Y - cy)).ThenBy(l => l.Id).First();
+            precinct.Use = LotUse.Precinct;
+        }
 
         var free = Map.Lots.Where(l => l.Use == LotUse.Empty).ToList();
         Rng.Shuffle(free);
         var kinds = Enum.GetValues<BusinessKind>();
-        int count = Math.Min(Settings.Businesses, free.Count - 8);
+        int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs);
         for (int i = 0; i < count; i++)
         {
             var lot = free[i];
@@ -235,7 +269,12 @@ public sealed class World
             boss.Loyalty = 100;
         }
         gang.BossHoodId = boss.Id;
-        gang.Name = string.Format(Rng.Pick(Content.GangPatterns), Surname(boss.Name));
+        // Two outfits with one name would confuse the papers: try the other patterns, then the boss's first name.
+        string surname = Surname(boss.Name);
+        var taken = LivingGangs.Where(g => g.Id != gang.Id).Select(g => g.Name).ToHashSet();
+        var patterns = Content.GangPatterns.OrderBy(_ => Rng.NextDouble()).ToList();
+        gang.Name = patterns.Select(p => string.Format(p, surname)).FirstOrDefault(n => !taken.Contains(n))
+                    ?? string.Format(patterns[0], boss.Name.Split(' ')[0] + " " + surname);
 
         for (int i = 1; i < hoods; i++) NewHood(gang.Id, bossQuality: false);
         return gang;
@@ -322,6 +361,12 @@ public sealed class World
         NextCrewId = _nextCrewId,
         StreetNames = Map.StreetNames,
         AvenueNames = Map.AvenueNames,
+        BlocksX = Map.BlocksX,
+        BlocksY = Map.BlocksY,
+        WardsX = Map.WardsX,
+        WardsY = Map.WardsY,
+        Wards = Wards,
+        Hall = Hall,
         Lots = Map.Lots,
         Gangs = Gangs,
         Hoods = Hoods,
@@ -335,7 +380,9 @@ public sealed class World
     {
         var w = new World(d.Settings) { Week = d.Week, _nextHoodId = d.NextHoodId, _nextGangId = d.NextGangId, _nextCrewId = d.NextCrewId };
         w.Rng = Rng.FromState(d.RngState);
-        w.Map = CityMap.FromSave(d.Lots, d.StreetNames, d.AvenueNames);
+        w.Map = CityMap.FromSave(d.Lots, d.StreetNames, d.AvenueNames, d.BlocksX, d.BlocksY, d.WardsX, d.WardsY);
+        w.Wards.AddRange(d.Wards);
+        if (d.Hall != null) w.Hall = d.Hall;
         w.Gangs.AddRange(d.Gangs);
         w.Hoods.AddRange(d.Hoods);
         w.Businesses.AddRange(d.Businesses);

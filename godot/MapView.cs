@@ -13,10 +13,18 @@ public partial class MapView : Control
 {
     public event Action<int>? BusinessClicked;
 
+    /// <summary>Raised when a ward is clicked while wards are shown.</summary>
+    public event Action<int>? WardClicked;
+
     /// <summary>Raised once per script action as the live clock passes the moment it happens.</summary>
     public event Action<ScriptAction>? ActionHappened;
 
     public World? World { get; set; }
+
+    private static readonly CityMap NoMap = new();
+
+    /// <summary>The city being drawn; its size sets the grid.</summary>
+    private CityMap Map => World?.Map ?? NoMap;
     public int SelectedBusiness { get; set; } = -1;
 
     public bool Live { get; private set; }
@@ -35,9 +43,9 @@ public partial class MapView : Control
     private Vector2 _pan;
     private bool _dragging;
 
-    private float FitTile => Mathf.Floor(Mathf.Min(Size.X / (CityMap.Width + 0.6f), Size.Y / (CityMap.Height + 0.6f)));
+    private float FitTile => Mathf.Floor(Mathf.Min(Size.X / (Map.Width + 0.6f), Size.Y / (Map.Height + 0.6f)));
     private float Tile => FitTile * _zoom;
-    private Vector2 Origin => (Size - new Vector2(CityMap.Width, CityMap.Height) * Tile) / 2 + _pan;
+    private Vector2 Origin => (Size - new Vector2(Map.Width, Map.Height) * Tile) / 2 + _pan;
 
     public override void _Ready()
     {
@@ -45,7 +53,6 @@ public partial class MapView : Control
         ClipContents = true;
         TooltipText = " "; // enables _GetTooltip
         Resized += QueueRedraw;
-        BuildTraffic();
     }
 
     public override void _Process(double delta)
@@ -54,13 +61,28 @@ public partial class MapView : Control
         QueueRedraw();
     }
 
+    /// <summary>Big cities draw small when fitted, so they can be zoomed in further.</summary>
+    private float MaxZoom => Mathf.Max(4, Map.Width / 6f);
+
     /// <summary>Zoom about a point on screen, keeping whatever is under it in place.</summary>
     private void ZoomAt(Vector2 screen, float factor)
     {
         var tileUnder = (screen - Origin) / Tile;
-        _zoom = Mathf.Clamp(_zoom * factor, 1, 4);
+        _zoom = Mathf.Clamp(_zoom * factor, 1, MaxZoom);
         if (_zoom <= 1.001f) { _pan = Vector2.Zero; return; }
         _pan += screen - (Origin + tileUnder * Tile);
+        ClampPan();
+    }
+
+    /// <summary>Fit the whole city, or on a big one, start zoomed in on a lot (usually your headquarters).</summary>
+    public void ResetView(Lot? focus)
+    {
+        _zoom = 1;
+        _pan = Vector2.Zero;
+        if (focus == null || Map.BlocksX <= 5 || Size.X <= 0) return;
+        ZoomAt(Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile, 2);
+        // Bring the lot towards the middle of the view.
+        _pan += Size / 2 - (Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile);
         ClampPan();
     }
 
@@ -69,7 +91,7 @@ public partial class MapView : Control
 
     private void ClampPan()
     {
-        var excess = (new Vector2(CityMap.Width, CityMap.Height) * Tile - Size) / 2 + Vector2.One * Tile;
+        var excess = (new Vector2(Map.Width, Map.Height) * Tile - Size) / 2 + Vector2.One * Tile;
         excess = excess.Max(Vector2.Zero);
         _pan = _pan.Clamp(-excess, excess);
     }
@@ -206,9 +228,11 @@ public partial class MapView : Control
             if (_dragging) { _pan += motion.Relative; ClampPan(); }
             int lot = LotUnder(motion.Position);
             if (lot != _hoverLot) { _hoverLot = lot; QueueRedraw(); }
+            HoverWard = ShowWards ? WardAtTile((motion.Position - Origin) / Tile) : -1;
         }
         else if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } click)
         {
+            if (ShowWards && WardAtTile((click.Position - Origin) / Tile) is int ward and >= 0) WardClicked?.Invoke(ward);
             int lotId = LotUnder(click.Position);
             if (lotId >= 0 && World.Map.LotAt(lotId).BusinessId is int biz and >= 0)
             {
@@ -240,15 +264,23 @@ public partial class MapView : Control
                 string owner = b.IsProtected ? World.GangById(b.ProtectorGangId).Name : "Nobody's paying anyone";
                 string racket = b.Racket != RacketKind.None ? $"\nBack room: {Content.Rackets[b.Racket].Label}" : "";
                 string shut = b.IsOpen ? "" : $"\nClosed by police for {b.ShutWeeks} more weeks";
-                return $"{b.Name}\nTakes ${b.Takings} a week · owner toughness {b.Toughness}/10\n{owner}{racket}{shut}";
+                return $"{b.Name}\nTakes ${b.Takings} a week · owner toughness {b.Toughness}/10\n{owner}{racket}{shut}{WardLine(lot)}";
             case LotUse.Headquarters:
                 var g = World.Gangs.First(x => x.Id == lot.GangId);
                 return $"Headquarters of {g.Name}";
             case LotUse.Precinct:
-                return "Precinct house";
+                return "Precinct house" + WardLine(lot);
             default:
                 return "";
         }
+    }
+
+    private string WardLine(Lot lot)
+    {
+        if (World == null || lot.WardId >= World.Wards.Count) return "";
+        var ward = World.Wards[lot.WardId];
+        string whose = ward.Reformer ? "a reformer" : ward.OwnerGangId >= 0 ? $"on {World.GangById(ward.OwnerGangId).Name}'s payroll" : "a party man";
+        return $"\n{ward.Name}: Alderman {ward.Alderman}, {whose}";
     }
 
     // ---- Drawing --------------------------------------------------------------
@@ -272,6 +304,7 @@ public partial class MapView : Control
         DrawPassersBy();
         DrawNight(night);
         foreach (var lot in w.Map.Lots) DrawLotOutline(lot);
+        DrawWards(font);
 
         if (Live) DrawActors(font);
     }

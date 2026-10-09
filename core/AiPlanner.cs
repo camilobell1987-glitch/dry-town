@@ -34,6 +34,8 @@ public static class AiPlanner
             cash -= Content.FamilyCost;
         }
 
+        cash -= PlanPolitics(w, g, turf, cash, orders);
+
         foreach (var biz in turf)
         {
             int rate = biz.Resentment > 55 ? 8 : biz.Resentment < 20 ? 15 : Content.DefaultRatePercent;
@@ -128,5 +130,49 @@ public static class AiPlanner
         }
 
         return orders;
+    }
+
+    /// <summary>
+    /// Buy the alderman where the gang does most of its business, and put money into elections
+    /// once it can afford to. Returns what it plans to spend.
+    /// </summary>
+    private static long PlanPolitics(World w, Gang g, List<Business> turf, long cash, List<Order> orders)
+    {
+        if (w.Wards.Count == 0 || !w.Settings.PoliticsEnabled || turf.Count < 4) return 0;
+        var home = turf.GroupBy(b => w.LotOf(b).WardId)
+            .Select(x => (Ward: w.Wards[x.Key], Count: x.Count()))
+            .OrderByDescending(x => x.Count).ThenBy(x => x.Ward.Id).ToList();
+
+        var due = Politics.Campaigning(w);
+        // Each race gets one budget, spent over a couple of weeks.
+        if (due is { Kind: ElectionKind.Mayor } && cash > 5000 && w.Hall.Campaign.GetValueOrDefault(g.Id) < 3000)
+        {
+            int amount = (int)Math.Min(1500, cash / 10);
+            orders.Add(new CampaignOrder(g.Id, -1, amount));
+            return amount;
+        }
+        if (due is { Kind: ElectionKind.Alderman } && cash > 4000)
+        {
+            // Defend a bought alderman first, then try for the home ward.
+            var target = home.FirstOrDefault(x => x.Ward.OwnerGangId == g.Id && x.Count >= 3).Ward ?? home[0].Ward;
+            if (target.Campaign.GetValueOrDefault(g.Id) < 1500)
+            {
+                int amount = (int)Math.Min(750, cash / 12);
+                orders.Add(new CampaignOrder(g.Id, target.Id, amount));
+                return amount;
+            }
+        }
+
+        foreach (var (ward, count) in home)
+        {
+            if (count < 3 || ward.OwnerGangId == g.Id || ward.Reformer || Politics.StaysBought(w, ward, g)) continue;
+            long cost = Politics.PayoffCost(w, ward, g);
+            if (cost > cash / 4 || cash - cost < 2500) continue;
+            // Rivals' aldermen are only worth stealing where the gang clearly runs the ward.
+            if (ward.OwnerGangId >= 0 && count < Politics.BusinessesIn(w, ward).Count(b => b.ProtectorGangId == ward.OwnerGangId) + 2) continue;
+            orders.Add(new PayoffOrder(g.Id, ward.Id));
+            return cost;
+        }
+        return 0;
     }
 }
