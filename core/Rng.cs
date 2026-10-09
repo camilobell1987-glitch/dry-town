@@ -19,6 +19,9 @@ public sealed class Rng
 
     public ulong State => _state;
 
+    /// <summary>Resume a generator exactly where a saved game left it.</summary>
+    public static Rng FromState(ulong state) => new(0) { _state = state };
+
     public uint NextUInt()
     {
         ulong old = _state;

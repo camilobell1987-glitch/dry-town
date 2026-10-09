@@ -77,35 +77,47 @@ public static class AiPlanner
         // Small gangs value their men more and so pick fewer fights.
         double manCost = (active <= 4 ? 900 : 450) * (1.3 - g.Aggression);
         var taken = new HashSet<int>();
+        var assigned = new HashSet<int>();
         foreach (var hood in hoods)
         {
+            if (assigned.Contains(hood.Id)) continue;
+            // Spare hands, weakest first, who could go along as backup on a hard job.
+            var spare = hoods.Where(h => h.Id != hood.Id && !assigned.Contains(h.Id)).Reverse().ToList();
             Business? best = null;
+            List<Hood> bestBackup = new();
             double bestScore = 0;
             foreach (var biz in w.Businesses)
             {
                 if (!biz.IsOpen || biz.ProtectorGangId == g.Id || taken.Contains(biz.Id)) continue;
                 double value = (biz.Takings * 0.12 + (biz.Racket != RacketKind.None ? 80 : 0)) * 10;
-                double score;
                 if (!biz.IsProtected)
                 {
-                    score = value * Simulation.ExtortChance(w, g, hood, biz);
+                    double score = value * Simulation.ExtortChance(w, g, hood, biz);
+                    if (score > bestScore) { bestScore = score; best = biz; bestBackup = new(); }
+                    continue;
                 }
-                else
+                if (hood.Id == g.BossHoodId) continue;
+                var rival = w.GangById(biz.ProtectorGangId);
+                double defence = Simulation.DefenceStrength(w, rival, biz);
+                // Alone, or with up to two men behind him if the gang has hands to spare. Gangs that
+                // already run much of the district are spread too thin to send men in pairs.
+                bool canBackUp = spare.Count >= 4 && turf.Count < w.Businesses.Count * 0.35;
+                for (int extra = 0; extra <= (canBackUp ? 2 : 0); extra++)
                 {
-                    if (hood.Id == g.BossHoodId) continue;
-                    var rival = w.GangById(biz.ProtectorGangId);
-                    double defence = Simulation.DefenceStrength(w, rival, biz);
-                    double edge = (hood.Strength - defence) / 10.0;
+                    var backup = spare.Take(extra).ToList();
+                    double edge = (hood.Strength + Simulation.BackupStrength(backup) - defence) / 10.0;
                     double win = Math.Clamp(0.5 + edge, 0.05, 0.95);
-                    score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost;
+                    double score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost - extra * 150;
                     if (g.Heat > 60) score *= 0.3;
                     if (rival.IsPlayer && !g.IsPlayer) score *= w.Settings.RivalWariness(w.Week / Content.WeeksPerYear);
+                    if (score > bestScore) { bestScore = score; best = biz; bestBackup = backup; }
                 }
-                if (score > bestScore) { bestScore = score; best = biz; }
             }
             if (best == null || bestScore < 80) continue;
             taken.Add(best.Id);
-            orders.Add(new ExtortOrder(g.Id, hood.Id, best.Id));
+            assigned.Add(hood.Id);
+            foreach (var b in bestBackup) assigned.Add(b.Id);
+            orders.Add(new ExtortOrder(g.Id, hood.Id, best.Id, bestBackup.Count > 0 ? bestBackup.Select(b => b.Id).ToArray() : null));
         }
 
         return orders;

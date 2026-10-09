@@ -212,3 +212,125 @@ public class Phase2Tests
         Assert.True(RepelledOutOf(guarded: true) > RepelledOutOf(guarded: false));
     }
 }
+
+public class Phase3Tests
+{
+    private static Simulation Run(ulong seed, int weeks)
+    {
+        var sim = Simulation.New(new WorldSettings { Seed = seed });
+        for (int i = 0; i < weeks; i++) sim.AdvanceWeek(playerAutopilot: true);
+        return sim;
+    }
+
+    [Fact]
+    public void SavedGameCarriesOnExactlyAsIfNeverStopped()
+    {
+        var original = Run(11, 40);
+        var w = original.World;
+        var crew = w.FormCrew(w.AvailableHoodsOf(w.Player.Id).First());
+        var pending = new List<Order> { new RecruitOrder(w.Player.Id), new BribeOrder(w.Player.Id, 200) };
+
+        string json = SaveGame.Write(original, pending);
+        var data = SaveGame.Read(json);
+        var loaded = SaveGame.Restore(data);
+
+        Assert.Equal(pending, data.Pending);
+        Assert.Equal(crew.LieutenantHoodId, loaded.World.CrewsOf(w.Player.Id).Single().LieutenantHoodId);
+        for (int i = 0; i < 40; i++)
+        {
+            original.AdvanceWeek(playerAutopilot: true);
+            loaded.AdvanceWeek(playerAutopilot: true);
+        }
+        Assert.Equal(original.World.Rng.State, loaded.World.Rng.State);
+        Assert.Equal(original.World.Events.Select(e => e.Text), loaded.World.Events.Select(e => e.Text));
+        Assert.Equal(original.World.Businesses.Select(b => b.ProtectorGangId), loaded.World.Businesses.Select(b => b.ProtectorGangId));
+    }
+
+    [Fact]
+    public void CantSaveMidWeek()
+    {
+        var sim = Run(3, 2);
+        sim.BeginWeek();
+        Assert.Throws<InvalidOperationException>(() => SaveGame.Write(sim, new List<Order>()));
+    }
+
+    [Fact]
+    public void RunningAWeekHourByHourMatchesRunningItAtOnce()
+    {
+        var a = Run(5, 20);
+        var b = Run(5, 20);
+        a.AdvanceWeek(playerAutopilot: true);
+        b.BeginWeek(playerAutopilot: true);
+        for (int tick = 0; tick < Content.CollectionTick; tick += 7) b.RunUntil(tick);
+        b.FinishWeek();
+        Assert.Equal(a.World.Rng.State, b.World.Rng.State);
+        Assert.Equal(a.World.Script.Select(s => s.Text), b.World.Script.Select(s => s.Text));
+    }
+
+    [Fact]
+    public void OrdersGivenMidWeekHappenWhenTheMenArrive()
+    {
+        var sim = Run(9, 4);
+        var w = sim.World;
+        sim.BeginWeek();
+        sim.RunUntil(40);
+        var hood = w.AvailableHoodsOf(w.Player.Id).First();
+        var target = w.Businesses.Where(b => !b.IsProtected && b.IsOpen).OrderBy(b => w.BlocksFromHq(w.Player, b)).First();
+        int? tick = sim.OrderNow(new ExtortOrder(w.Player.Id, hood.Id, target.Id), 40.5f);
+        Assert.NotNull(tick);
+        Assert.True(tick > 40);
+        Assert.Contains(hood.Id, sim.CommittedHoods(w.Player.Id));
+        sim.FinishWeek();
+        var done = w.Script.Single(s => s.HoodId == hood.Id && s.BusinessId == target.Id);
+        Assert.Equal(tick, done.Tick);
+        Assert.Null(NewOrderAfterHours(Run(9, 4)));
+    }
+
+    private static int? NewOrderAfterHours(Simulation sim)
+    {
+        var w = sim.World;
+        sim.BeginWeek();
+        sim.RunUntil(Simulation.LastOrderTick);
+        var hood = w.AvailableHoodsOf(w.Player.Id).First();
+        return sim.OrderNow(new ExtortOrder(w.Player.Id, hood.Id, w.Businesses.First(b => !b.IsProtected).Id), Simulation.LastOrderTick);
+    }
+
+    [Fact]
+    public void ACrewHitsHarderAndTiesUpEveryMan()
+    {
+        var sim = Run(4, 3);
+        var w = sim.World;
+        var shell = new CommandShell(sim);
+        var men = w.AvailableHoodsOf(w.Player.Id).Where(h => h.Id != w.Player.BossHoodId).Take(3).ToList();
+        var crew = w.FormCrew(men[0]);
+        Assert.True(w.JoinCrew(crew, men[1]));
+        Assert.True(w.JoinCrew(crew, men[2]));
+
+        var biz = w.Businesses.First(b => !b.IsProtected && b.IsOpen && Simulation.ExtortChance(w, w.Player, men[0], b) is > 0.1 and < 0.8);
+        Assert.True(Simulation.ExtortChance(w, w.Player, men[0], biz, 2) > Simulation.ExtortChance(w, w.Player, men[0], biz));
+        Assert.True(Simulation.BackupStrength(men.Skip(1)) > 0);
+
+        shell.Execute($"send {crew.Id} {biz.Id}");
+        var order = Assert.IsType<ExtortOrder>(shell.Pending.Single());
+        Assert.Equal(men.Select(h => h.Id).ToHashSet(), order.Team.ToHashSet());
+        shell.EndWeek();
+        var action = w.Script.Single(s => s.HoodId == order.HoodId && s.Kind == ActionKind.Extort);
+        Assert.Equal(2, action.Backup.Count);
+    }
+
+    [Fact]
+    public void ALieutenantWhoBreaksAwayTakesHisCrew()
+    {
+        var sim = Run(6, 10);
+        var w = sim.World;
+        var men = w.AvailableHoodsOf(w.Player.Id).Where(h => h.Id != w.Player.BossHoodId).Take(3).ToList();
+        var crew = w.FormCrew(men[0]);
+        w.JoinCrew(crew, men[1]);
+        w.JoinCrew(crew, men[2]);
+        men[1].Loyalty = men[2].Loyalty = 90;
+        var gang = sim.Breakaway(w.Player, men[0]);
+        Assert.Equal(gang.Id, men[1].GangId);
+        Assert.Equal(gang.Id, men[2].GangId);
+        Assert.Empty(w.CrewsOf(w.Player.Id));
+    }
+}

@@ -17,6 +17,13 @@ public sealed class Director
 
     public Director(World world) => _w = world;
 
+    /// <summary>The director's counters, for saving and loading.</summary>
+    public (int DominantWeeks, int QuietWeeks) State
+    {
+        get => (_dominantWeeks, _quietWeeks);
+        set => (_dominantWeeks, _quietWeeks) = value;
+    }
+
     public void Step()
     {
         if (!_w.Settings.DirectorEnabled) return;
