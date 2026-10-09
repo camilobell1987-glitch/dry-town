@@ -5,7 +5,8 @@ namespace DryTown.Core;
 /// <summary>Everything needed to carry on a city exactly where it was left: the world, the dice, and the orders on the desk.</summary>
 public sealed class SaveData
 {
-    public const int CurrentVersion = 1;
+    /// <summary>2 added ages, heirs and family.</summary>
+    public const int CurrentVersion = 2;
 
     public int Version { get; set; } = CurrentVersion;
     public DateTime SavedAt { get; set; }
@@ -54,7 +55,20 @@ public static class SaveGame
     {
         var data = JsonSerializer.Deserialize<SaveData>(json, Options) ?? throw new InvalidDataException("Empty save file.");
         if (data.Version > SaveData.CurrentVersion) throw new InvalidDataException("This save is from a newer version of the game.");
+        if (data.Version < 2) GiveAges(data);
         return data;
+    }
+
+    /// <summary>Saves from before men had ages: give everyone a plausible one, bosses older.</summary>
+    private static void GiveAges(SaveData data)
+    {
+        var bosses = data.Gangs.Select(g => g.BossHoodId).ToHashSet();
+        foreach (var h in data.Hoods)
+        {
+            int age = bosses.Contains(h.Id) ? 38 + h.Id % 12 : 20 + h.Id * 7 % 20;
+            h.BornWeek = data.Week - age * Content.WeeksPerYear - h.Id * 11 % Content.WeeksPerYear;
+        }
+        data.Version = SaveData.CurrentVersion;
     }
 
     /// <summary>Rebuild a running simulation from saved data.</summary>

@@ -49,11 +49,11 @@ public static class Reports
     {
         var sb = new StringBuilder();
         var gang = w.GangById(gangId);
-        sb.AppendLine($"{"Id",4} {"Name",-30} {"Int",3} {"Mus",3} {"Brn",3} {"Stl",3} {"Loy",3} {"Wage",4}  State");
+        sb.AppendLine($"{"Id",4} {"Name",-30} {"Age",3} {"Int",3} {"Mus",3} {"Brn",3} {"Stl",3} {"Loy",3} {"Wage",4}  State");
         foreach (var h in w.HoodsOf(gangId).OrderBy(h => h.Id))
         {
-            string state = h.State == HoodState.Jailed ? $"jailed {h.JailWeeks}w" : h.Id == gang.BossHoodId ? "boss" : "free";
-            sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state}");
+            string state = h.State == HoodState.Jailed ? $"jailed {h.JailWeeks}w" : h.Id == gang.BossHoodId ? "boss" : h.Id == gang.HeirHoodId ? "heir" : "free";
+            sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {h.Age(w.Week),3} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state}");
         }
         return sb.ToString();
     }

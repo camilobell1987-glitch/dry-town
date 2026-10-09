@@ -244,6 +244,7 @@ public sealed class World
     public Hood NewHood(int gangId, bool bossQuality)
     {
         int lo = bossQuality ? 4 : 1, hi = bossQuality ? 9 : 8;
+        int age = bossQuality ? Rng.Range(32, 50) : Rng.Range(18, 40);
         string first = Rng.Pick(Content.FirstNames);
         string last = Rng.Pick(Content.LastNames);
         string name = Rng.Chance(0.3) ? $"{first} \"{Rng.Pick(Content.Nicknames)}\" {last}" : $"{first} {last}";
@@ -259,10 +260,54 @@ public sealed class World
             Loyalty = bossQuality ? 100 : Rng.Range(40, 90),
             Ambition = Rng.Range(10, 90),
             JoinedWeek = Week,
+            BornWeek = Week - age * Content.WeeksPerYear - Rng.Range(0, Content.WeeksPerYear - 1),
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
         return hood;
+    }
+
+    /// <summary>A son or nephew of the boss: young, green, and loyal to the family.</summary>
+    public Hood NewRelative(Gang gang)
+    {
+        var boss = HoodById(gang.BossHoodId);
+        string first = Rng.Pick(Content.FirstNames);
+        string relation = Rng.Chance(0.5) ? "son" : "nephew";
+        var hood = new Hood
+        {
+            Id = _nextHoodId++,
+            Name = $"{first} {Surname(boss.Name)}",
+            GangId = gang.Id,
+            Intimidation = Rng.Range(1, 5),
+            Muscle = Rng.Range(2, 6),
+            Brains = Rng.Range(3, 7),
+            Stealth = Rng.Range(2, 6),
+            Loyalty = 95,
+            Ambition = Rng.Range(20, 60),
+            JoinedWeek = Week,
+            BornWeek = Week - Rng.Range(17, 22) * Content.WeeksPerYear - Rng.Range(0, Content.WeeksPerYear - 1),
+            Family = true,
+        };
+        hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
+        Hoods.Add(hood);
+        Log(EventKind.Family, gang.Id, $"{boss.Name} brought his {relation} {first} into {gang.Name}.");
+        return hood;
+    }
+
+    /// <summary>
+    /// Name the man who takes over. The rest of the outfit notices: the most ambitious man
+    /// passed over takes it badly.
+    /// </summary>
+    public void NameHeir(Gang gang, Hood heir, bool announce = true)
+    {
+        if (heir.GangId != gang.Id || !heir.IsActive || heir.Id == gang.BossHoodId || gang.HeirHoodId == heir.Id) return;
+        gang.HeirHoodId = heir.Id;
+        heir.Loyalty = Math.Max(heir.Loyalty, 70);
+        var passedOver = HoodsOf(gang.Id)
+            .Where(h => h.Id != heir.Id && h.Id != gang.BossHoodId && !h.Family && h.Ambition > 60)
+            .OrderByDescending(h => h.Ambition).ThenBy(h => h.Id).FirstOrDefault();
+        if (passedOver != null) passedOver.Loyalty = Math.Max(0, passedOver.Loyalty - 10);
+        if (announce) Log(EventKind.Heir, gang.Id, $"{HoodById(gang.BossHoodId).Name} named {heir.Name} to take over {gang.Name} after him.");
     }
 
     // ---- Saving ---------------------------------------------------------------

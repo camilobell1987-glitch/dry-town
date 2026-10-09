@@ -2,7 +2,7 @@
 
 An open-ended Prohibition-era crime strategy game, inspired by how *Gangsters: Organized Crime* (1998) plays. It is a new game. It uses none of the original's art, audio, text, code, data or name.
 
-There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3, the current state, makes it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound.
+There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4, the current state, lets the game outlive your boss. Men grow old and die, and the outfit passes to an heir, so one game can run through generations of a family.
 
 ![Planning a week](docs/screenshots/planning.png)
 
@@ -20,7 +20,7 @@ There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). To play the game, install the **.NET edition** of Godot 4.7, open `godot/project.godot` and press Play. If your editor is a different 4.x version, it updates the version in `DryTown.csproj` when it opens the project.
 
 ```sh
-dotnet test tests                                                    # 29 tests
+dotnet test tests                                                    # 34 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
@@ -34,6 +34,16 @@ dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
 3. **Report (Sunday).** Collectors make their rounds, then the police, the Treasury and the gangs settle up. The **Report** tab shows the books and the week's headlines, with your own in bold.
 
 ![The live week on Sunday morning](docs/screenshots/live-week.png)
+
+## Bosses grow old
+
+Every man has an age. Young men get better at the job each year, and men past 55 slow down. Anyone can die of natural causes, and the chance climbs steeply with age, so few bosses see 80.
+
+On the **Men** tab, under **The family**, you can name the man who takes over when your boss dies or goes away for a long stretch. The heir learns the business while he waits, so his brains and other skills creep up. Naming him has a cost: the most ambitious man you passed over takes it badly. If you name nobody, the outfit settles on the obvious man once a year. Once a year you can also bring a son or nephew into the business. He starts young and green, but he's loyal and grows into the job, and family gets the nod when the chair is empty.
+
+When your boss dies, a dialog tells you who runs the outfit now, and you carry on as him. The game is over only if nobody is left to take over.
+
+![The family on the Men tab](docs/screenshots/family.png)
 
 ## Crews
 
@@ -81,14 +91,16 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 
 All gangs, including the player's, were run by the AI planner. A city counts as stalled if, in any year, it has fewer than two gangs at some point, one gang holds over 75% of the district all year, or fewer than 3 businesses change hands.
 
-| Check | Phase 1 | Phase 2 | Phase 3 |
-| --- | --- | --- | --- |
-| 10-year cities contested, seeds 1–40 (Normal) | 40/40 | 40/40 | 40/40 |
-| 10-year cities contested, seeds 1–40 (Hard) | n/a | 40/40 | 40/40 |
-| 50-year cities contested, seeds 1–10 | 10/10 | 10/10 | 10/10 |
-| Player's gang alive after 3 years (Normal) | 8/40 | 35/40 | 35/40 |
-| Player's gang alive after 10 years (Normal) | 0/40 | 28/40 | 32/40 |
-| Player's gang alive after 3 years (Hard) | n/a | 19/40 | 21/40 |
+| Check | Result |
+| --- | --- |
+| 10-year cities contested, seeds 1–80 (Normal) | 80/80 |
+| 10-year cities contested, seeds 1–40 (Hard) | 40/40 |
+| 50-year cities contested, seeds 1–10 | 10/10 |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 71/80 / 55/80 |
+| Player's gang alive after 3 / 10 years, seeds 1–40 (Hard) | 27/40 / 25/40 |
+| Player's gang alive after 50 years, seeds 1–10 (Normal) | 3/10 |
+
+Phase 3 on the same 80 Normal seeds kept the player's gang alive in 69/80 after 3 years and 58/80 after 10, and in 1/10 after 50 years. The game now loses some bosses to old age, but heirs and family make up for it, and long games survive more often.
 
 The AI is a cautious but simple player; a person paying attention should do better.
 

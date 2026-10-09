@@ -24,12 +24,13 @@ public sealed class CommandShell
 
     public string Welcome => $"You run {W.Player.Name}. {Reports.Date(W)}. Type 'help' for commands.\n";
 
-    public const string Help =
+    public static readonly string Help =
         "gangs | hoods | turf | targets | log\n" +
         "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark>\n" +
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "crews | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
+        "heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -54,6 +55,8 @@ public sealed class CommandShell
                 case "bribe": return Queue(new BribeOrder(Me, int.Parse(p[1])));
                 case "rate": return Queue(new SetRateOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "crews": return Reports.Crews(W, Me);
+                case "heir": return NameHeir(int.Parse(p[1]));
+                case "family": return Queue(new RecruitOrder(Me, Family: true));
                 case "crew": return CrewCommand(p);
                 case "send": return CrewOrder(int.Parse(p[1]), int.Parse(p[2]), guard: false);
                 case "post": return CrewOrder(int.Parse(p[1]), int.Parse(p[2]), guard: true);
@@ -74,6 +77,15 @@ public sealed class CommandShell
         {
             return "Couldn't read that order. Type 'help'.\n";
         }
+    }
+
+    private string NameHeir(int hoodId)
+    {
+        if (CheckHood(hoodId, allowJailed: true) is string bad) return bad + "\n";
+        var hood = W.HoodById(hoodId);
+        if (hood.Id == W.Player.BossHoodId) return "He's already the boss.\n";
+        W.NameHeir(W.Player, hood);
+        return $"{hood.Name} will take over when {W.HoodById(W.Player.BossHoodId).Name} is gone.\n";
     }
 
     private string CrewCommand(string[] p)
@@ -151,6 +163,8 @@ public sealed class CommandShell
                 ?? (W.BusinessById(r.BusinessId).ProtectorGangId != Me ? "You can only open a racket on your own turf." : null)
                 ?? (!Content.RacketsFor(W.BusinessById(r.BusinessId).Kind).Contains(r.Racket) ? "That business can't hide that racket." : null),
             SetRateOrder s => CheckBiz(s.BusinessId),
+            RecruitOrder { Family: true } => Pending.Any(o => o is RecruitOrder { Family: true }) ? "Family is already coming this week."
+                : !Simulation.CanBringInFamily(W, W.Player) ? $"You can bring family in once a year, for ${Content.FamilyCost}." : null,
             GuardOrder g => g.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null) ?? CheckBiz(g.BusinessId)
                 ?? (W.BusinessById(g.BusinessId).ProtectorGangId != Me ? "You can only guard your own turf." : null),
             _ => null,
@@ -165,6 +179,7 @@ public sealed class CommandShell
         ExtortOrder e => $"{HoodName(e.HoodId)}{With(e.Backup)} {(W.BusinessById(e.BusinessId).IsProtected ? "moves on" : "leans on")} {BizName(e.BusinessId)}",
         RacketOrder r => $"{HoodName(r.HoodId)} opens a {Content.Rackets[r.Racket].Label} behind {BizName(r.BusinessId)}",
         GuardOrder g => $"{HoodName(g.HoodId)}{With(g.Backup)} {(Sim.WeekRunning ? "guard" : "guards")} {BizName(g.BusinessId)} all week",
+        RecruitOrder { Family: true } => $"bring a young relative into the business (${Content.FamilyCost})",
         RecruitOrder => $"recruit a new hood (${Content.RecruitCost})",
         BribeOrder b => $"pay the precinct ${b.Amount}",
         SetRateOrder s => $"set {BizName(s.BusinessId)} to {s.RatePercent}%",

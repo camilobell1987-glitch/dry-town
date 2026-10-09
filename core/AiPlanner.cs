@@ -27,6 +27,13 @@ public static class AiPlanner
             cash -= Content.RecruitCost;
         }
 
+        // An aging boss with money to spare brings his family into the business.
+        if (w.HoodById(g.BossHoodId).Age(w.Week) >= 45 && cash > Content.FamilyCost * 5 && Simulation.CanBringInFamily(w, g))
+        {
+            orders.Add(new RecruitOrder(g.Id, Family: true));
+            cash -= Content.FamilyCost;
+        }
+
         foreach (var biz in turf)
         {
             int rate = biz.Resentment > 55 ? 8 : biz.Resentment < 20 ? 15 : Content.DefaultRatePercent;

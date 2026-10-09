@@ -97,6 +97,7 @@ public sealed class Simulation
                 case GuardOrder o: Guard(gang, o); break;
                 case ExtortOrder o: Extort(gang, o); break;
                 case RacketOrder o: OpenRacket(gang, o); break;
+                case RecruitOrder { Family: true }: BringInFamily(gang); break;
                 case RecruitOrder:
                     if (_recruits.GetValueOrDefault(gang.Id) < 2) { _recruits[gang.Id] = _recruits.GetValueOrDefault(gang.Id) + 1; Recruit(gang); }
                     break;
@@ -169,6 +170,7 @@ public sealed class Simulation
         Police();
         Feds();
         Loyalty();
+        Aging();
         Successions();
         Dissolutions();
         w.TidyCrews();
@@ -408,6 +410,19 @@ public sealed class Simulation
         World.Ledger(gang.Id).Spending += Content.RecruitCost;
         var hood = World.NewHood(gang.Id, bossQuality: false);
         World.Log(EventKind.Recruited, gang.Id, $"{gang.Name} took on {hood.Name}.");
+    }
+
+    /// <summary>Whether a gang can bring a relative in this week: once a year, if it has the money.</summary>
+    public static bool CanBringInFamily(World w, Gang gang) =>
+        gang.Cash >= Content.FamilyCost && w.Week - gang.LastFamilyWeek >= Content.WeeksPerYear && w.HoodById(gang.BossHoodId).IsActive;
+
+    private void BringInFamily(Gang gang)
+    {
+        if (!CanBringInFamily(World, gang)) return;
+        gang.Cash -= Content.FamilyCost;
+        gang.LastFamilyWeek = World.Week;
+        World.Ledger(gang.Id).Spending += Content.FamilyCost;
+        World.NewRelative(gang);
     }
 
     private void Bribe(Gang gang, int amount)
@@ -668,6 +683,73 @@ public sealed class Simulation
         return gang;
     }
 
+    /// <summary>
+    /// Time passes for everyone. Young men learn on the job, old ones slow down, and sooner or
+    /// later every man dies, in his bed if he's lucky. The heir is groomed for the chair.
+    /// </summary>
+    private void Aging()
+    {
+        var w = World;
+        foreach (var gang in w.LivingGangs.ToList())
+        {
+            foreach (var hood in w.HoodsOf(gang.Id).ToList())
+            {
+                int age = hood.Age(w.Week);
+                if (w.Rng.Chance(Content.YearlyDeathChance(age) / Content.WeeksPerYear))
+                {
+                    string where = hood.State == HoodState.Jailed ? " in prison" : "";
+                    hood.State = HoodState.Dead;
+                    string role = hood.Id == gang.BossHoodId ? $", boss of {gang.Name}," : $" of {gang.Name}";
+                    w.Log(EventKind.DiedNaturally, gang.Id, $"{hood.Name}{role} died{where} at {age}.");
+                    continue;
+                }
+
+                bool birthday = (w.Week - hood.BornWeek) % Content.WeeksPerYear == 0;
+                if (birthday && age < 30 && w.Rng.Chance(0.6)) Improve(hood);
+                if (birthday && age >= 55 && w.Rng.Chance(0.5)) hood.Muscle = Math.Max(1, hood.Muscle - 1);
+                if (birthday && age >= 65 && w.Rng.Chance(0.3)) hood.Stealth = Math.Max(1, hood.Stealth - 1);
+                if (hood.Id == gang.HeirHoodId && hood.IsAvailable && w.Rng.Chance(1 / 13.0))
+                {
+                    if (hood.Brains < 10 && w.Rng.Chance(0.6)) hood.Brains++;
+                    else Improve(hood);
+                }
+            }
+
+            // Once a year, an outfit with nobody lined up settles on the obvious man. The player can always name someone else.
+            var heir = w.Hoods.FirstOrDefault(h => h.Id == gang.HeirHoodId);
+            if (heir == null || heir.GangId != gang.Id || !heir.IsActive) gang.HeirHoodId = -1;
+            if (gang.HeirHoodId < 0 && w.Week % Content.WeeksPerYear == 0)
+            {
+                var pick = BestSuccessor(gang).FirstOrDefault();
+                if (pick != null)
+                {
+                    w.NameHeir(gang, pick, announce: false);
+                    if (gang.IsPlayer)
+                        w.Log(EventKind.Heir, gang.Id, $"Your men expect {pick.Name} to take over if anything happens to {w.HoodById(gang.BossHoodId).Name}. You can name someone else on the Men tab.");
+                }
+            }
+        }
+    }
+
+    private void Improve(Hood hood)
+    {
+        switch (World.Rng.Range(0, 3))
+        {
+            case 0: hood.Intimidation = Math.Min(10, hood.Intimidation + 1); break;
+            case 1: hood.Muscle = Math.Min(10, hood.Muscle + 1); break;
+            case 2: hood.Brains = Math.Min(10, hood.Brains + 1); break;
+            default: hood.Stealth = Math.Min(10, hood.Stealth + 1); break;
+        }
+    }
+
+    /// <summary>Who could run the gang, best first. The named heir comes first if he's free to take over.</summary>
+    private IEnumerable<Hood> BestSuccessor(Gang gang) =>
+        World.HoodsOf(gang.Id)
+            .Where(h => h.IsAvailable && h.Id != gang.BossHoodId)
+            .OrderByDescending(h => h.Id == gang.HeirHoodId)
+            .ThenByDescending(h => h.Brains * 2 + h.Strength + h.Loyalty / 10 + (h.Family ? 4 : 0))
+            .ThenBy(h => h.Id);
+
     private void Successions()
     {
         var w = World;
@@ -683,13 +765,16 @@ public sealed class Simulation
                 boss.Ambition = Math.Max(boss.Ambition, 75);
             }
 
-            var heirs = w.HoodsOf(gang.Id).Where(h => h.IsAvailable).OrderByDescending(h => h.Brains * 2 + h.Strength + h.Loyalty / 10).ToList();
+            var heirs = BestSuccessor(gang).ToList();
             if (heirs.Count == 0) continue; // handled by Dissolutions
 
             var heir = heirs[0];
+            bool named = heir.Id == gang.HeirHoodId;
             gang.BossHoodId = heir.Id;
+            gang.HeirHoodId = -1;
             heir.Loyalty = 100;
-            w.Log(EventKind.Succession, gang.Id, $"{heir.Name} takes over {gang.Name}.");
+            w.LeaveCrew(heir.Id);
+            w.Log(EventKind.Succession, gang.Id, named ? $"{heir.Name} takes over {gang.Name}, as {boss.Name} wanted." : $"{heir.Name} takes over {gang.Name}.");
 
             var rival = heirs.Skip(1).FirstOrDefault(h => h.Ambition > 70 && h.Loyalty < 55 && h.IsAvailable);
             if (rival != null && w.LivingGangs.Count() < Content.MaxGangs) Breakaway(gang, rival);

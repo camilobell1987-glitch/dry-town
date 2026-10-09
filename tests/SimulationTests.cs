@@ -334,3 +334,73 @@ public class Phase3Tests
         Assert.Empty(w.CrewsOf(w.Player.Id));
     }
 }
+
+public class Phase4Tests
+{
+    private static Simulation Run(ulong seed, int weeks)
+    {
+        var sim = Simulation.New(new WorldSettings { Seed = seed });
+        for (int i = 0; i < weeks; i++) sim.AdvanceWeek(playerAutopilot: true);
+        return sim;
+    }
+
+    [Fact]
+    public void OldMenAreLikelierToDie()
+    {
+        Assert.True(Content.YearlyDeathChance(30) < 0.01);
+        Assert.True(Content.YearlyDeathChance(50) < Content.YearlyDeathChance(65));
+        Assert.True(Content.YearlyDeathChance(80) > 0.2);
+    }
+
+    [Fact]
+    public void OverDecadesMenDieOfOldAgeAndGangsCarryOn()
+    {
+        var sim = Run(2, 40 * Content.WeeksPerYear);
+        Assert.Contains(sim.World.Events, e => e.Kind == EventKind.DiedNaturally);
+        Assert.Contains(sim.World.Events, e => e.Kind == EventKind.Succession);
+        Assert.False(sim.Metrics.Check().Stalled);
+    }
+
+    [Fact]
+    public void TheNamedHeirTakesOverWhenTheBossDies()
+    {
+        var sim = Run(8, 10);
+        var w = sim.World;
+        var gang = w.Player;
+        var heir = w.AvailableHoodsOf(gang.Id).Where(h => h.Id != gang.BossHoodId).OrderBy(h => h.Brains).First();
+        var shell = new CommandShell(sim);
+        shell.Execute($"heir {heir.Id}");
+        Assert.Equal(heir.Id, gang.HeirHoodId);
+        w.HoodById(gang.BossHoodId).State = HoodState.Dead;
+        sim.AdvanceWeek();
+        if (heir.IsAvailable) Assert.Equal(heir.Id, gang.BossHoodId);
+        else Assert.NotEqual(heir.Id, gang.HeirHoodId);
+    }
+
+    [Fact]
+    public void FamilyComesInYoungAndLoyalOnceAYear()
+    {
+        var sim = Run(12, 4);
+        var w = sim.World;
+        w.Player.Cash = 5000;
+        var shell = new CommandShell(sim);
+        shell.Execute("family");
+        Assert.Single(shell.Pending);
+        shell.EndWeek();
+        var relative = w.HoodsOf(w.Player.Id).Single(h => h.Family);
+        Assert.Equal(World.Surname(w.HoodById(w.Player.BossHoodId).Name), World.Surname(relative.Name));
+        Assert.InRange(relative.Age(w.Week), 17, 22);
+        Assert.Contains("once a year", shell.Execute("family"));
+    }
+
+    [Fact]
+    public void SavesFromBeforeAgesGetPlausibleAges()
+    {
+        var sim = Run(5, 20);
+        var json = System.Text.Json.Nodes.JsonNode.Parse(SaveGame.Write(sim, new List<Order>()))!;
+        json["Version"] = 1;
+        foreach (var h in json["Hoods"]!.AsArray()) h!.AsObject().Remove("BornWeek");
+        var loaded = SaveGame.Restore(SaveGame.Read(json.ToJsonString()));
+        foreach (var h in loaded.World.Hoods) Assert.InRange(h.Age(loaded.World.Week), 18, 60);
+    }
+}

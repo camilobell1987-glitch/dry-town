@@ -13,6 +13,15 @@ public static class Content
     public const int RepealYear = 1934;
 
     public const int RecruitCost = 120;
+
+    /// <summary>Bringing family in costs more (a place to live, a suit, a start) and can only be done once a year.</summary>
+    public const int FamilyCost = 300;
+
+    /// <summary>
+    /// Chance a man of the given age dies of natural causes within a year. Close to nothing
+    /// before forty, doubling about every six years after; the city's bosses rarely see eighty.
+    /// </summary>
+    public static double YearlyDeathChance(int age) => age < 30 ? 0.001 : Math.Min(0.6, 0.005 * Math.Exp((age - 40) / 9.0));
     public const int BribeUnit = 100;
     public const int HeatPerBribeUnit = 4;
     public const int MaxGangs = 6;

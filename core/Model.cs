@@ -27,6 +27,14 @@ public sealed class Hood
     public int JailWeeks { get; set; }
     public int JoinedWeek { get; set; }
 
+    /// <summary>The game week he was born, counted from the start of 1920, so usually negative.</summary>
+    public int BornWeek { get; set; }
+
+    /// <summary>Family of the boss who brought him in: they start green and loyal.</summary>
+    public bool Family { get; set; }
+
+    public int Age(int week) => (week - BornWeek) / Content.WeeksPerYear;
+
     public bool IsAvailable => State == HoodState.Free;
     public bool IsActive => State is HoodState.Free or HoodState.Jailed;
     public int Strength => Intimidation + Muscle;
@@ -80,6 +88,12 @@ public sealed class Gang
 
     public int ConsecutiveUnpaidWeeks { get; set; }
 
+    /// <summary>Who takes over when the boss dies or goes away for a long stretch, if he's still around and willing.</summary>
+    public int HeirHoodId { get; set; } = -1;
+
+    /// <summary>The week the gang last brought a relative into the business.</summary>
+    public int LastFamilyWeek { get; set; } = -1000;
+
     public int HqLotId { get; set; } = -1;
 }
 
@@ -116,7 +130,7 @@ public enum EventKind
 {
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
-    Succession, Bribe, Era, Lapsed,
+    Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

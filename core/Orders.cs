@@ -30,8 +30,8 @@ public sealed record GuardOrder(int GangId, int HoodId, int BusinessId, int[]? B
     [JsonIgnore] public IEnumerable<int> Team => (Backup ?? Array.Empty<int>()).Prepend(HoodId);
 }
 
-/// <summary>Hire a new hood.</summary>
-public sealed record RecruitOrder(int GangId) : Order(GangId);
+/// <summary>Hire a new hood, or bring a young relative of the boss into the business.</summary>
+public sealed record RecruitOrder(int GangId, bool Family = false) : Order(GangId);
 
 /// <summary>Pay off police. Amount is spent in units of Content.BribeUnit.</summary>
 public sealed record BribeOrder(int GangId, int Amount) : Order(GangId);
