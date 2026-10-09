@@ -681,6 +681,7 @@ public partial class Main : Control
         menu.AddItem("New small city: one district, three outfits", 2);
         menu.AddItem("New medium city: four wards, four outfits", 3);
         menu.AddItem("New large city: six wards, five outfits", 4);
+        menu.AddItem("New huge city: twelve wards, seven outfits", 5);
         menu.AddSeparator();
         for (int i = 1; i <= Slots; i++) menu.AddItem($"Save to slot {i}" + (SlotLabel(i) is string l ? $": {l}" : ""), 10 + i);
         menu.AddSeparator();
@@ -694,7 +695,7 @@ public partial class Main : Control
 
     private void OnGameMenu(long id)
     {
-        if (id is >= 2 and <= 4) { _citySize = (CitySize)(id - 2); NewGame(GD.Randi()); }
+        if (id is >= 2 and <= 5) { _citySize = (CitySize)(id - 2); NewGame(GD.Randi()); }
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
         else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
     }
@@ -1012,6 +1013,19 @@ public partial class Main : Control
             if (Arg("--then") is string then) _map.Advance(float.Parse(then));
             _clock.Text = MapView.ClockText(_map.Clock);
             RefreshAll();
+        }
+        if (Arg("--bench") is string frames)
+        {
+            // Time how long the map takes to draw, for checking big cities stay smooth.
+            if (Arg("--zoom") is string z) _map.ZoomCentre(float.Parse(z));
+            for (int i = 0; i < 10; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            ulong start = Time.GetTicksUsec();
+            MapView.CityDraws = 0;
+            int n = int.Parse(frames);
+            for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            GD.Print($"BENCH {W.Map.BlocksX}x{W.Map.BlocksY}: {(Time.GetTicksUsec() - start) / 1000.0 / n:F1} ms per frame; city {MapView.CityMillis:F1} ms, overlay {MapView.OverlayMillis:F1} ms, city drawn {MapView.CityDraws} times");
+            GetTree().Quit();
+            return;
         }
         if (Arg("--shot") is string shot)
         {

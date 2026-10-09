@@ -49,7 +49,7 @@ public sealed class Director
             // A gang that owns most of the district has more than one lieutenant eyeing the chair.
             if (share >= 0.7) StirDissent(top);
             // A full city still gets a challenger when one outfit owns most of it.
-            if (living < _w.Settings.MaxGangs || share >= 0.7) Outsiders($"arrived to challenge {top.Name}");
+            if (living < _w.Settings.MaxGangs + (share >= 0.7 ? 2 : 0)) Outsiders($"arrived to challenge {top.Name}");
         }
         else if (_quietWeeks >= QuietWeeks)
         {
@@ -57,7 +57,8 @@ public sealed class Director
             if (living < _w.Settings.MaxGangs) Outsiders("smelled easy money in a quiet district");
             else StirDissent(top);
         }
-        else if (living < 3 && _w.Rng.Chance(0.01))
+        // A big city that has thinned out draws newcomers sooner than a small one.
+        else if (living < Math.Max(3, _w.Settings.StartingGangCount - 1) && _w.Rng.Chance(living < 3 ? 0.01 : 0.02))
         {
             Outsiders("came down from the North Side");
         }
@@ -81,7 +82,9 @@ public sealed class Director
     {
         var top = _w.LivingGangs.OrderByDescending(g => _w.HoodsOf(g.Id).Count()).FirstOrDefault();
         long cash = Math.Max(2500, (top?.Cash ?? 0) / 8);
-        int hoods = Math.Clamp((top == null ? 0 : _w.HoodsOf(top.Id).Count()) * 2 / 3, 5, 12);
+        // Bigger cities draw bigger syndicates.
+        int most = Math.Clamp(12 * _w.Businesses.Count / 150, 12, 24);
+        int hoods = Math.Clamp((top == null ? 0 : _w.HoodsOf(top.Id).Count()) * 2 / 3, 5, most);
         // Outsiders come looking for a fight, not to share.
         var gang = _w.FoundGang(isPlayer: false, cash: cash, hoods: hoods, aggression: 1.0);
         _w.Log(EventKind.NewGang, gang.Id, $"{gang.Name} {why}.");

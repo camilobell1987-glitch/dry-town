@@ -48,7 +48,7 @@ public partial class MapView
             {
                 var wash = colour with { A = ward.OwnerGangId >= 0 ? 0.22f : 0.1f };
                 if (ward.Id == HoverWard) wash.A += 0.08f;
-                DrawRect(new Rect2(P(r.Position.X, r.Position.Y), r.Size * _t), wash);
+                C.DrawRect(new Rect2(P(r.Position.X, r.Position.Y), r.Size * _t), wash);
             }
 
             // Dashed boundary, skipping the edges of the map.
@@ -59,7 +59,7 @@ public partial class MapView
                 var b = c[(i + 1) % 4];
                 bool edge = (a.X == b.X && (a.X <= 0.5f || a.X >= Map.Width - 0.5f)) || (a.Y == b.Y && (a.Y <= 0.5f || a.Y >= Map.Height - 0.5f));
                 if (edge && !ShowWards) continue;
-                DrawDashedLine(P(a.X, a.Y), P(b.X, b.Y), (ShowWards ? colour : Palette.Ink) with { A = alpha }, lw, Mathf.Max(4, _t * 0.4f));
+                C.DrawDashedLine(P(a.X, a.Y), P(b.X, b.Y), (ShowWards ? colour : Palette.Ink) with { A = alpha }, lw, Mathf.Max(4, _t * 0.4f));
             }
 
             // The ward's name in the middle, with its alderman underneath when wards are shown.
@@ -69,14 +69,14 @@ public partial class MapView
             var ink = (ShowWards ? Palette.Ink : Palette.Ink with { A = 0.28f });
             var textSize = font.GetStringSize(name, HorizontalAlignment.Left, -1, size);
             if (ShowWards)
-                DrawRect(new Rect2(centre - new Vector2(textSize.X / 2 + 8, size + 4), new Vector2(textSize.X + 16, size * 2.6f + 8)), Palette.Panel with { A = 0.85f });
-            DrawString(font, centre - new Vector2(textSize.X / 2, ShowWards ? 0 : -size * 0.35f), name, HorizontalAlignment.Left, -1, size, ink);
+                C.DrawRect(new Rect2(centre - new Vector2(textSize.X / 2 + 8, size + 4), new Vector2(textSize.X + 16, size * 2.6f + 8)), Palette.Panel with { A = 0.85f });
+            C.DrawString(font, centre - new Vector2(textSize.X / 2, ShowWards ? 0 : -size * 0.35f), name, HorizontalAlignment.Left, -1, size, ink);
             if (ShowWards)
             {
                 int small = Mathf.Max(9, size * 2 / 3);
                 string who = ward.Reformer ? $"{ward.Alderman}, reformer" : ward.OwnerGangId >= 0 ? $"{ward.Alderman}, {w.GangById(ward.OwnerGangId).Name}" : $"{ward.Alderman}, the party";
                 var ws = font.GetStringSize(who, HorizontalAlignment.Left, -1, small);
-                DrawString(font, centre + new Vector2(-ws.X / 2, size * 1.2f), who, HorizontalAlignment.Left, -1, small, colour.Lightened(0.25f));
+                C.DrawString(font, centre + new Vector2(-ws.X / 2, size * 1.2f), who, HorizontalAlignment.Left, -1, small, colour.Lightened(0.25f));
             }
         }
     }

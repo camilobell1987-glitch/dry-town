@@ -53,12 +53,21 @@ public partial class MapView : Control
         ClipContents = true;
         TooltipText = " "; // enables _GetTooltip
         Resized += QueueRedraw;
+        C = this;
+        _overlay = new Overlay { Map = this, MouseFilter = MouseFilterEnum.Ignore };
+        _overlay.SetAnchorsPreset(LayoutPreset.FullRect);
+        AddChild(_overlay);
     }
+
+    private (float Zoom, Vector2 Pan, Vector2 Size) _cityView;
 
     public override void _Process(double delta)
     {
         _anim += (float)delta;
-        QueueRedraw();
+        _overlay.QueueRedraw();
+        // The city only needs drawing again when the view moves or the light changes.
+        var view = (_zoom, _pan, Size);
+        if (view != _cityView || Mathf.Round(Night * 40) / 40 != _cityNight) { _cityView = view; QueueRedraw(); }
     }
 
     /// <summary>Big cities draw small when fitted, so they can be zoomed in further.</summary>
@@ -204,6 +213,7 @@ public partial class MapView : Control
                     _ => was,
                 };
             }
+            if (a.BusinessId >= 0) QueueRedraw();
             ActionHappened?.Invoke(a);
         }
     }
@@ -227,7 +237,7 @@ public partial class MapView : Control
         {
             if (_dragging) { _pan += motion.Relative; ClampPan(); }
             int lot = LotUnder(motion.Position);
-            if (lot != _hoverLot) { _hoverLot = lot; QueueRedraw(); }
+            _hoverLot = lot;
             HoverWard = ShowWards ? WardAtTile((motion.Position - Origin) / Tile) : -1;
         }
         else if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } click)
@@ -285,28 +295,68 @@ public partial class MapView : Control
 
     // ---- Drawing --------------------------------------------------------------
 
+    /// <summary>
+    /// The canvas the drawing helpers paint on. The city itself (ground, buildings, street names)
+    /// is drawn on the map and only redrawn when something changes; what moves every frame
+    /// (traffic, people, the night, outlines, wards and men on the street) goes on an overlay.
+    /// </summary>
+    private CanvasItem C = null!;
+
+    private Overlay _overlay = null!;
+
+    /// <summary>Milliseconds the city and the overlay last took to draw, for the --bench flag.</summary>
+    public static double CityMillis, OverlayMillis;
+    public static int CityDraws;
+
+    private sealed partial class Overlay : Control
+    {
+        public MapView Map = null!;
+        public override void _Draw() => Map.DrawOverlay(this);
+    }
+
+    /// <summary>Night, quantised, as last drawn on the city; the city is redrawn when it moves on.</summary>
+    private float _cityNight = -1;
+
     public override void _Draw()
     {
         if (World == null) return;
-        var w = World;
+        ulong started = Time.GetTicksUsec();
+        C = this;
+        _t = Tile;
+        _o = Origin;
+        _cityNight = Mathf.Round(Night * 40) / 40;
+        var font = ThemeDB.FallbackFont;
+        DrawGround();
+        DrawShadows();
+        var view = new Rect2(Vector2.Zero, Size).Grow(_t);
+        foreach (var lot in World.Map.Lots)
+            if (view.Intersects(Footprint(lot))) DrawLot(lot, _cityNight);
+        DrawLampPosts(_cityNight);
+        DrawStreetNames(font);
+        CityMillis = (Time.GetTicksUsec() - started) / 1000.0;
+        CityDraws++;
+    }
+
+    private void DrawOverlay(CanvasItem canvas)
+    {
+        if (World == null) return;
+        ulong started = Time.GetTicksUsec();
+        C = canvas;
         _t = Tile;
         _o = Origin;
         _headlights.Clear();
         var font = ThemeDB.FallbackFont;
         float night = Night;
-
-        DrawGround();
-        DrawShadows();
-        foreach (var lot in w.Map.Lots) DrawLot(lot, night);
-        DrawLampPosts(night);
-        DrawStreetNames(font);
         DrawTraffic(night);
         DrawPassersBy();
         DrawNight(night);
-        foreach (var lot in w.Map.Lots) DrawLotOutline(lot);
+        var view = new Rect2(Vector2.Zero, Size).Grow(_t);
+        foreach (var lot in World.Map.Lots)
+            if (lot.Use != LotUse.Empty && view.Intersects(Footprint(lot))) DrawLotOutline(lot);
         DrawWards(font);
-
         if (Live) DrawActors(font);
+        C = this;
+        OverlayMillis = (Time.GetTicksUsec() - started) / 1000.0;
     }
 
     /// <summary>Who protects a business, and what's in its back room, as of the live clock.</summary>
@@ -330,16 +380,16 @@ public partial class MapView : Control
                 {
                     var f = Footprint(lot);
                     for (float x = f.Position.X + _t * 0.1f; x < f.End.X - _t * 0.05f; x += _t * 0.1f)
-                        DrawLine(new Vector2(x, f.Position.Y + _t * 0.08f), new Vector2(x, f.End.Y - _t * 0.08f), roof.Darkened(0.15f), 1);
+                        C.DrawLine(new Vector2(x, f.Position.Y + _t * 0.08f), new Vector2(x, f.End.Y - _t * 0.08f), roof.Darkened(0.15f), 1);
                 }
                 if (b.Kind == BusinessKind.Hotel)
                 {
                     // A water tower on its stilts.
                     var c = P(lot.X + 0.78f, lot.Y + (lot.FrontY < lot.Y ? 0.78f : 0.24f));
-                    DrawCircle(c + Vector2.One * _t * 0.08f, _t * 0.12f, Shadow);
-                    DrawCircle(c, _t * 0.12f, new Color("6b5038"));
-                    DrawArc(c, _t * 0.12f, 0, Mathf.Tau, 14, new Color("3a2a1e"), Mathf.Max(1, _t * 0.025f));
-                    DrawCircle(c, _t * 0.04f, new Color("3a2a1e"));
+                    C.DrawCircle(c + Vector2.One * _t * 0.08f, _t * 0.12f, Shadow);
+                    C.DrawCircle(c, _t * 0.12f, new Color("6b5038"));
+                    C.DrawArc(c, _t * 0.12f, 0, Mathf.Tau, 14, new Color("3a2a1e"), Mathf.Max(1, _t * 0.025f));
+                    C.DrawCircle(c, _t * 0.04f, new Color("3a2a1e"));
                 }
                 DrawAwning(lot, protector >= 0 ? Palette.Gang(w, protector) : null, open);
                 DrawSign(lot, b);
@@ -367,18 +417,18 @@ public partial class MapView : Control
         if (lot.Use == LotUse.Business)
         {
             var (protector, _) = ShownState(w.BusinessById(lot.BusinessId));
-            if (protector >= 0) DrawRect(r, Palette.Gang(w, protector), false, Mathf.Max(2, _t * 0.06f));
+            if (protector >= 0) C.DrawRect(r, Palette.Gang(w, protector), false, Mathf.Max(2, _t * 0.06f));
         }
         else if (lot.Use == LotUse.Headquarters)
-            DrawRect(r, Palette.Gang(w, lot.GangId), false, Mathf.Max(2, _t * 0.09f));
+            C.DrawRect(r, Palette.Gang(w, lot.GangId), false, Mathf.Max(2, _t * 0.09f));
 
         bool selected = lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness;
         if (selected)
         {
             float pulse = 0.75f + 0.25f * Mathf.Sin(_anim * 4);
-            DrawRect(r.Grow(Mathf.Max(3, _t * 0.08f)), Palette.Ink with { A = pulse }, false, Mathf.Max(2, _t * 0.06f));
+            C.DrawRect(r.Grow(Mathf.Max(3, _t * 0.08f)), Palette.Ink with { A = pulse }, false, Mathf.Max(2, _t * 0.06f));
         }
-        else if (lot.Id == _hoverLot && lot.Use != LotUse.Empty) DrawRect(r.Grow(2), Palette.Ink with { A = 0.6f }, false, 1.5f);
+        else if (lot.Id == _hoverLot && lot.Use != LotUse.Empty) C.DrawRect(r.Grow(2), Palette.Ink with { A = 0.6f }, false, 1.5f);
     }
 
     /// <summary>A man seen from above: shoulders in his coat, a hat on top, a shadow under him.</summary>
@@ -389,9 +439,9 @@ public partial class MapView : Control
         Ellipse(pos + new Vector2(r * 0.35f, r * 0.45f), new Vector2(r * 0.75f, r * 1.05f), Shadow, angle);
         Ellipse(pos, new Vector2(r * 0.62f, r * 1.0f), coat.Darkened(0.55f), angle + sway, 16);
         Ellipse(pos, new Vector2(r * 0.52f, r * 0.9f), coat, angle + sway, 16);
-        DrawCircle(pos + facing.Normalized() * r * 0.08f, r * 0.62f, hat);
-        DrawArc(pos + facing.Normalized() * r * 0.08f, r * 0.42f, 0, Mathf.Tau, 14, band, Mathf.Max(1, r * 0.16f));
-        DrawCircle(pos + facing.Normalized() * r * 0.08f, r * 0.3f, hat.Lightened(0.12f));
+        C.DrawCircle(pos + facing.Normalized() * r * 0.08f, r * 0.62f, hat);
+        C.DrawArc(pos + facing.Normalized() * r * 0.08f, r * 0.42f, 0, Mathf.Tau, 14, band, Mathf.Max(1, r * 0.16f));
+        C.DrawCircle(pos + facing.Normalized() * r * 0.08f, r * 0.3f, hat.Lightened(0.12f));
     }
 
     private void DrawActors(Font font)
@@ -440,7 +490,7 @@ public partial class MapView : Control
                     _ => Palette.Neutral,
                 };
                 float pulse = 1 + 0.35f * Mathf.Sin((now - actor.Arrive) * 9);
-                DrawArc(o + target * t, t * 0.4f * pulse, 0, Mathf.Tau, 24, ring, 2.5f);
+                C.DrawArc(o + target * t, t * 0.4f * pulse, 0, Mathf.Tau, 24, ring, 2.5f);
             }
 
             // In a takeover the rival's man stands in the doorway, and shots are traded.
@@ -464,7 +514,7 @@ public partial class MapView : Control
                 DrawFigure(pos, ahead, radius, Palette.Police, new Color("1b2a4a"), Palette.Police.Lightened(0.3f), walking);
             else
                 DrawFigure(pos, ahead, radius, actor.Colour, new Color("1c1a19"), actor.Colour.Lightened(0.25f), walking);
-            if (a.Kind == ActionKind.Guard && atScene) DrawArc(pos, radius + 3, 0, Mathf.Tau, 16, actor.Colour with { A = 0.6f }, 1.5f);
+            if (a.Kind == ActionKind.Guard && atScene) C.DrawArc(pos, radius + 3, 0, Mathf.Tau, 16, actor.Colour with { A = 0.6f }, 1.5f);
         }
 
         DrawOnTheirWay(now, o, t);
@@ -477,8 +527,8 @@ public partial class MapView : Control
             if (a.Kind == ActionKind.Raid) continue;
             var c = o + (actor.Path[^1] + new Vector2(-0.3f, 0.3f)) * t;
             float s = t * 0.14f;
-            DrawLine(c - new Vector2(s, s), c + new Vector2(s, s), Palette.Bad, 2.5f);
-            DrawLine(c - new Vector2(s, -s), c + new Vector2(s, -s), Palette.Bad, 2.5f);
+            C.DrawLine(c - new Vector2(s, s), c + new Vector2(s, s), Palette.Bad, 2.5f);
+            C.DrawLine(c - new Vector2(s, -s), c + new Vector2(s, -s), Palette.Bad, 2.5f);
         }
     }
 

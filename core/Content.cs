@@ -32,6 +32,7 @@ public static class Content
     {
         CitySize.Medium => new(7, 5, 2, 2, 2, 90, 4, 8),
         CitySize.Large => new(9, 7, 3, 2, 3, 150, 5, 10),
+        CitySize.Huge => new(13, 10, 4, 3, 5, 300, 7, 14),
         _ => new(5, 4, 2, 1, 1, 48, 3, 6),
     };
 
@@ -62,6 +63,7 @@ public static class Content
     {
         "the Levee", "Tannery Row", "Goat Hill", "the Flats", "Little Palermo", "Canal Bend",
         "Kerry Patch", "Dutch Hollow", "the Stockyards", "Gaslight Square", "Shantytown", "the Bottoms",
+        "the Docks", "Brewery Hill", "Lamplight Row", "Old Town", "the Gold Coast", "Cinder Flats",
     };
 
     public static readonly string[] PoliticianFirstNames =
@@ -138,13 +140,13 @@ public static class Content
     public static readonly string[] StreetNames =
     {
         "Canal", "Halsted", "Mercer", "Larkin", "Foundry", "Orchard", "Tanner", "Vine", "Kessler", "Market",
-        "Rook", "Ashby", "Pullman", "Weller",
+        "Rook", "Ashby", "Pullman", "Weller", "Quarry", "Dock",
     };
 
     public static readonly string[] AvenueNames =
     {
         "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Railroad", "Lake",
-        "Seventh", "Eighth", "Union", "Grand",
+        "Seventh", "Eighth", "Union", "Grand", "Ninth", "Tenth", "Harbor", "Elm",
     };
 
     public const int HoursPerWeek = 168;

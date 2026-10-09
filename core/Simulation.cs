@@ -662,7 +662,8 @@ public sealed class Simulation
 
                 if (!hood.IsAvailable || hood.Loyalty >= 20 || !w.Rng.Chance(0.12)) continue;
 
-                if (hood.Ambition > 65 && w.LivingGangs.Count() < w.Settings.MaxGangs)
+                // An outfit that owns most of the city splits even when the city is crowded.
+                if (hood.Ambition > 65 && (w.LivingGangs.Count() < w.Settings.MaxGangs || share >= 0.5))
                     Breakaway(gang, hood);
                 else
                 {
