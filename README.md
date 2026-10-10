@@ -153,9 +153,12 @@ All gangs, including the player's, were run by the AI planner. A city counts as 
 
 | Check | Small | Medium | Large | Huge | Metropolis |
 | --- | --- | --- | --- | --- | --- |
-| 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 | 80/80 | 40/40 (seeds 100–139) |
-| 50-year cities contested | 10/10 | | 10/10 | 8/8 | |
-| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 73/80 / 66/80 | 67/80 / 52/80 | 64/80 / 36/80 | 77/80 / 54/80 | 38/40 / 36/40 (seeds 100–139) |
+| 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 | 80/80 | 20/20 (seeds 100–119) |
+| 50-year cities contested (Phase 6, before the street) | 10/10 | | 10/10 | 8/8 | |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 70/80 / 61/80 | 67/80 / 43/80 | 61/80 / 38/80 | 73/80 / 56/80 | 20/20 / 14/20 (seeds 100–119) |
+| Arson / hits / bank jobs / hijacks per city per year | 1.2 / 0.1 / 0.1 / 3.2 | 2.2 / 0.2 / 0.3 / 4.2 | 4.0 / 0.2 / 0.4 / 6.6 | 7.1 / 0.2 / 0.7 / 11.8 | 9.2 / 0.3 / 0.9 / 19.5 |
+
+These runs include the people on the street and the new crimes and rackets. Before them, the player's gang was alive after 3 / 10 years in 73/66 small, 67/52 medium, 64/36 large and 77/54 huge cities out of 80. The medium city's ten-year figure fell the most. Hijacks are the commonest new crime because a beer truck is a quick win for a gang with a strong man; hits are rare, since the AI only goes after a rival's best man when the odds are good.
 
 Parks in the huge city leave a few fewer lots to build on, so it was run again on seeds 100–179 after they went in: all 80 stayed contested, and the player's gang was alive in 74/80 after 3 years and 46/80 after 10. A metropolis takes about a minute and a half for ten years on the headless runner, so a week takes under a fifth of a second.
 
