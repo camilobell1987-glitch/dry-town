@@ -2,13 +2,13 @@ namespace DryTown.Core;
 
 public enum Difficulty { Easy, Normal, Hard }
 
-public enum CitySize { Small, Medium, Large }
+public enum CitySize { Small, Medium, Large, Huge }
 
 public sealed class WorldSettings
 {
     public ulong Seed { get; init; } = 1;
 
-    /// <summary>Small is the first district of five blocks by four; Large is nine by seven with six wards.</summary>
+    /// <summary>Small is the first district of five blocks by four; Large is nine by seven with six wards; Huge is thirteen by ten with twelve.</summary>
     public CitySize Size { get; init; } = CitySize.Small;
 
     /// <summary>Businesses and starting gangs, or 0 to fit the city's size.</summary>
@@ -93,9 +93,10 @@ public sealed class World
 
     public Gang Player => Gangs.First(g => g.IsPlayer);
 
-    public Gang GangById(int id) => Gangs.First(g => g.Id == id);
-    public Hood HoodById(int id) => Hoods.First(h => h.Id == id);
-    public Business BusinessById(int id) => Businesses.First(b => b.Id == id);
+    // Ids are handed out in order and nothing is ever removed, so an id is usually its index.
+    public Gang GangById(int id) => id >= 0 && id < Gangs.Count && Gangs[id].Id == id ? Gangs[id] : Gangs.First(g => g.Id == id);
+    public Hood HoodById(int id) => id >= 0 && id < Hoods.Count && Hoods[id].Id == id ? Hoods[id] : Hoods.First(h => h.Id == id);
+    public Business BusinessById(int id) => id >= 0 && id < Businesses.Count && Businesses[id].Id == id ? Businesses[id] : Businesses.First(b => b.Id == id);
 
     public IEnumerable<Gang> LivingGangs => Gangs.Where(g => g.Alive);
     public IEnumerable<Hood> HoodsOf(int gangId) => Hoods.Where(h => h.GangId == gangId && h.IsActive);

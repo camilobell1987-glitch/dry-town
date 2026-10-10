@@ -2,7 +2,7 @@
 
 An open-ended Prohibition-era crime strategy game, inspired by how *Gangsters: Organized Crime* (1998) plays. It is a new game. It uses none of the original's art, audio, text, code, data or name.
 
-There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5, the current state, adds politics and a bigger city. The city now comes in three sizes, the largest with six wards and five outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out.
+There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6, the current state, adds a huge one. The city now comes in four sizes, the largest with twelve wards and seven outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out.
 
 ![Planning a week](docs/screenshots/planning.png)
 
@@ -24,7 +24,7 @@ dotnet test tests                                                    # 44 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
-dotnet run --project sim -- soak --seeds 40 --years 10 --size Large   # Small, Medium or Large
+dotnet run --project sim -- soak --seeds 40 --years 10 --size Large   # Small, Medium, Large or Huge
 ```
 
 ## How a week works
@@ -51,17 +51,19 @@ Rival outfits play too. They buy the alderman where they do most of their busine
 
 ## City sizes
 
-**Game → New city** offers three sizes. A new game starts in a large city, zoomed in on your headquarters; scroll out to see all of it.
+**Game → New city** offers four sizes. A new game starts in a large city, zoomed in on your headquarters; scroll out to see all of it.
 
 | Size | Blocks | Wards | Precincts | Businesses | Outfits at the start / at most |
 | --- | --- | --- | --- | --- | --- |
 | Small | 5 × 4 | 2 | 1 | 48 | 3 / 6 |
 | Medium | 7 × 5 | 4 | 2 | 90 | 4 / 8 |
 | Large | 9 × 7 | 6 | 3 | 150 | 5 / 10 |
+| Huge | 13 × 10 | 12 | 5 | 300 | 7 / 14 |
 
-Police answer a raid from the nearest precinct house. Saves from earlier versions load as a small city split into two wards.
+Police answer a raid from the nearest precinct house. In a big city that thins out to a few outfits, newcomers move in sooner. Fitted whole on the screen, a huge city leaves out the smallest details, such as trade-sign pictures and paving joints, and they come back as you zoom in. Saves from earlier versions load as a small city split into two wards.
 
 ![A large city](docs/screenshots/large-city.png)
+![A huge city, all of it on screen](docs/screenshots/huge-city.png)
 
 ## Bosses grow old
 
@@ -83,7 +85,7 @@ Rival gangs send men in pairs and threes too, but only while they are small. A g
 
 ## Saving
 
-The game saves itself every Sunday and when you close the window. Next time you open it, you carry on where you left off. The **Game** menu has three save slots, loading, and a new city in any of the three sizes. Saves are JSON files in Godot's user folder, under `saves/`.
+The game saves itself every Sunday and when you close the window. Next time you open it, you carry on where you left off. The **Game** menu has three save slots, loading, and a new city in any of the four sizes. Saves are JSON files in Godot's user folder, under `saves/`.
 
 ## Sound
 
@@ -105,7 +107,7 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 
 ## Systems
 
-- **The city.** It is a grid of blocks, four lots wide and two deep, in one of three sizes (see above). Most lots are businesses; the rest are empty lots, gang headquarters and precinct houses. Owners take a gang less seriously the further its headquarters is: each block beyond the second costs a few points of extortion chance.
+- **The city.** It is a grid of blocks, four lots wide and two deep, in one of four sizes (see above). Most lots are businesses; the rest are empty lots, gang headquarters and precinct houses. Owners take a gang less seriously the further its headquarters is: each block beyond the second costs a few points of extortion chance.
 - **Protection.** A hood leans on a shop. Success depends on his Intimidation against the owner's toughness. Higher rates pay more but build resentment, and resentful owners talk to the police.
 - **Rackets.** These hide behind protected businesses: speakeasies, stills, numbers games and loan books. Liquor rackets only pay well until repeal in 1934.
 - **Turf wars and guards.** A hood sent at a rival's business fights whoever answers the door. That is the guard posted there, otherwise the business's handler. A guard fights harder than a handler who gets called in. The rest of the rival gang only backs him up if it isn't spread thin. Losers can die.
@@ -119,14 +121,13 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 
 All gangs, including the player's, were run by the AI planner. A city counts as stalled if, in any year, it has fewer than two gangs at some point, one gang holds over 75% of the district all year, or fewer than 3 businesses change hands.
 
-| Check | Small | Medium | Large |
-| --- | --- | --- | --- |
-| 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 |
-| 10-year cities contested, seeds 1–40 (Hard) | 40/40 | 40/40 | 40/40 |
-| 50-year cities contested, seeds 1–10 | 10/10 | | 10/10 |
-| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 71/80 / 58/80 | 70/80 / 46/80 | 68/80 / 36/80 |
-| Player's gang alive after 3 / 10 years, seeds 1–40 (Hard) | 26/40 / 22/40 | 20/40 / 9/40 | 21/40 / 12/40 |
-| Player's gang alive after 50 years, seeds 1–10 (Normal) | 1/10 | | 1/10 |
+| Check | Small | Medium | Large | Huge |
+| --- | --- | --- | --- | --- |
+| 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 | 80/80 |
+| 50-year cities contested | 10/10 | | 10/10 | 8/8 |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 73/80 / 66/80 | 67/80 / 52/80 | 64/80 / 36/80 | 77/80 / 54/80 |
+
+Hard results from Phase 5, before the huge city: alive after 3 / 10 years in 26/40 / 22/40 small, 20/40 / 9/40 medium and 21/40 / 12/40 large cities, with all 40 contested on each.
 
 Phase 4's small city kept the player's gang alive in 71/80 after 3 years and 55/80 after 10, so politics hasn't made the small city harder. Bigger cities are harder to last in: there are more rivals, and the autopilot doesn't pick its fights by ward. With politics turned off (`--no-politics`), the small city gives 68/80 after 3 years on the same build.
 

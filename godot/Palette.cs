@@ -35,6 +35,10 @@ public static class Palette
         new("b4b8bf"), // silver
         new("a8693a"), // sienna
         new("6fcf9f"), // mint
+        new("8a62b0"), // plum
+        new("3f8a5a"), // forest
+        new("6ab0c8"), // sky
+        new("e3a3a8"), // blush
     };
 
     private static readonly Dictionary<int, int> Assigned = new();
