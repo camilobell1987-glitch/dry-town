@@ -30,7 +30,7 @@ public static class Reports
         return sb.ToString();
     }
 
-    public static bool IsHeadline(GameEvent e) => e.Kind is not (EventKind.Recruited or EventKind.Bribe or EventKind.HoodReleased or EventKind.Street);
+    public static bool IsHeadline(GameEvent e) => e.Kind is not (EventKind.Recruited or EventKind.Bribe or EventKind.HoodReleased or EventKind.Street or EventKind.Gear);
 
     /// <summary>Who is about on the street, and what each of them can be for the gang.</summary>
     public static string Street(World w, int gangId)
@@ -50,6 +50,27 @@ public static class Reports
             sb.AppendLine($"{p.Id,4} {Trim(p.Name, 40),-40} {line}");
         }
         return sb.Length == 0 ? "Nobody about.\n" : sb.ToString();
+    }
+
+    /// <summary>What a man carries and drives, in a few words.</summary>
+    public static string Gear(Hood h) =>
+        h.Weapon == Weapon.None && h.Car == Car.None ? "-"
+        : string.Join(", ", new[] { h.Weapon != Weapon.None ? Content.Guns[h.Weapon].Label : null, h.Car != Car.None ? Content.Cars[h.Car].Label : null }.Where(x => x != null));
+
+    /// <summary>Where to buy guns and cars, and what they cost.</summary>
+    public static string Shops(World w, int gangId)
+    {
+        var sb = new StringBuilder();
+        foreach (var lot in w.Shops(LotUse.GunShop).Concat(w.Shops(LotUse.CarDealer)))
+            sb.AppendLine($"  {World.ShopName(w.Map, lot)}");
+        sb.AppendLine("Guns (arm <hood> <gun>):");
+        foreach (var (kind, g) in Content.Guns.Where(x => x.Key != Weapon.None))
+            sb.AppendLine($"  {kind,-9} {g.Label,-18} ${g.Price,-5} +{g.Firepower} strength, +{g.Extort * 100:0}% to lean on a shop" + (g.Heat > 0 ? $", +{g.Heat} heat in a gunfight" : ""));
+        sb.AppendLine("Cars (drive <hood> <car>):");
+        foreach (var (kind, c) in Content.Cars.Where(x => x.Key != Car.None))
+            sb.AppendLine($"  {kind,-9} {c.Label,-18} ${c.Price,-5} {c.Speed:0.#}x as fast, {c.Getaway * 100:0}% better getaway" + (kind == Car.Cadillac ? ", bulletproof" : ""));
+        sb.AppendLine($"Trading in what a man has already gets back half its price.");
+        return sb.ToString();
     }
 
     public static string Banks(World w, int gangId)
@@ -77,11 +98,11 @@ public static class Reports
     {
         var sb = new StringBuilder();
         var gang = w.GangById(gangId);
-        sb.AppendLine($"{"Id",4} {"Name",-30} {"Age",3} {"Int",3} {"Mus",3} {"Brn",3} {"Stl",3} {"Loy",3} {"Wage",4}  State");
+        sb.AppendLine($"{"Id",4} {"Name",-30} {"Age",3} {"Int",3} {"Mus",3} {"Brn",3} {"Stl",3} {"Loy",3} {"Wage",4}  {"State",-10} Carries / drives");
         foreach (var h in w.HoodsOf(gangId).OrderBy(h => h.Id))
         {
             string state = h.State == HoodState.Jailed ? $"jailed {h.JailWeeks}w" : h.Id == gang.BossHoodId ? "boss" : h.Id == gang.HeirHoodId ? "heir" : "free";
-            sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {h.Age(w.Week),3} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state}");
+            sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {h.Age(w.Week),3} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state,-10} {Gear(h)}");
         }
         return sb.ToString();
     }

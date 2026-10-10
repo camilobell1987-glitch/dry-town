@@ -34,6 +34,7 @@ public sealed class CommandShell
         "wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
         "street (people about) | hire <person> | paycop <person> | buystory <person> | silence <hood> <person>\n" +
         "torch <hood> <biz> | hit <hood> <target hood> [backup..] | banks | rob <hood> <bank> [backup..] | hijack <hood> <biz> [backup..]\n" +
+        "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -71,6 +72,10 @@ public sealed class CommandShell
                 case "hit": return Queue(new HitOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "rob": return Queue(new RobberyOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "hijack": return Queue(new HijackOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
+                case "shops": return Reports.Shops(W, Me);
+                case "arm": return Buy(int.Parse(p[1]), gun: Enum.Parse<Weapon>(p[2], true));
+                case "drive": return Buy(int.Parse(p[1]), car: Enum.Parse<Car>(p[2], true));
+                case "hand": return Hand(int.Parse(p[1]), int.Parse(p[2]), p[3].ToLowerInvariant() == "car");
                 case "heir": return NameHeir(int.Parse(p[1]));
                 case "family": return Queue(new RecruitOrder(Me, Family: true));
                 case "crew": return CrewCommand(p);
@@ -93,6 +98,32 @@ public sealed class CommandShell
         {
             return "Couldn't read that order. Type 'help'.\n";
         }
+    }
+
+    /// <summary>Buy a man a gun or a car on the spot. The money goes now.</summary>
+    private string Buy(int hoodId, Weapon? gun = null, Car? car = null)
+    {
+        if (CheckHood(hoodId, allowJailed: true) is string bad) return bad + "\n";
+        var hood = W.HoodById(hoodId);
+        if (gun is { } g)
+        {
+            if (W.CannotArm(W.Player, hood, g) is string no) return no + "\n";
+            int cost = W.Arm(W.Player, hood, g);
+            return $"{hood.Name} now carries a {Content.Guns[g].Label}. That cost ${cost}.\n";
+        }
+        var c = car!.Value;
+        if (W.CannotDrive(W.Player, hood, c) is string no2) return no2 + "\n";
+        int paid = W.Drive(W.Player, hood, c);
+        return $"{hood.Name} now drives a {Content.Cars[c].Label}. That cost ${paid}.\n";
+    }
+
+    private string Hand(int fromId, int toId, bool car)
+    {
+        if (CheckHood(fromId, allowJailed: true) is string bad) return bad + "\n";
+        if (CheckHood(toId, allowJailed: true) is string bad2) return bad2 + "\n";
+        var from = W.HoodById(fromId);
+        var to = W.HoodById(toId);
+        return W.HandOver(from, to, car) ? $"{from.Name} handed his {(car ? "car" : "gun")} to {to.Name}.\n" : $"{from.Name} has no {(car ? "car" : "gun he can hand over")}.\n";
     }
 
     private static int[]? Rest(string[] p, int from) => p.Length > from ? p.Skip(from).Select(int.Parse).ToArray() : null;
@@ -187,6 +218,8 @@ public sealed class CommandShell
                 ?? (W.BusinessById(g.BusinessId).ProtectorGangId != Me ? "You can only guard your own turf." : null),
             PayoffOrder po => CheckPayoff(po),
             CampaignOrder co => CheckCampaign(co),
+            ArmOrder a => CheckHood(a.HoodId, allowJailed: true) ?? W.CannotArm(W.Player, W.HoodById(a.HoodId), a.Weapon),
+            CarOrder c => CheckHood(c.HoodId, allowJailed: true) ?? W.CannotDrive(W.Player, W.HoodById(c.HoodId), c.Car),
             _ => CheckStreet(order),
         };
         if (problem != null) return problem + "\n";
@@ -215,6 +248,8 @@ public sealed class CommandShell
         PayCopOrder c => $"pay {PersonName(c.PersonId)} ${Content.CopPrice} to look away",
         BuyStoryOrder b => $"buy {PersonName(b.PersonId)}'s story (${Content.StoryPrice(W.Player.Heat)})",
         SilenceOrder s => $"{HoodName(s.HoodId)} has a word with {PersonName(s.PersonId)}",
+        ArmOrder a => $"buy {HoodName(a.HoodId)} a {Content.Guns[a.Weapon].Label}",
+        CarOrder c => $"buy {HoodName(c.HoodId)} a {Content.Cars[c.Car].Label}",
         _ => o.ToString(),
     };
 

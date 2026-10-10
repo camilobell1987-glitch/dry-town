@@ -113,6 +113,8 @@ public sealed partial class Simulation
                 case PayCopOrder o: PayCop(gang, o); break;
                 case BuyStoryOrder o: BuyStory(gang, o); break;
                 case SilenceOrder o: Silence(gang, o); break;
+                case ArmOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Arm(gang, man, o.Weapon); break;
+                case CarOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Drive(gang, man, o.Car); break;
             }
         }
         w.Tick = Math.Max(w.Tick, Math.Min(tick, Content.HoursPerWeek - 1));
@@ -131,7 +133,7 @@ public sealed partial class Simulation
         if (!WeekRunning) return null;
         var gang = World.GangById(order.GangId);
         int toLot = TargetLot(World, order);
-        int tick = Math.Max((int)Math.Ceiling(now + WalkHours(World, gang.HqLotId, toLot)), _timeline.Take(_cursor).LastOrDefault()?.Tick ?? 0);
+        int tick = Math.Max((int)Math.Ceiling(now + TravelHours(World, gang.HqLotId, toLot, TeamOf(order).Select(World.HoodById))), _timeline.Take(_cursor).LastOrDefault()?.Tick ?? 0);
         if (tick > LastOrderTick) return null;
         var job = new Job(tick, gang.Id, order);
         if (order is ExtortOrder e2) _protectorWhenOrdered[order] = World.BusinessById(e2.BusinessId).ProtectorGangId;
@@ -228,7 +230,7 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
@@ -288,7 +290,7 @@ public sealed partial class Simulation
     /// </summary>
     public static double ExtortChance(World w, Gang gang, Hood hood, Business biz, int backup = 0) =>
         Math.Clamp(0.35 + (hood.Intimidation - biz.Toughness) * 0.08 - Math.Max(0, w.BlocksFromHq(gang, biz) - 2) * 0.04
-            + Math.Min(backup, Crew.MaxMembers) * 0.06, 0.05, 0.95);
+            + Math.Min(backup, Crew.MaxMembers) * 0.06 + Content.Guns[hood.Weapon].Extort, 0.05, 0.95);
 
     private void Extort(Gang gang, ExtortOrder o)
     {
@@ -329,7 +331,7 @@ public sealed partial class Simulation
                 gang.Heat = Math.Min(100, gang.Heat + 2);
                 string text = $"{biz.Name} threw {hood.Name} out.";
                 w.Log(EventKind.ExtortFailed, gang.Id, text);
-                bool arrested = w.Rng.Chance(0.06 + (10 - hood.Stealth) * 0.01);
+                bool arrested = w.Rng.Chance((0.06 + (10 - hood.Stealth) * 0.01) * (1 - Getaway(backup.Prepend(hood))));
                 if (arrested) Jail(hood, w.Rng.Range(2, 8), "for menacing a shopkeeper");
                 w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Extort, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id,
                     arrested ? ActionResult.Arrested : ActionResult.Failed, arrested ? $"{text} The police picked him up." : text,
@@ -343,9 +345,9 @@ public sealed partial class Simulation
         _guards.TryGetValue(biz.Id, out var guard);
         bool guarded = guard.Hood is { IsAvailable: true } && guard.Hood.GangId == rival.Id;
         double defence = DefenceStrength(w, rival, biz, guarded ? guard.Hood : null, guarded ? guard.Backup : 0);
-        double attack = hood.Strength + BackupStrength(backup) + w.Rng.Range(0, 6);
+        double attack = StormingStrength(hood, backup) + w.Rng.Range(0, 6);
         double roll = defence + w.Rng.Range(0, 6);
-        gang.Heat = Math.Min(100, gang.Heat + 5);
+        gang.Heat = Math.Min(100, gang.Heat + 5 + GunHeat(backup.Prepend(hood)));
         rival.Heat = Math.Min(100, rival.Heat + 2);
         biz.Resentment = Math.Min(100, biz.Resentment + 12);
 
@@ -359,7 +361,8 @@ public sealed partial class Simulation
                 : $"{gang.Name} muscled {rival.Name} out of {biz.Name}.";
             w.Log(EventKind.Takeover, gang.Id, text);
             int casualty = -1;
-            if (w.Rng.Chance(0.3))
+            // A Thompson gun on the job leaves fewer men standing.
+            if (w.Rng.Chance(backup.Prepend(hood).Any(h => h.Weapon == Weapon.TommyGun) ? 0.45 : 0.3))
             {
                 var victim = defender ?? PickVictim(rival);
                 if (victim != null) { Kill(victim, $"in a fight over {biz.Name}"); casualty = victim.Id; }
@@ -372,7 +375,7 @@ public sealed partial class Simulation
             string text = $"{rival.Name} saw off {hood.Name} at {biz.Name}.";
             w.Log(EventKind.TakeoverRepelled, rival.Id, text);
             int casualty = -1;
-            if (w.Rng.Chance(0.25))
+            if (w.Rng.Chance(0.25 * (1 - Getaway(backup.Prepend(hood)))))
             {
                 // Whoever is in front takes the bullet; with backup along, it may be one of them.
                 var fallen = backup.Count > 0 && w.Rng.Chance(0.5) ? w.Rng.Pick(backup) : hood;
@@ -873,6 +876,8 @@ public sealed partial class Simulation
     private void Kill(Hood hood, string where)
     {
         hood.State = HoodState.Dead;
+        hood.Weapon = Weapon.None;
+        hood.Car = Car.None;
         var gang = World.GangById(hood.GangId);
         gang.Heat = Math.Min(100, gang.Heat + 3);
         World.Log(EventKind.HoodKilled, gang.Id, $"{hood.Name} of {gang.Name} was killed {where}.");

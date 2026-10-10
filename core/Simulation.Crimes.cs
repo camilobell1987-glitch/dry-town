@@ -19,7 +19,7 @@ public sealed partial class Simulation
     /// <summary>Chance a hit comes off: stealth to get close, then strength against the target's.</summary>
     public static double HitChance(World w, Hood hood, IEnumerable<Hood> backup, Hood target) =>
         Math.Clamp(0.45 + hood.Stealth * 0.03 + (hood.Strength + BackupStrength(backup) - target.Strength) * 0.03
-            - (IsGuardedBoss(w, target) ? 0.25 : 0), 0.05, 0.9);
+            - (IsGuardedBoss(w, target) ? 0.25 : 0) - (target.Car == Car.Cadillac ? Content.ArmouredCar : 0), 0.05, 0.9);
 
     /// <summary>
     /// Chance of getting into a vault and out again. The man in front plans it; the backup holds
@@ -32,7 +32,7 @@ public sealed partial class Simulation
         var lot = w.Map.LotAt(bank.LotId);
         double defence = bank.Guards * 6 + (w.Map.Distance(w.PrecinctNear(lot), lot) <= CityMap.StrideX * 2 ? 4 : 0)
             + (w.Week - bank.RobbedWeek < 12 ? 6 : 0);
-        return Math.Clamp(0.3 + (power - defence) * 0.04, 0.1, 0.85);
+        return Math.Clamp(0.3 + (power - defence) * 0.04 + Getaway(team) * 0.15, 0.1, 0.85);
     }
 
     /// <summary>Chance of stopping a rival's truck and getting away with the load. The drivers ride armed.</summary>
@@ -84,14 +84,15 @@ public sealed partial class Simulation
         int casualty = -1;
         ActionResult result = ActionResult.Failed;
         string fail = $"{hood.Name} was seen off before he could set fire to {biz.Name}.";
-        if (guarded && w.Rng.Chance(0.3))
+        double stay = 1 - Getaway(new[] { hood });
+        if (guarded && w.Rng.Chance(0.3 * stay))
         {
             Kill(hood, $"caught with a can of gasoline at {biz.Name}");
             casualty = hood.Id;
             result = ActionResult.Killed;
             fail = $"{guard.Hood.Name} of {rival.Name} caught {hood.Name} with a can of gasoline at {biz.Name}.";
         }
-        else if (w.Rng.Chance(0.25 + (10 - hood.Stealth) * 0.02))
+        else if (w.Rng.Chance((0.25 + (10 - hood.Stealth) * 0.02) * stay))
         {
             Jail(hood, w.Rng.Range(10, 30), "for attempted arson");
             casualty = hood.Id;
@@ -125,7 +126,7 @@ public sealed partial class Simulation
         {
             bool boss = rival.BossHoodId == target.Id;
             Kill(target, boss ? $"in a hit ordered by {gang.Name}" : $"on the street, in a hit ordered by {gang.Name}");
-            gang.Heat = Math.Min(100, gang.Heat + 10);
+            gang.Heat = Math.Min(100, gang.Heat + 10 + GunHeat(backup.Prepend(hood)));
             string text = boss
                 ? $"{hood.Name} gunned down {target.Name}, boss of {rival.Name}."
                 : $"{hood.Name} of {gang.Name} gunned down {target.Name} of {rival.Name}.";
@@ -136,10 +137,10 @@ public sealed partial class Simulation
             return;
         }
 
-        gang.Heat = Math.Min(100, gang.Heat + 5);
+        gang.Heat = Math.Min(100, gang.Heat + 5 + GunHeat(backup.Prepend(hood)));
         int casualty = -1;
         string fail = $"{target.Name} of {rival.Name} got away from {hood.Name}.";
-        if (w.Rng.Chance(0.35))
+        if (w.Rng.Chance(0.35 * (1 - Getaway(backup.Prepend(hood)))))
         {
             var fallen = backup.Count > 0 && w.Rng.Chance(0.5) ? w.Rng.Pick(backup) : hood;
             Kill(fallen, $"trying to kill {target.Name}");
@@ -168,7 +169,7 @@ public sealed partial class Simulation
             bank.Vault -= take;
             gang.Cash += take;
             w.Ledger(gang.Id).Rackets += take;
-            gang.Heat = Math.Min(100, gang.Heat + 20);
+            gang.Heat = Math.Min(100, gang.Heat + 20 + GunHeat(backup.Prepend(hood)));
             w.Hall.Outrage = Math.Min(100, w.Hall.Outrage + 3);
             string text = $"{hood.Name} and {(backup.Count == 0 ? "nobody else" : backup.Count == 1 ? "one other man" : $"{backup.Count} men")} held up {bank.Name} and got away with ${take}.";
             w.Log(EventKind.Robbery, gang.Id, text);
@@ -177,14 +178,15 @@ public sealed partial class Simulation
             return;
         }
 
-        gang.Heat = Math.Min(100, gang.Heat + 12);
         int casualty = -1;
         var team = backup.Prepend(hood).ToList();
+        gang.Heat = Math.Min(100, gang.Heat + 12 + GunHeat(team));
+        double stay = 1 - Getaway(team);
         var pinched = new List<Hood>();
         foreach (var man in team)
         {
-            if (w.Rng.Chance(0.12)) { Kill(man, $"in a shoot-out at {bank.Name}"); casualty = man.Id; continue; }
-            if (w.Rng.Chance(0.45 - man.Stealth * 0.025)) { Jail(man, w.Rng.Range(26, 78), $"for the hold-up at {bank.Name}"); pinched.Add(man); }
+            if (w.Rng.Chance(0.12 * stay)) { Kill(man, $"in a shoot-out at {bank.Name}"); casualty = man.Id; continue; }
+            if (w.Rng.Chance((0.45 - man.Stealth * 0.025) * stay)) { Jail(man, w.Rng.Range(26, 78), $"for the hold-up at {bank.Name}"); pinched.Add(man); }
         }
         string fail = $"The hold-up at {bank.Name} went wrong for {gang.Name}" +
             (casualty >= 0 ? $": {w.HoodById(casualty).Name} was shot" : "") +
@@ -206,7 +208,7 @@ public sealed partial class Simulation
         var rival = w.GangById(biz.ProtectorGangId);
         var info = Content.Rackets[biz.Racket];
         double chance = HijackChance(w, hood, backup, biz);
-        gang.Heat = Math.Min(100, gang.Heat + 3);
+        gang.Heat = Math.Min(100, gang.Heat + 3 + GunHeat(backup.Prepend(hood)));
 
         if (w.Rng.Chance(chance))
         {
@@ -224,7 +226,7 @@ public sealed partial class Simulation
 
         int casualty = -1;
         string fail = $"{rival.Name}'s drivers saw off {hood.Name} on the road to {biz.Name}.";
-        if (w.Rng.Chance(0.25))
+        if (w.Rng.Chance(0.25 * (1 - Getaway(backup.Prepend(hood)))))
         {
             var fallen = backup.Count > 0 && w.Rng.Chance(0.5) ? w.Rng.Pick(backup) : hood;
             Kill(fallen, $"trying to hijack a beer truck");

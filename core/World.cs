@@ -44,7 +44,7 @@ public sealed class WorldSettings
 }
 
 /// <summary>The whole simulation state for one district. Pure data plus id lookups.</summary>
-public sealed class World
+public sealed partial class World
 {
     public WorldSettings Settings { get; }
     public Rng Rng { get; private set; }
@@ -188,6 +188,7 @@ public sealed class World
                 player ? settings.PlayerStartingCash : settings.StartingCash,
                 player ? settings.PlayerStartingHoods : settings.StartingHoods);
         }
+        world.PlaceShops();
         return world;
     }
 
@@ -492,6 +493,7 @@ public sealed class World
         w.Banks.AddRange(d.Banks);
         // Cities saved before there were banks get them now.
         w.PlaceBanks();
+        w.PlaceShops();
         return w;
     }
 

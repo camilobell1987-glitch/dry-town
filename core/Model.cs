@@ -4,6 +4,12 @@ public enum HoodState { Free, Jailed, Dead, Gone }
 
 public enum BusinessKind { Grocer, Diner, Barber, Tailor, Garage, Laundry, Hotel, Pharmacy, PoolHall, Warehouse }
 
+/// <summary>What a man carries. Better guns win fights but bring more heat.</summary>
+public enum Weapon { None, Pistol, Shotgun, TommyGun }
+
+/// <summary>What a man drives. A car gets him there faster and away when it goes wrong.</summary>
+public enum Car { None, ModelT, Packard, Cadillac }
+
 public enum RacketKind { None, Speakeasy, Numbers, LoanShark, Still, Bookie, GamblingDen, Counterfeit }
 
 public sealed class Hood
@@ -35,9 +41,14 @@ public sealed class Hood
 
     public int Age(int week) => (week - BornWeek) / Content.WeeksPerYear;
 
+    public Weapon Weapon { get; set; }
+    public Car Car { get; set; }
+
     public bool IsAvailable => State == HoodState.Free;
     public bool IsActive => State is HoodState.Free or HoodState.Jailed;
-    public int Strength => Intimidation + Muscle;
+
+    /// <summary>What he brings to a fight: his own menace and muscle, and what he's carrying.</summary>
+    public int Strength => Intimidation + Muscle + Content.Guns[Weapon].Firepower;
 }
 
 public sealed class Business
@@ -134,7 +145,7 @@ public enum EventKind
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
     Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
-    Arson, Hit, Robbery, Hijack, Street,
+    Arson, Hit, Robbery, Hijack, Street, Gear,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

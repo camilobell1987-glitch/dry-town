@@ -1,6 +1,6 @@
 namespace DryTown.Core;
 
-public enum LotUse { Empty, Business, Headquarters, Precinct, Bank }
+public enum LotUse { Empty, Business, Headquarters, Precinct, Bank, GunShop, CarDealer }
 
 /// <summary>What the ground under a lot is. Only land can be built on; the river and the parks stay as they are.</summary>
 public enum Terrain { Land, Water, Park }

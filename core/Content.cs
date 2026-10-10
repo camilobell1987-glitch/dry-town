@@ -182,6 +182,42 @@ public static class Content
         "Commerce Bank", "Harbor Savings",
     };
 
+    // ---- Guns and cars ---------------------------------------------------------
+
+    /// <summary>
+    /// A gun adds to a man's strength in a fight and makes shopkeepers quicker to pay, but
+    /// gunplay draws more heat. A man who is killed loses what he carried.
+    /// </summary>
+    public sealed record GunInfo(string Label, int Price, int Firepower, int Heat, double Extort);
+
+    public static readonly IReadOnlyDictionary<Weapon, GunInfo> Guns = new Dictionary<Weapon, GunInfo>
+    {
+        [Weapon.None] = new("bare hands", 0, 0, 0, 0),
+        [Weapon.Pistol] = new(".38 revolver", 90, 1, 0, 0.02),
+        [Weapon.Shotgun] = new("sawed-off shotgun", 220, 2, 0, 0.03),
+        [Weapon.TommyGun] = new("Thompson gun", 700, 3, 2, 0.04),
+    };
+
+    /// <summary>
+    /// A car takes a man to the job faster, and gets him away when it goes wrong: the getaway
+    /// share is how much less likely he is to be killed or caught. The best car on a job counts.
+    /// </summary>
+    public sealed record CarInfo(string Label, int Price, float Speed, double Getaway);
+
+    public static readonly IReadOnlyDictionary<Car, CarInfo> Cars = new Dictionary<Car, CarInfo>
+    {
+        [Car.None] = new("on foot", 0, 1, 0),
+        [Car.ModelT] = new("Ford Model T", 450, 1.6f, 0.25),
+        [Car.Packard] = new("Packard sedan", 1500, 2.2f, 0.4),
+        [Car.Cadillac] = new("armoured Cadillac", 4000, 1.8f, 0.55),
+    };
+
+    /// <summary>What a gun or a car fetches when it's traded in for a better one.</summary>
+    public static int TradeIn(int price) => price / 2;
+
+    /// <summary>How much harder a man in an armoured car is to hit.</summary>
+    public const double ArmouredCar = 0.15;
+
     public const int HoursPerWeek = 168;
 
     /// <summary>Sunday morning: collectors make the rounds.</summary>
