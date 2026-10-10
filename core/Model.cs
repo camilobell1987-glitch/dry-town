@@ -4,7 +4,7 @@ public enum HoodState { Free, Jailed, Dead, Gone }
 
 public enum BusinessKind { Grocer, Diner, Barber, Tailor, Garage, Laundry, Hotel, Pharmacy, PoolHall, Warehouse }
 
-public enum RacketKind { None, Speakeasy, Numbers, LoanShark, Still }
+public enum RacketKind { None, Speakeasy, Numbers, LoanShark, Still, Bookie, GamblingDen, Counterfeit }
 
 public sealed class Hood
 {
@@ -131,6 +131,7 @@ public enum EventKind
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
     Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
+    Arson, Hit, Robbery, Hijack, Street,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);
@@ -149,6 +150,18 @@ public enum ActionKind
     Raid,
     /// <summary>Collectors make the Sunday rounds.</summary>
     Collect,
+    /// <summary>A hood sets fire to a rival's business.</summary>
+    Arson,
+    /// <summary>A hood goes after a named man in a rival gang.</summary>
+    Hit,
+    /// <summary>A crew holds up a bank.</summary>
+    Robbery,
+    /// <summary>A crew stops a rival's beer truck on its way to a speakeasy.</summary>
+    Hijack,
+    /// <summary>A hood has a quiet word with a witness.</summary>
+    Silence,
+    /// <summary>Someone on the street is hired, paid off or bought.</summary>
+    Hire,
 }
 
 public enum ActionResult { None, Success, Failed, Won, Lost, BackedOff, Killed, Arrested }
@@ -164,4 +177,64 @@ public sealed record ScriptAction(
 {
     /// <summary>Men who went along as backup, not counting <see cref="HoodId"/>.</summary>
     public IReadOnlyList<int> Backup { get; init; } = Array.Empty<int>();
+}
+
+/// <summary>Who someone on the street is. Shopkeepers and gangsters are clicked through their businesses and gangs.</summary>
+public enum PersonKind { Drifter, BeatCop, Reporter, Witness }
+
+/// <summary>
+/// Someone on the street who isn't in a gang: a drifter looking for work, the beat cop, a
+/// reporter working on a story about a gang, or a witness who saw one of its men do something.
+/// </summary>
+public sealed class StreetPerson
+{
+    public int Id { get; init; }
+    public PersonKind Kind { get; init; }
+    public required string Name { get; init; }
+
+    /// <summary>Where he hangs about.</summary>
+    public int LotId { get; set; }
+    public int WardId { get; init; }
+
+    // A drifter's skills, 1 to 10, which he keeps if he's hired.
+    public int Intimidation { get; init; }
+    public int Muscle { get; init; }
+    public int Brains { get; init; }
+    public int Stealth { get; init; }
+    public int BornWeek { get; init; }
+
+    /// <summary>A reporter's or a witness's gang, and the man the witness saw.</summary>
+    public int GangId { get; init; } = -1;
+    public int HoodId { get; init; } = -1;
+
+    /// <summary>What he saw or is writing about.</summary>
+    public string About { get; init; } = "";
+
+    /// <summary>How hard he is to scare or buy, 1 to 10.</summary>
+    public int Nerve { get; init; }
+
+    /// <summary>Weeks until the drifter moves on, the reporter goes to print or the witness testifies.</summary>
+    public int WeeksLeft { get; set; }
+
+    /// <summary>The gang that has paid this beat cop to look away this week, or -1.</summary>
+    public int PaidByGangId { get; set; } = -1;
+
+    public int Strength => Intimidation + Muscle;
+
+    /// <summary>What a drifter asks to sign on: more for a better man.</summary>
+    public int Fee => 60 + (Intimidation + Muscle + Brains + Stealth) * 8;
+}
+
+/// <summary>A bank: a vault that fills up through the week, and guards on the door.</summary>
+public sealed class Bank
+{
+    public int Id { get; init; }
+    public required string Name { get; init; }
+    public int LotId { get; init; }
+    public int Capacity { get; init; }
+    public int Vault { get; set; }
+    public int Guards { get; init; }
+
+    /// <summary>The week it was last held up. A bank stays on its guard for a while afterwards.</summary>
+    public int RobbedWeek { get; set; } = -1000;
 }

@@ -12,6 +12,14 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(SetRateOrder), "rate")]
 [JsonDerivedType(typeof(PayoffOrder), "payoff")]
 [JsonDerivedType(typeof(CampaignOrder), "campaign")]
+[JsonDerivedType(typeof(ArsonOrder), "arson")]
+[JsonDerivedType(typeof(HitOrder), "hit")]
+[JsonDerivedType(typeof(RobberyOrder), "robbery")]
+[JsonDerivedType(typeof(HijackOrder), "hijack")]
+[JsonDerivedType(typeof(HireOrder), "hire")]
+[JsonDerivedType(typeof(PayCopOrder), "paycop")]
+[JsonDerivedType(typeof(BuyStoryOrder), "buystory")]
+[JsonDerivedType(typeof(SilenceOrder), "silence")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -46,3 +54,36 @@ public sealed record PayoffOrder(int GangId, int WardId) : Order(GangId);
 
 /// <summary>Put money behind a candidate while an election is coming. WardId -1 is the mayor's race.</summary>
 public sealed record CampaignOrder(int GangId, int WardId, int Amount) : Order(GangId);
+
+/// <summary>Burn down a business a rival protects. It stays shut for weeks and its racket is lost.</summary>
+public sealed record ArsonOrder(int GangId, int HoodId, int BusinessId) : Order(GangId);
+
+/// <summary>Send a hood after a named man in another gang, with backup if he's well protected.</summary>
+public sealed record HitOrder(int GangId, int HoodId, int TargetHoodId, int[]? Backup = null) : Order(GangId)
+{
+    [JsonIgnore] public IEnumerable<int> Team => (Backup ?? Array.Empty<int>()).Prepend(HoodId);
+}
+
+/// <summary>Hold up a bank. The man in front plans it; the backup carries the guns.</summary>
+public sealed record RobberyOrder(int GangId, int HoodId, int BankId, int[]? Backup = null) : Order(GangId)
+{
+    [JsonIgnore] public IEnumerable<int> Team => (Backup ?? Array.Empty<int>()).Prepend(HoodId);
+}
+
+/// <summary>Stop the beer truck on its way to a rival's speakeasy or still and drive off with the load.</summary>
+public sealed record HijackOrder(int GangId, int HoodId, int BusinessId, int[]? Backup = null) : Order(GangId)
+{
+    [JsonIgnore] public IEnumerable<int> Team => (Backup ?? Array.Empty<int>()).Prepend(HoodId);
+}
+
+/// <summary>Sign on a drifter, at his asking price.</summary>
+public sealed record HireOrder(int GangId, int PersonId) : Order(GangId);
+
+/// <summary>Pay the beat cop to look the other way this week.</summary>
+public sealed record PayCopOrder(int GangId, int PersonId) : Order(GangId);
+
+/// <summary>Buy a reporter's story about the gang before it runs.</summary>
+public sealed record BuyStoryOrder(int GangId, int PersonId) : Order(GangId);
+
+/// <summary>Send a hood to persuade a witness to forget what he saw.</summary>
+public sealed record SilenceOrder(int GangId, int HoodId, int PersonId) : Order(GangId);

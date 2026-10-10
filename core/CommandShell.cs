@@ -26,12 +26,14 @@ public sealed class CommandShell
 
     public static readonly string Help =
         "gangs | hoods | turf | targets | log\n" +
-        "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark>\n" +
+        "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit>\n" +
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "crews | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
         "heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
         "wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
+        "street (people about) | hire <person> | paycop <person> | buystory <person> | silence <hood> <person>\n" +
+        "torch <hood> <biz> | hit <hood> <target hood> [backup..] | banks | rob <hood> <bank> [backup..] | hijack <hood> <biz> [backup..]\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -59,6 +61,16 @@ public sealed class CommandShell
                 case "wards": return Reports.Wards(W, Me);
                 case "payoff": return Queue(new PayoffOrder(Me, int.Parse(p[1])));
                 case "campaign": return Queue(new CampaignOrder(Me, p[1].ToLowerInvariant() == "mayor" ? -1 : int.Parse(p[1]), int.Parse(p[2])));
+                case "street": return Reports.Street(W, Me);
+                case "banks": return Reports.Banks(W, Me);
+                case "hire": return Queue(new HireOrder(Me, int.Parse(p[1])));
+                case "paycop": return Queue(new PayCopOrder(Me, int.Parse(p[1])));
+                case "buystory": return Queue(new BuyStoryOrder(Me, int.Parse(p[1])));
+                case "silence": return Queue(new SilenceOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "torch": return Queue(new ArsonOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "hit": return Queue(new HitOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
+                case "rob": return Queue(new RobberyOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
+                case "hijack": return Queue(new HijackOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "heir": return NameHeir(int.Parse(p[1]));
                 case "family": return Queue(new RecruitOrder(Me, Family: true));
                 case "crew": return CrewCommand(p);
@@ -82,6 +94,8 @@ public sealed class CommandShell
             return "Couldn't read that order. Type 'help'.\n";
         }
     }
+
+    private static int[]? Rest(string[] p, int from) => p.Length > from ? p.Skip(from).Select(int.Parse).ToArray() : null;
 
     private string NameHeir(int hoodId)
     {
@@ -173,7 +187,7 @@ public sealed class CommandShell
                 ?? (W.BusinessById(g.BusinessId).ProtectorGangId != Me ? "You can only guard your own turf." : null),
             PayoffOrder po => CheckPayoff(po),
             CampaignOrder co => CheckCampaign(co),
-            _ => null,
+            _ => CheckStreet(order),
         };
         if (problem != null) return problem + "\n";
         Pending.Add(order);
@@ -193,8 +207,84 @@ public sealed class CommandShell
             $"put Alderman {W.Wards[po.WardId].Alderman} of {W.Wards[po.WardId].Name} on the payroll (${Politics.PayoffCost(W, W.Wards[po.WardId], W.Player)})",
         CampaignOrder co => co.WardId < 0 ? $"put ${co.Amount} behind the machine's man for mayor"
             : $"put ${co.Amount} behind your man in {(co.WardId < W.Wards.Count ? W.Wards[co.WardId].Name : "ward " + co.WardId)}",
+        ArsonOrder a => $"{HoodName(a.HoodId)} sets fire to {BizName(a.BusinessId)}",
+        HitOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "go" : "goes")} after {HoodName(h.TargetHoodId)}",
+        RobberyOrder r => $"{HoodName(r.HoodId)}{With(r.Backup)} {(Sim.WeekRunning ? "hold" : "holds")} up {W.BankById(r.BankId)?.Name ?? "a bank"}",
+        HijackOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "stop" : "stops")} the beer truck for {BizName(h.BusinessId)}",
+        HireOrder h => $"sign on {PersonName(h.PersonId)} (${W.PersonById(h.PersonId)?.Fee ?? 0})",
+        PayCopOrder c => $"pay {PersonName(c.PersonId)} ${Content.CopPrice} to look away",
+        BuyStoryOrder b => $"buy {PersonName(b.PersonId)}'s story (${Content.StoryPrice(W.Player.Heat)})",
+        SilenceOrder s => $"{HoodName(s.HoodId)} has a word with {PersonName(s.PersonId)}",
         _ => o.ToString(),
     };
+
+    private string PersonName(int id) => W.PersonById(id)?.Name ?? $"person {id}";
+
+    /// <summary>Why the player can't give one of the street orders or the heavier jobs, or null.</summary>
+    public string? CheckStreet(Order order)
+    {
+        StreetPerson? Person(int id, PersonKind kind) => W.PersonById(id) is { } p && p.Kind == kind ? p : null;
+        bool Already(Func<Order, bool> same) => Pending.Any(same);
+        switch (order)
+        {
+            case HireOrder h:
+            {
+                var p = Person(h.PersonId, PersonKind.Drifter);
+                if (p == null) return "There's nobody like that looking for work. Type 'street'.";
+                if (Already(o => o is HireOrder q && q.PersonId == h.PersonId)) return $"You're already signing on {p.Name}.";
+                return W.Player.Cash < p.Fee ? $"{p.Name} wants ${p.Fee}." : null;
+            }
+            case PayCopOrder c:
+            {
+                var p = Person(c.PersonId, PersonKind.BeatCop);
+                if (p == null) return "That's not a beat cop. Type 'street'.";
+                if (p.PaidByGangId >= 0 || Already(o => o is PayCopOrder q && q.PersonId == c.PersonId)) return $"{p.Name} has already been paid this week.";
+                return W.Player.Cash < Content.CopPrice ? $"It takes ${Content.CopPrice}." : null;
+            }
+            case BuyStoryOrder b:
+            {
+                var p = Person(b.PersonId, PersonKind.Reporter);
+                if (p == null) return "That's not a reporter. Type 'street'.";
+                if (p.GangId != Me) return $"{p.Name} isn't writing about you.";
+                if (Already(o => o is BuyStoryOrder q && q.PersonId == b.PersonId)) return "You're already buying that story.";
+                return W.Player.Cash < Content.StoryPrice(W.Player.Heat) ? $"{p.Name} wants ${Content.StoryPrice(W.Player.Heat)}." : null;
+            }
+            case SilenceOrder s:
+            {
+                var p = Person(s.PersonId, PersonKind.Witness);
+                if (p == null) return "That's not a witness. Type 'street'.";
+                if (p.GangId != Me) return $"{p.Name} didn't see anything of yours.";
+                return CheckHood(s.HoodId);
+            }
+            case ArsonOrder a:
+            {
+                var biz = W.Businesses.FirstOrDefault(b => b.Id == a.BusinessId);
+                if (biz == null) return CheckBiz(a.BusinessId);
+                if (!biz.IsProtected || biz.ProtectorGangId == Me) return "Only a business a rival protects is worth burning.";
+                return biz.IsOpen ? CheckHood(a.HoodId) : $"{biz.Name} is already shut.";
+            }
+            case HitOrder h:
+            {
+                var target = W.Hoods.FirstOrDefault(x => x.Id == h.TargetHoodId);
+                if (target == null || target.GangId == Me || !target.IsActive) return "Pick a man from another gang. Type 'gangs'.";
+                if (!target.IsAvailable) return $"{target.Name} is in jail, out of reach.";
+                return h.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
+            }
+            case RobberyOrder r:
+                if (W.BankById(r.BankId) == null) return "There's no such bank. Type 'banks'.";
+                return r.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
+            case HijackOrder h:
+            {
+                var biz = W.Businesses.FirstOrDefault(b => b.Id == h.BusinessId);
+                if (biz == null) return CheckBiz(h.BusinessId);
+                if (!W.Prohibition) return "Since repeal, nobody's beer is worth stealing.";
+                if (!Simulation.CanHijack(W, W.Player, biz)) return "Only a rival's speakeasy or still gets beer trucks worth stopping.";
+                return h.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
+            }
+            default:
+                return null;
+        }
+    }
 
     private string With(int[]? backup) => backup is { Length: > 0 } ? $" and {backup.Length} {(backup.Length == 1 ? "man" : "men")}" : "";
 

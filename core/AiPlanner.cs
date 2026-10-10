@@ -21,11 +21,24 @@ public static class AiPlanner
         }
 
         int wanted = Math.Max(5, 3 + turf.Count / 3);
+        // A good man on the street is worth his asking price over a stranger off the boat.
+        var hires = w.People.Where(p => p.Kind == PersonKind.Drifter && p.Intimidation + p.Muscle + p.Brains + p.Stealth >= 22)
+            .OrderByDescending(p => p.Intimidation + p.Muscle + p.Brains + p.Stealth).ThenBy(p => p.Id).ToList();
         for (int i = 0; i < 2 && active + i < wanted && cash > Content.RecruitCost * 4; i++)
         {
+            var drifter = hires.FirstOrDefault(p => cash > p.Fee * 4);
+            if (drifter != null)
+            {
+                orders.Add(new HireOrder(g.Id, drifter.Id));
+                hires.Remove(drifter);
+                cash -= drifter.Fee;
+                continue;
+            }
             orders.Add(new RecruitOrder(g.Id));
             cash -= Content.RecruitCost;
         }
+
+        cash -= PlanStreet(w, g, cash, orders);
 
         // An aging boss with money to spare brings his family into the business.
         if (w.HoodById(g.BossHoodId).Age(w.Week) >= 45 && cash > Content.FamilyCost * 5 && Simulation.CanBringInFamily(w, g))
@@ -58,9 +71,12 @@ public static class AiPlanner
                 var racket = Content.RacketsFor(site.Kind)
                     .Select(k => Content.Rackets[k])
                     .Where(r => !r.NeedsProhibition || w.Prohibition)
-                    .OrderByDescending(r => r.WeeklyIncome)
+                    // The dearer setups are for outfits with money behind them, and a press only for the well off.
+                    .Where(r => cash > (r.SetupCost >= 900 ? r.SetupCost * 2 : r.SetupCost) + 400)
+                    .Where(r => r.Kind != RacketKind.Counterfeit || cash > 5000)
+                    .OrderByDescending(r => r.WeeklyIncome - r.WeeklyHeat * 15 - (r.Kind == RacketKind.Counterfeit ? 60 : 0))
                     .FirstOrDefault();
-                if (racket != null && cash > racket.SetupCost + 400)
+                if (racket != null)
                 {
                     var brains = hoods.OrderByDescending(h => h.Brains).First();
                     orders.Add(new RacketOrder(g.Id, brains.Id, site.Id, racket.Kind));
@@ -81,6 +97,8 @@ public static class AiPlanner
                 hoods.Remove(guard);
             }
         }
+
+        PlanCrimes(w, g, turf, hoods, cash, orders);
 
         // Score each target as about ten weeks of income, less the expected cost of losing the man.
         // Small gangs value their men more and so pick fewer fights.
@@ -130,6 +148,119 @@ public static class AiPlanner
         }
 
         return orders;
+    }
+
+    /// <summary>Kill a story before it runs, and pay the beat cop when the precinct is breathing down the gang's neck.</summary>
+    private static long PlanStreet(World w, Gang g, long cash, List<Order> orders)
+    {
+        long spent = 0;
+        var reporter = w.People.FirstOrDefault(p => p.Kind == PersonKind.Reporter && p.GangId == g.Id);
+        if (reporter != null && cash > Math.Max(2500, Content.StoryPrice(g.Heat) * 5))
+        {
+            orders.Add(new BuyStoryOrder(g.Id, reporter.Id));
+            spent += Content.StoryPrice(g.Heat);
+        }
+        if (g.Heat > 40 && cash - spent > 1500)
+        {
+            // The cop in the ward with the most rackets to lose.
+            var ward = w.TurfOf(g.Id).Where(b => b.Racket != RacketKind.None)
+                .GroupBy(b => w.LotOf(b).WardId).OrderByDescending(x => x.Count()).ThenBy(x => x.Key).FirstOrDefault()?.Key;
+            var cop = ward == null ? null : w.People.FirstOrDefault(p => p.Kind == PersonKind.BeatCop && p.WardId == ward && p.PaidByGangId < 0 && p.Nerve < 8);
+            if (cop != null)
+            {
+                orders.Add(new PayCopOrder(g.Id, cop.Id));
+                spent += Content.CopPrice;
+            }
+        }
+        return spent;
+    }
+
+    /// <summary>
+    /// The heavier work, taken on now and then: silence a witness, rob a bank when money is short,
+    /// hijack a rival's beer, burn out his best earner, or go after his best man. Men sent on these
+    /// come out of the pool for shakedowns.
+    /// </summary>
+    private static void PlanCrimes(World w, Gang g, List<Business> turf, List<Hood> hoods, long cash, List<Order> orders)
+    {
+        Hood? Take(Func<Hood, int> by)
+        {
+            var h = hoods.OrderByDescending(by).ThenBy(x => x.Id).FirstOrDefault();
+            if (h != null) hoods.Remove(h);
+            return h;
+        }
+
+        foreach (var witness in w.People.Where(p => p.Kind == PersonKind.Witness && p.GangId == g.Id).ToList())
+        {
+            if (hoods.Count == 0) return;
+            var man = Take(h => h.Intimidation);
+            orders.Add(new SilenceOrder(g.Id, man!.Id, witness.Id));
+        }
+
+        // A gang only tries one big job a week, and only every so often.
+        int beat = (w.Week + g.Id * 7) % 4;
+
+        if (beat == 0 && cash < 1500 && hoods.Count >= 4 && g.Heat < 30 && g.Aggression > 0.35 && w.Banks.Count > 0)
+        {
+            var lead = hoods.OrderByDescending(h => h.Brains * 2 + h.Stealth).ThenBy(h => h.Id).First();
+            var backup = hoods.Where(h => h.Id != lead.Id).OrderByDescending(h => h.Muscle).ThenBy(h => h.Id).Take(2).ToList();
+            var bank = w.Banks.OrderByDescending(b => b.Vault * Simulation.RobberyChance(w, lead, backup, b)).ThenBy(b => b.Id).First();
+            if (Simulation.RobberyChance(w, lead, backup, bank) >= 0.45 && bank.Vault >= 2000)
+            {
+                hoods.Remove(lead);
+                foreach (var b in backup) hoods.Remove(b);
+                orders.Add(new RobberyOrder(g.Id, lead.Id, bank.Id, backup.Select(b => b.Id).ToArray()));
+                return;
+            }
+        }
+
+        bool Near(Business b) => w.BlocksFromHq(g, b) <= 4;
+        bool Wary(Business b) => w.GangById(b.ProtectorGangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1;
+
+        if (beat == 1 && w.Prohibition && g.Heat < 40 && hoods.Count >= 3)
+        {
+            var lead = hoods[0];
+            var backup = hoods.Skip(1).Take(1).ToList();
+            var truck = w.Businesses.Where(b => Simulation.CanHijack(w, g, b) && Near(b) && !Wary(b))
+                .OrderByDescending(b => Simulation.HijackChance(w, lead, backup, b)).ThenBy(b => b.Id).FirstOrDefault();
+            if (truck != null && Simulation.HijackChance(w, lead, backup, truck) >= 0.55)
+            {
+                hoods.Remove(lead);
+                foreach (var b in backup) hoods.Remove(b);
+                orders.Add(new HijackOrder(g.Id, lead.Id, truck.Id, backup.Select(b => b.Id).ToArray()));
+                return;
+            }
+        }
+
+        if (beat == 2 && g.Aggression > 0.5 && g.Heat < 35 && hoods.Count >= 3)
+        {
+            var torch = hoods.OrderByDescending(h => h.Stealth).ThenBy(h => h.Id).First();
+            var target = w.Businesses.Where(b => b.IsOpen && b.IsProtected && b.ProtectorGangId != g.Id && b.Racket != RacketKind.None && Near(b) && !Wary(b))
+                .OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault();
+            if (target != null && Simulation.ArsonChance(torch, guarded: false) >= 0.6)
+            {
+                hoods.Remove(torch);
+                orders.Add(new ArsonOrder(g.Id, torch.Id, target.Id));
+                return;
+            }
+        }
+
+        if (beat == 3 && (w.Week / 4 + g.Id) % 3 == 0 && g.Aggression > 0.6 && g.Heat < 30 && hoods.Count >= 4)
+        {
+            // The rival's best man who works close to home.
+            var lead = hoods[0];
+            var backup = hoods.Skip(1).Take(1).ToList();
+            var target = w.Hoods.Where(h => h.IsAvailable && h.GangId != g.Id && w.GangById(h.GangId).Alive && w.GangById(h.GangId).BossHoodId != h.Id
+                    && !(w.GangById(h.GangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1))
+                .Where(h => w.Map.Distance(w.HqOf(g), w.Map.LotAt(Simulation.HauntOf(w, h))) <= CityMap.StrideX * 4)
+                .OrderByDescending(h => w.Businesses.Count(b => b.HandlerHoodId == h.Id)).ThenByDescending(h => h.Strength).ThenBy(h => h.Id)
+                .FirstOrDefault();
+            if (target != null && Simulation.HitChance(w, lead, backup, target) >= 0.55)
+            {
+                hoods.Remove(lead);
+                foreach (var b in backup) hoods.Remove(b);
+                orders.Add(new HitOrder(g.Id, lead.Id, target.Id, backup.Select(b => b.Id).ToArray()));
+            }
+        }
     }
 
     /// <summary>
