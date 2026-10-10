@@ -127,11 +127,13 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 
 All gangs, including the player's, were run by the AI planner. A city counts as stalled if, in any year, it has fewer than two gangs at some point, one gang holds over 75% of the district all year, or fewer than 3 businesses change hands.
 
-| Check | Small | Medium | Large | Huge |
-| --- | --- | --- | --- | --- |
-| 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 | 80/80 |
-| 50-year cities contested | 10/10 | | 10/10 | 8/8 |
-| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 73/80 / 66/80 | 67/80 / 52/80 | 64/80 / 36/80 | 77/80 / 54/80 |
+| Check | Small | Medium | Large | Huge | Metropolis |
+| --- | --- | --- | --- | --- | --- |
+| 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 | 80/80 | 40/40 (seeds 100–139) |
+| 50-year cities contested | 10/10 | | 10/10 | 8/8 | |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 73/80 / 66/80 | 67/80 / 52/80 | 64/80 / 36/80 | 77/80 / 54/80 | 38/40 / 36/40 (seeds 100–139) |
+
+Parks in the huge city leave a few fewer lots to build on, so it was run again on seeds 100–179 after they went in: all 80 stayed contested, and the player's gang was alive in 74/80 after 3 years and 46/80 after 10. A metropolis takes about a minute and a half for ten years on the headless runner, so a week takes under a fifth of a second.
 
 Hard results from Phase 5, before the huge city: alive after 3 / 10 years in 26/40 / 22/40 small, 20/40 / 9/40 medium and 21/40 / 12/40 large cities, with all 40 contested on each.
 
