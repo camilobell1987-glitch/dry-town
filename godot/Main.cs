@@ -292,7 +292,7 @@ public partial class Main : Control
         if (id < 0)
         {
             AddLabel(_businessPanel, "Click a business on the map.", Palette.InkQuiet);
-            AddLabel(_businessPanel, "A shop's awning is striped in the colours of the gang it pays; yours are brass. Plain awnings pay nobody yet. A red badge on the roof means a racket in the back room.", Palette.InkQuiet, wrap: true);
+            AddLabel(_businessPanel, "A shop's rooftop sign is framed, and its awning striped, in the colours of the gang it pays; yours are brass. Plain ones pay nobody yet. A red badge on the roof means a racket in the back room.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "Scroll to zoom the map. Drag with the right mouse button to move it.", Palette.InkQuiet, wrap: true);
             return;
         }
@@ -682,6 +682,7 @@ public partial class Main : Control
         menu.AddItem("New medium city: four wards, four outfits", 3);
         menu.AddItem("New large city: six wards, five outfits", 4);
         menu.AddItem("New huge city: twelve wards, seven outfits", 5);
+        menu.AddItem("New metropolis: a river city of twenty wards, nine outfits", 6);
         menu.AddSeparator();
         for (int i = 1; i <= Slots; i++) menu.AddItem($"Save to slot {i}" + (SlotLabel(i) is string l ? $": {l}" : ""), 10 + i);
         menu.AddSeparator();
@@ -695,7 +696,7 @@ public partial class Main : Control
 
     private void OnGameMenu(long id)
     {
-        if (id is >= 2 and <= 5) { _citySize = (CitySize)(id - 2); NewGame(GD.Randi()); }
+        if (id is >= 2 and <= 6) { _citySize = (CitySize)(id - 2); NewGame(GD.Randi()); }
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
         else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
     }
@@ -1023,7 +1024,7 @@ public partial class Main : Control
             MapView.CityDraws = 0;
             int n = int.Parse(frames);
             for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            GD.Print($"BENCH {W.Map.BlocksX}x{W.Map.BlocksY}: {(Time.GetTicksUsec() - start) / 1000.0 / n:F1} ms per frame; city {MapView.CityMillis:F1} ms, overlay {MapView.OverlayMillis:F1} ms, city drawn {MapView.CityDraws} times");
+            GD.Print($"BENCH {W.Map.BlocksX}x{W.Map.BlocksY}: draw calls {Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame)}, primitives {Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame)}, items {Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame)}; {(Time.GetTicksUsec() - start) / 1000.0 / n:F1} ms per frame; city recorded in {MapView.CityMillis:F1} ms, moving things {MapView.OverlayMillis:F1} ms, rows re-recorded {MapView.CityDraws} times");
             GetTree().Quit();
             return;
         }

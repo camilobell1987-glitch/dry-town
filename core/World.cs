@@ -2,13 +2,13 @@ namespace DryTown.Core;
 
 public enum Difficulty { Easy, Normal, Hard }
 
-public enum CitySize { Small, Medium, Large, Huge }
+public enum CitySize { Small, Medium, Large, Huge, Metropolis }
 
 public sealed class WorldSettings
 {
     public ulong Seed { get; init; } = 1;
 
-    /// <summary>Small is the first district of five blocks by four; Large is nine by seven with six wards; Huge is thirteen by ten with twelve.</summary>
+    /// <summary>Small is the first district of five blocks by four; Large is nine by seven with six wards; Huge is thirteen by ten with twelve; Metropolis is eighteen by fourteen, split by a river, with twenty.</summary>
     public CitySize Size { get; init; } = CitySize.Small;
 
     /// <summary>Businesses and starting gangs, or 0 to fit the city's size.</summary>
@@ -185,7 +185,7 @@ public sealed class World
     private void GenerateBusinesses()
     {
         var shape = Settings.Shape;
-        Map = CityMap.Generate(Rng, shape.BlocksX, shape.BlocksY);
+        Map = CityMap.Generate(Rng, shape.BlocksX, shape.BlocksY, shape.River, shape.Parks);
         Map.DrawWards(shape.WardsX, shape.WardsY);
 
         // Precinct houses sit evenly across the city, the first near the middle.
@@ -194,12 +194,12 @@ public sealed class World
             float fx = shape.Precincts == 1 ? 0.5f : (p + 0.5f) / shape.Precincts;
             float fy = shape.Precincts == 1 ? 0.5f : p % 2 == 0 ? 0.35f : 0.65f;
             int cx = (int)(Map.Width * fx), cy = (int)(Map.Height * fy);
-            var precinct = Map.Lots.Where(l => l.Use == LotUse.Empty)
+            var precinct = Map.Lots.Where(l => l.IsFree)
                 .OrderBy(l => Math.Abs(l.X - cx) + Math.Abs(l.Y - cy)).ThenBy(l => l.Id).First();
             precinct.Use = LotUse.Precinct;
         }
 
-        var free = Map.Lots.Where(l => l.Use == LotUse.Empty).ToList();
+        var free = Map.Lots.Where(l => l.IsFree).ToList();
         Rng.Shuffle(free);
         var kinds = Enum.GetValues<BusinessKind>();
         int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs);
@@ -227,7 +227,7 @@ public sealed class World
     private Lot PickHeadquarters()
     {
         var hqs = LivingGangs.Where(g => g.HqLotId >= 0).Select(g => Map.LotAt(g.HqLotId)).ToList();
-        var free = Map.Lots.Where(l => l.Use == LotUse.Empty).ToList();
+        var free = Map.Lots.Where(l => l.IsFree).ToList();
         if (hqs.Count == 0) return free[Rng.Range(0, free.Count - 1)];
         return free
             .OrderByDescending(l => hqs.Min(h => Map.Distance(h, l)))

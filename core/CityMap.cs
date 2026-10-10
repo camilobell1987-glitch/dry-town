@@ -2,6 +2,9 @@ namespace DryTown.Core;
 
 public enum LotUse { Empty, Business, Headquarters, Precinct }
 
+/// <summary>What the ground under a lot is. Only land can be built on; the river and the parks stay as they are.</summary>
+public enum Terrain { Land, Water, Park }
+
 /// <summary>A building plot. Every lot faces one street row, above or below its block.</summary>
 public sealed class Lot
 {
@@ -18,6 +21,12 @@ public sealed class Lot
 
     /// <summary>The ward the lot votes in.</summary>
     public int WardId { get; set; }
+
+    public Terrain Terrain { get; set; }
+
+    /// <summary>Empty land, where a business, a headquarters or a precinct house can go.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsFree => Use == LotUse.Empty && Terrain == Terrain.Land;
 }
 
 /// <summary>
@@ -42,6 +51,9 @@ public sealed class CityMap
     public int WardCount => WardsX * WardsY;
 
     public List<Lot> Lots { get; } = new();
+
+    /// <summary>The row of blocks the river runs through, or -1 for a city without one.</summary>
+    public int RiverRow { get; private set; } = -1;
     public string[] StreetNames { get; }
     public string[] AvenueNames { get; }
 
@@ -68,7 +80,7 @@ public sealed class CityMap
     public static bool IsAvenue(int x) => x % StrideX == 0;
     public static bool IsRoad(int x, int y) => IsStreetRow(y) || IsAvenue(x);
 
-    public static CityMap Generate(Rng rng, int blocksX = 5, int blocksY = 4)
+    public static CityMap Generate(Rng rng, int blocksX = 5, int blocksY = 4, bool river = false, int parks = 0)
     {
         var map = new CityMap(blocksX, blocksY);
         var streets = Content.StreetNames.ToList();
@@ -92,13 +104,43 @@ public sealed class CityMap
                 FrontY = ly == 0 ? by * StrideY : (by + 1) * StrideY,
             });
         }
+        if (river) map.LayRiver(blocksY / 2);
+        map.LayParks(parks);
         return map;
+    }
+
+    /// <summary>Turn a row of blocks into river. The streets either side become the waterfront and the avenues cross on bridges.</summary>
+    private void LayRiver(int row)
+    {
+        RiverRow = row;
+        foreach (var lot in Lots)
+            if ((lot.Y - 1) / StrideY == row) lot.Terrain = Terrain.Water;
+    }
+
+    /// <summary>
+    /// Lay out whole blocks as parks, spread through the city and away from the river. Chosen by
+    /// position rather than by dice, so the city's other draws come out the same.
+    /// </summary>
+    private void LayParks(int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            int bx = (int)(BlocksX * (i + 0.5) / count + (i % 2 == 0 ? 0.2 : -0.2));
+            int by = (int)(BlocksY * (i % 2 == 0 ? 0.25 : 0.72));
+            if (by == RiverRow) by++;
+            bx = Math.Clamp(bx, 0, BlocksX - 1);
+            by = Math.Clamp(by, 0, BlocksY - 1);
+            foreach (var lot in Lots)
+                if ((lot.X - 1) / StrideX == bx && (lot.Y - 1) / StrideY == by && lot.Terrain == Terrain.Land) lot.Terrain = Terrain.Park;
+        }
     }
 
     public static CityMap FromSave(List<Lot> lots, string[] streets, string[] avenues, int blocksX, int blocksY, int wardsX, int wardsY)
     {
         var map = new CityMap(blocksX, blocksY) { WardsX = Math.Max(1, wardsX), WardsY = Math.Max(1, wardsY) };
         map.Lots.AddRange(lots.OrderBy(l => l.Id));
+        var water = map.Lots.FirstOrDefault(l => l.Terrain == Terrain.Water);
+        if (water != null) map.RiverRow = (water.Y - 1) / StrideY;
         Array.Copy(streets, map.StreetNames, Math.Min(streets.Length, map.StreetNames.Length));
         Array.Copy(avenues, map.AvenueNames, Math.Min(avenues.Length, map.AvenueNames.Length));
         return map;

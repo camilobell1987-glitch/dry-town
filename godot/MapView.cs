@@ -5,9 +5,10 @@ using DryTown.Core;
 using Godot;
 
 /// <summary>
-/// Draws the district: streets, blocks, every business tinted by whoever protects it, gang
-/// headquarters and the precinct house. In live mode it also replays the week's script,
-/// with hoods walking the streets to their jobs and coming home (or not).
+/// Draws the city at an angle, the way the old gangster games did: streets and pavements flat on
+/// the ground, buildings standing up with their fronts and west walls showing, every business tinted
+/// by whoever protects it. In live mode it also replays the week's script, with hoods walking the
+/// streets to their jobs and coming home (or not).
 /// </summary>
 public partial class MapView : Control
 {
@@ -43,31 +44,30 @@ public partial class MapView : Control
     private Vector2 _pan;
     private bool _dragging;
 
-    private float FitTile => Mathf.Floor(Mathf.Min(Size.X / (Map.Width + 0.6f), Size.Y / (Map.Height + 0.6f)));
+    /// <summary>Room above the top street for the tallest buildings, in tiles.</summary>
+    private const float Headroom = 1.6f;
+
+    private float FitTile => Mathf.Min(Size.X / (Map.Width + 0.6f), Size.Y / (Map.Height + 0.6f + Headroom));
     private float Tile => FitTile * _zoom;
-    private Vector2 Origin => (Size - new Vector2(Map.Width, Map.Height) * Tile) / 2 + _pan;
+    private Vector2 Origin => (Size - new Vector2(Map.Width, Map.Height - Headroom) * Tile) / 2 + _pan;
 
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Stop;
         ClipContents = true;
         TooltipText = " "; // enables _GetTooltip
-        Resized += QueueRedraw;
-        C = this;
-        _overlay = new Overlay { Map = this, MouseFilter = MouseFilterEnum.Ignore };
-        _overlay.SetAnchorsPreset(LayoutPreset.FullRect);
-        AddChild(_overlay);
     }
 
-    private (float Zoom, Vector2 Pan, Vector2 Size) _cityView;
+    public override void _ExitTree() => FreeLayers();
 
     public override void _Process(double delta)
     {
         _anim += (float)delta;
-        _overlay.QueueRedraw();
-        // The city only needs drawing again when the view moves or the light changes.
-        var view = (_zoom, _pan, Size);
-        if (view != _cityView || Mathf.Round(Night * 40) / 40 != _cityNight) { _cityView = view; QueueRedraw(); }
+        if (World == null) return;
+        if (_builtFor != World.Map) BuildCity();
+        RefreshChangedLots();
+        PlaceWorld();
+        DrawFrame();
     }
 
     /// <summary>Big cities draw small when fitted, so they can be zoomed in further.</summary>
@@ -89,7 +89,8 @@ public partial class MapView : Control
         _zoom = 1;
         _pan = Vector2.Zero;
         if (focus == null || Map.BlocksX <= 5 || Size.X <= 0) return;
-        ZoomAt(Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile, 2);
+        float zoom = Map.BlocksX >= 15 ? 3 : 2;
+        ZoomAt(Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile, zoom);
         // Bring the lot towards the middle of the view.
         _pan += Size / 2 - (Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile);
         ClampPan();
@@ -100,7 +101,7 @@ public partial class MapView : Control
 
     private void ClampPan()
     {
-        var excess = (new Vector2(Map.Width, Map.Height) * Tile - Size) / 2 + Vector2.One * Tile;
+        var excess = (new Vector2(Map.Width, Map.Height + Headroom) * Tile - Size) / 2 + Vector2.One * Tile;
         excess = excess.Max(Vector2.Zero);
         _pan = _pan.Clamp(-excess, excess);
     }
@@ -133,7 +134,6 @@ public partial class MapView : Control
         _fired.Clear();
         _collectIndex = 0;
         Step();
-        QueueRedraw();
     }
 
     private List<Vector2> StreetPath(int fromLot, int toLot)
@@ -176,7 +176,6 @@ public partial class MapView : Control
         _sim = null;
         _actors.Clear();
         _fired.Clear();
-        QueueRedraw();
     }
 
     /// <summary>Advance the live clock by some hours of game time.</summary>
@@ -185,7 +184,6 @@ public partial class MapView : Control
         if (!Live) return;
         Clock = Mathf.Min(Clock + hours, Content.HoursPerWeek);
         Step();
-        QueueRedraw();
     }
 
     /// <summary>Run the simulation up to the clock, then show whatever has happened by now.</summary>
@@ -213,7 +211,6 @@ public partial class MapView : Control
                     _ => was,
                 };
             }
-            if (a.BusinessId >= 0) QueueRedraw();
             ActionHappened?.Invoke(a);
         }
     }
@@ -236,8 +233,7 @@ public partial class MapView : Control
         if (e is InputEventMouseMotion motion)
         {
             if (_dragging) { _pan += motion.Relative; ClampPan(); }
-            int lot = LotUnder(motion.Position);
-            _hoverLot = lot;
+            _hoverLot = LotUnder(motion.Position);
             HoverWard = ShowWards ? WardAtTile((motion.Position - Origin) / Tile) : -1;
         }
         else if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } click)
@@ -248,18 +244,30 @@ public partial class MapView : Control
             {
                 SelectedBusiness = biz;
                 BusinessClicked?.Invoke(biz);
-                QueueRedraw();
             }
         }
     }
 
+    /// <summary>
+    /// The lot under a point on screen. Buildings stand up from their lots, so a tall one is found by
+    /// its walls and roof too, and whichever stands in front wins.
+    /// </summary>
     private int LotUnder(Vector2 pos)
     {
         if (World == null) return -1;
-        var tile = ((pos - Origin) / Tile).Floor();
-        var lot = World.Map.Lots.FirstOrDefault(l => l.X == (int)tile.X && l.Y == (int)tile.Y);
-        return lot?.Id ?? -1;
+        var tile = (pos - Origin) / Tile;
+        int best = -1;
+        foreach (var lot in World.Map.Lots)
+        {
+            if (lot.X > tile.X + 0.2f || lot.X + 1 + S * 3 < tile.X || lot.Y + 1 < tile.Y || lot.Y - 3 > tile.Y) continue;
+            if (!Geometry2D.IsPointInPolygon(tile, Silhouette(lot))) continue;
+            if (best < 0 || InFront(lot, World.Map.LotAt(best))) best = lot.Id;
+        }
+        return best;
     }
+
+    /// <summary>Whether one lot's building is drawn over another's: rows nearer the bottom, then lots further west.</summary>
+    private static bool InFront(Lot a, Lot b) => a.Y != b.Y ? a.Y > b.Y : a.X < b.X;
 
     public override string _GetTooltip(Vector2 atPosition)
     {
@@ -281,7 +289,7 @@ public partial class MapView : Control
             case LotUse.Precinct:
                 return "Precinct house" + WardLine(lot);
             default:
-                return "";
+                return lot.Terrain == Terrain.Land ? FillerName(lot) : "";
         }
     }
 
@@ -293,69 +301,259 @@ public partial class MapView : Control
         return $"\n{ward.Name}: Alderman {ward.Alderman}, {whose}";
     }
 
-    // ---- Drawing --------------------------------------------------------------
+    // ---- Layers ---------------------------------------------------------------
 
     /// <summary>
-    /// The canvas the drawing helpers paint on. The city itself (ground, buildings, street names)
-    /// is drawn on the map and only redrawn when something changes; what moves every frame
-    /// (traffic, people, the night, outlines, wards and men on the street) goes on an overlay.
+    /// The pen the drawing helpers paint with. The city is recorded once into canvas items laid out
+    /// row by row, back to front, so buildings hide what stands behind them; panning and zooming only
+    /// move the lot. Whatever moves (traffic, people, the men on the job) is drawn each frame into the
+    /// row it stands in, so it passes behind the buildings in front of it.
     /// </summary>
-    private CanvasItem C = null!;
+    private Pen C = null!;
 
-    private Overlay _overlay = null!;
+    /// <summary>Tile units are drawn this many units across in the recorded city, and scaled to the zoom.</summary>
+    private const float U = 32;
 
-    /// <summary>Milliseconds the city and the overlay last took to draw, for the --bench flag.</summary>
+    private readonly List<Rid> _items = new();
+    private Rid _world;
+    private Pen[,] _groundFull = new Pen[0, 0], _groundCoarse = new Pen[0, 0];
+
+    /// <summary>Per row and column of blocks: the buildings in full detail, in outline for a far-off view, and their lit windows.</summary>
+    private Pen[,] _full = new Pen[0, 0], _coarse = new Pen[0, 0], _lit = new Pen[0, 0];
+
+    /// <summary>Per row: whatever moves there this frame.</summary>
+    private Pen[] _dyn = Array.Empty<Pen>();
+
+    private Pen _lampGlow = null!, _frameGlow = null!, _marks = null!, _screen = null!;
+
+    private CityMap? _builtFor;
+    private long[] _signature = Array.Empty<long>();
+    private float[] _height = Array.Empty<float>();
+    private float _shownNight = -1;
+    private bool? _shownFine;
+
+    /// <summary>Milliseconds the city took to record, the last frame took to draw, and how many times a part of the city was recorded, for --bench.</summary>
     public static double CityMillis, OverlayMillis;
     public static int CityDraws;
 
-    private sealed partial class Overlay : Control
+    private Pen NewPen(Rid parent)
     {
-        public MapView Map = null!;
-        public override void _Draw() => Map.DrawOverlay(this);
+        var rid = RenderingServer.CanvasItemCreate();
+        RenderingServer.CanvasItemSetParent(rid, parent);
+        RenderingServer.CanvasItemSetDrawIndex(rid, _items.Count);
+        _items.Add(rid);
+        return new Pen(rid);
     }
 
-    /// <summary>Night, quantised, as last drawn on the city; the city is redrawn when it moves on.</summary>
-    private float _cityNight = -1;
-
-    public override void _Draw()
+    private void FreeLayers()
     {
-        if (World == null) return;
+        foreach (var rid in _items) RenderingServer.FreeRid(rid);
+        _items.Clear();
+        _builtFor = null;
+    }
+
+    /// <summary>Lay out the canvas items for a new city and record every part of it.</summary>
+    private void BuildCity()
+    {
         ulong started = Time.GetTicksUsec();
-        C = this;
-        _t = Tile;
-        _o = Origin;
-        _cityNight = Mathf.Round(Night * 40) / 40;
-        var font = ThemeDB.FallbackFont;
-        DrawGround();
-        DrawShadows();
-        var view = new Rect2(Vector2.Zero, Size).Grow(_t);
-        foreach (var lot in World.Map.Lots)
-            if (view.Intersects(Footprint(lot))) DrawLot(lot, _cityNight);
-        DrawLampPosts(_cityNight);
-        DrawStreetNames(font);
+        FreeLayers();
+        var map = World!.Map;
+        _builtFor = map;
+        _trafficFor = null;
+        _world = RenderingServer.CanvasItemCreate();
+        RenderingServer.CanvasItemSetParent(_world, GetCanvasItem());
+        _items.Add(_world);
+
+        int cols = map.BlocksX, rows = map.Height;
+        _groundFull = new Pen[map.BlocksX + 1, map.BlocksY + 1];
+        _groundCoarse = new Pen[map.BlocksX + 1, map.BlocksY + 1];
+        for (int by = 0; by <= map.BlocksY; by++)
+        for (int bx = 0; bx <= map.BlocksX; bx++)
+        {
+            _groundFull[bx, by] = NewPen(_world);
+            _groundCoarse[bx, by] = NewPen(_world);
+        }
+
+        _full = new Pen[rows, cols];
+        _coarse = new Pen[rows, cols];
+        _lit = new Pen[rows, cols];
+        _dyn = new Pen[rows];
+        for (int y = 0; y < rows; y++)
+        {
+            // East to west: the camera looks from the south-west, so western buildings stand in front.
+            for (int c = cols - 1; c >= 0; c--)
+            {
+                _full[y, c] = NewPen(_world);
+                _coarse[y, c] = NewPen(_world);
+                _lit[y, c] = NewPen(_world);
+            }
+            _dyn[y] = NewPen(_world);
+        }
+        _lampGlow = NewPen(_world);
+        _frameGlow = NewPen(_world);
+        _marks = NewPen(_world);
+        _screen = NewPen(GetCanvasItem());
+
+        _signature = new long[map.Lots.Count];
+        _height = new float[map.Lots.Count];
+        foreach (var lot in map.Lots)
+        {
+            _signature[lot.Id] = Signature(lot);
+            _height[lot.Id] = HeightOf(lot);
+        }
+        WorldMode();
+        IndexCity();
+        for (int by = 0; by <= map.BlocksY; by++)
+        for (int bx = 0; bx <= map.BlocksX; bx++)
+            RecordGround(bx, by);
+        for (int y = 0; y < rows; y++)
+        for (int c = 0; c < cols; c++)
+            RecordRow(y, c);
+        RecordLampGlow();
+        _shownNight = -1;
+        _shownFine = null;
         CityMillis = (Time.GetTicksUsec() - started) / 1000.0;
-        CityDraws++;
     }
 
-    private void DrawOverlay(CanvasItem canvas)
+    /// <summary>A number that changes whenever anything shown on a lot's building does.</summary>
+    private long Signature(Lot lot)
     {
-        if (World == null) return;
-        ulong started = Time.GetTicksUsec();
-        C = canvas;
-        _t = Tile;
+        long s = (long)lot.Use * 1_000_003 + lot.GangId * 7919 + lot.BusinessId;
+        if (lot.Use == LotUse.Business)
+        {
+            var b = World!.BusinessById(lot.BusinessId);
+            var (gang, racket) = ShownState(b);
+            s = s * 31 + gang;
+            s = s * 31 + (int)racket;
+            s = s * 31 + (b.IsOpen || Live ? 1 : 0);
+        }
+        return s;
+    }
+
+    /// <summary>Record again any part of the city where a business changed hands, opened a racket or was shut.</summary>
+    private void RefreshChangedLots()
+    {
+        var map = World!.Map;
+        HashSet<(int Row, int Col)>? rows = null;
+        HashSet<(int, int)>? blocks = null;
+        foreach (var lot in map.Lots)
+        {
+            long s = Signature(lot);
+            if (s == _signature[lot.Id]) continue;
+            _signature[lot.Id] = s;
+            _height[lot.Id] = HeightOf(lot);
+            int col = Column(lot.X);
+            (rows ??= new()).Add((lot.Y, col));
+            (blocks ??= new()).Add((col, (lot.Y - 1) / CityMap.StrideY));
+        }
+        if (rows == null) return;
+        WorldMode();
+        FindFactories();
+        foreach (var (row, col) in rows) RecordRow(row, col);
+        foreach (var (bx, by) in blocks!) RecordGround(bx, by);
+    }
+
+    /// <summary>The column of blocks a tile belongs to; the avenue on a block's west side goes with it.</summary>
+    private int Column(float x) => Mathf.Clamp((int)(x / CityMap.StrideX), 0, Map.BlocksX - 1);
+
+    private Pen DynAt(float y) => _dyn[Mathf.Clamp((int)y, 0, _dyn.Length - 1)];
+
+    /// <summary>Draw in tile units of the recorded city.</summary>
+    private void WorldMode()
+    {
+        _o = Vector2.Zero;
+        _t = U;
+    }
+
+    /// <summary>Draw in pixels on screen.</summary>
+    private void ScreenMode()
+    {
         _o = Origin;
-        _headlights.Clear();
-        var font = ThemeDB.FallbackFont;
+        _t = Tile;
+    }
+
+    /// <summary>A size in screen pixels, as recorded-city units at the current zoom.</summary>
+    private float Px(float px) => px * U / Mathf.Max(0.01f, Tile);
+
+    /// <summary>Move and scale the recorded city to the view, and switch detail and daylight as needed.</summary>
+    private void PlaceWorld()
+    {
+        float k = Tile / U;
+        RenderingServer.CanvasItemSetTransform(_world, new Transform2D(0, new Vector2(k, k), 0, Origin));
+
+        bool fine = Tile >= 16;
+        if (fine != _shownFine)
+        {
+            _shownFine = fine;
+            for (int y = 0; y < _full.GetLength(0); y++)
+            for (int c = 0; c < _full.GetLength(1); c++)
+            {
+                RenderingServer.CanvasItemSetVisible(_full[y, c].Item, fine);
+                RenderingServer.CanvasItemSetVisible(_coarse[y, c].Item, !fine);
+            }
+            foreach (var pen in _groundFull) RenderingServer.CanvasItemSetVisible(pen.Item, fine);
+            foreach (var pen in _groundCoarse) RenderingServer.CanvasItemSetVisible(pen.Item, !fine);
+        }
+
+        float night = Mathf.Round(Night * 40) / 40;
+        if (night != _shownNight)
+        {
+            _shownNight = night;
+            var shade = Colors.White.Lerp(NightShade, night);
+            foreach (var pen in _groundFull) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
+            foreach (var pen in _groundCoarse) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
+            foreach (var pen in _full) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
+            foreach (var pen in _coarse) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
+            foreach (var pen in _dyn) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
+            foreach (var pen in _lit) RenderingServer.CanvasItemSetSelfModulate(pen.Item, Colors.White with { A = night });
+            RenderingServer.CanvasItemSetSelfModulate(_lampGlow.Item, Colors.White with { A = night });
+        }
+    }
+
+    /// <summary>The tiles on screen, with a margin for tall buildings and people half in view.</summary>
+    private Rect2 VisibleTiles()
+    {
+        var from = (-Origin) / Tile;
+        return new Rect2(from, Size / Tile).Grow(1.5f);
+    }
+
+    /// <summary>Draw everything that moves or marks, once a frame.</summary>
+    private void DrawFrame()
+    {
+        ulong started = Time.GetTicksUsec();
+        foreach (var pen in _dyn) pen.Clear();
+        _frameGlow.Clear();
+        _marks.Clear();
+        _screen.Clear();
+
+        WorldMode();
+        _fine = Tile >= 16;
+        var view = VisibleTiles();
         float night = Night;
-        DrawTraffic(night);
-        DrawPassersBy();
-        DrawNight(night);
-        var view = new Rect2(Vector2.Zero, Size).Grow(_t);
-        foreach (var lot in World.Map.Lots)
-            if (lot.Use != LotUse.Empty && view.Intersects(Footprint(lot))) DrawLotOutline(lot);
+        DrawTraffic(night, view);
+        DrawParkedOfficials(night, view);
+        DrawPassersBy(view);
+        DrawRiverTraffic(view);
+        DrawTrain(night, view);
+        DrawSmoke(view);
+        C = _marks;
+        foreach (var lot in World!.Map.Lots)
+            if (lot.Use != LotUse.Empty && view.HasPoint(new Vector2(lot.X, lot.Y))) DrawLotOutline(lot);
+        if (Live) DrawActors();
+        C = _frameGlow;
+        foreach (var (at, strength) in _headlights) Glow(at, _t * 0.2f, new Color("fff2c0"), strength * 0.8f);
+        _headlights.Clear();
+
+        ScreenMode();
+        C = _screen;
+        var font = ThemeDB.FallbackFont;
+        DrawStreetNames(font, view);
+        DrawHeadquartersSigns(font, view);
         DrawWards(font);
-        if (Live) DrawActors(font);
-        C = this;
+        foreach (var pen in _dyn) pen.Flush();
+        _frameGlow.Flush();
+        _marks.Flush();
+        _screen.Flush();
         OverlayMillis = (Time.GetTicksUsec() - started) / 1000.0;
     }
 
@@ -363,92 +561,81 @@ public partial class MapView : Control
     private (int Gang, RacketKind Racket) ShownState(Business b) =>
         Live && _shown.TryGetValue(b.Id, out var shown) ? shown : (b.ProtectorGangId, b.Racket);
 
-    private void DrawLot(Lot lot, float night)
-    {
-        var w = World!;
-        switch (lot.Use)
-        {
-            case LotUse.Business:
-            {
-                var b = w.BusinessById(lot.BusinessId);
-                var (protector, racket) = ShownState(b);
-                bool open = b.IsOpen || Live;
-                var roof = Roofs[(int)(Hash(lot.Id, 1) * Roofs.Length)];
-                if (b.Kind == BusinessKind.Warehouse) roof = new Color("5d5a55");
-                DrawBuilding(lot, open ? roof : roof.Darkened(0.35f), night);
-                if (b.Kind == BusinessKind.Warehouse)
-                {
-                    var f = Footprint(lot);
-                    for (float x = f.Position.X + _t * 0.1f; x < f.End.X - _t * 0.05f; x += _t * 0.1f)
-                        C.DrawLine(new Vector2(x, f.Position.Y + _t * 0.08f), new Vector2(x, f.End.Y - _t * 0.08f), roof.Darkened(0.15f), 1);
-                }
-                if (b.Kind == BusinessKind.Hotel)
-                {
-                    // A water tower on its stilts.
-                    var c = P(lot.X + 0.78f, lot.Y + (lot.FrontY < lot.Y ? 0.78f : 0.24f));
-                    C.DrawCircle(c + Vector2.One * _t * 0.08f, _t * 0.12f, Shadow);
-                    C.DrawCircle(c, _t * 0.12f, new Color("6b5038"));
-                    C.DrawArc(c, _t * 0.12f, 0, Mathf.Tau, 14, new Color("3a2a1e"), Mathf.Max(1, _t * 0.025f));
-                    C.DrawCircle(c, _t * 0.04f, new Color("3a2a1e"));
-                }
-                DrawAwning(lot, protector >= 0 ? Palette.Gang(w, protector) : null, open);
-                DrawSign(lot, b);
-                if (racket != RacketKind.None) DrawRacketBadge(lot, racket);
-                if (!open) DrawBoardedUp(lot);
-                break;
-            }
-            case LotUse.Headquarters:
-                DrawHeadquarters(lot, Palette.Gang(w, lot.GangId), night);
-                break;
-            case LotUse.Precinct:
-                DrawPrecinct(lot, night);
-                break;
-            default:
-                DrawEmptyLot(lot);
-                break;
-        }
-    }
-
-    /// <summary>Ownership rims, selection and hover, drawn over the lighting so they read at night.</summary>
+    /// <summary>Ownership rims round the whole building, selection and hover, drawn over everything so they read at night.</summary>
     private void DrawLotOutline(Lot lot)
     {
         var w = World!;
-        var r = Footprint(lot);
+        float width = Px(2);
+        Color? rim = null;
         if (lot.Use == LotUse.Business)
         {
             var (protector, _) = ShownState(w.BusinessById(lot.BusinessId));
-            if (protector >= 0) C.DrawRect(r, Palette.Gang(w, protector), false, Mathf.Max(2, _t * 0.06f));
+            if (protector >= 0) rim = Palette.Gang(w, protector);
         }
         else if (lot.Use == LotUse.Headquarters)
-            C.DrawRect(r, Palette.Gang(w, lot.GangId), false, Mathf.Max(2, _t * 0.09f));
+        {
+            rim = Palette.Gang(w, lot.GangId);
+            width = Px(3);
+        }
+
+        var outline = Silhouette(lot).Select(p => p * _t).ToArray();
+        var closed = outline.Append(outline[0]).ToArray();
+        if (rim is Color r) C.DrawPolyline(closed, r with { A = 0.9f }, width);
 
         bool selected = lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness;
         if (selected)
         {
             float pulse = 0.75f + 0.25f * Mathf.Sin(_anim * 4);
-            C.DrawRect(r.Grow(Mathf.Max(3, _t * 0.08f)), Palette.Ink with { A = pulse }, false, Mathf.Max(2, _t * 0.06f));
+            var grown = Grow(outline, Px(4));
+            C.DrawPolyline(grown.Append(grown[0]).ToArray(), Palette.Ink with { A = pulse }, Px(2.5f));
         }
-        else if (lot.Id == _hoverLot && lot.Use != LotUse.Empty) C.DrawRect(r.Grow(2), Palette.Ink with { A = 0.6f }, false, 1.5f);
+        else if (lot.Id == _hoverLot) C.DrawPolyline(Grow(outline, Px(2)).Append(Grow(outline, Px(2))[0]).ToArray(), Palette.Ink with { A = 0.6f }, Px(1.5f));
     }
 
-    /// <summary>A man seen from above: shoulders in his coat, a hat on top, a shadow under him.</summary>
-    private void DrawFigure(Vector2 pos, Vector2 facing, float r, Color coat, Color hat, Color band, bool walking)
+    /// <summary>Push every corner of an outline away from its middle.</summary>
+    private static Vector2[] Grow(Vector2[] poly, float by)
     {
-        float angle = facing.LengthSquared() > 0.0001f ? facing.Angle() : 0;
-        float sway = walking ? Mathf.Sin(_anim * 10 + pos.X * 0.1f) * 0.15f : 0;
-        Ellipse(pos + new Vector2(r * 0.35f, r * 0.45f), new Vector2(r * 0.75f, r * 1.05f), Shadow, angle);
-        Ellipse(pos, new Vector2(r * 0.62f, r * 1.0f), coat.Darkened(0.55f), angle + sway, 16);
-        Ellipse(pos, new Vector2(r * 0.52f, r * 0.9f), coat, angle + sway, 16);
-        C.DrawCircle(pos + facing.Normalized() * r * 0.08f, r * 0.62f, hat);
-        C.DrawArc(pos + facing.Normalized() * r * 0.08f, r * 0.42f, 0, Mathf.Tau, 14, band, Mathf.Max(1, r * 0.16f));
-        C.DrawCircle(pos + facing.Normalized() * r * 0.08f, r * 0.3f, hat.Lightened(0.12f));
+        var mid = poly.Aggregate(Vector2.Zero, (a, p) => a + p) / poly.Length;
+        return poly.Select(p => p + (p - mid).Normalized() * by).ToArray();
     }
 
-    private void DrawActors(Font font)
+    /// <summary>
+    /// A standing man, three-quarters on: shadow at his feet, legs, coat, a face and a hat. He leans
+    /// the way he walks, and his legs scissor while he does.
+    /// </summary>
+    private void DrawFigure(Vector2 ground, Vector2 facing, float r, Color coat, Color hat, Color band, bool walking)
+    {
+        var pen = DynAt(ground.Y / _t);
+        var keep = C;
+        C = pen;
+        float step = walking ? Mathf.Sin(_anim * 10 + ground.X * 0.1f) : 0;
+        float side = facing.X >= 0 ? 1 : -1;
+        Ellipse(ground + new Vector2(r * 0.3f, 0), new Vector2(r * 0.85f, r * 0.32f), Shadow);
+        var legs = coat.Darkened(0.6f);
+        C.DrawLine(ground + new Vector2(-r * 0.22f, -r * 1.0f), ground + new Vector2(-r * 0.22f + step * r * 0.35f, 0), legs, r * 0.32f);
+        C.DrawLine(ground + new Vector2(r * 0.22f, -r * 1.0f), ground + new Vector2(r * 0.22f - step * r * 0.35f, 0), legs, r * 0.32f);
+        var body = new[]
+        {
+            ground + new Vector2(-r * 0.55f, -r * 0.9f), ground + new Vector2(r * 0.55f, -r * 0.9f),
+            ground + new Vector2(r * 0.5f, -r * 2.05f), ground + new Vector2(-r * 0.5f, -r * 2.05f),
+        };
+        C.DrawColoredPolygon(body, coat);
+        C.DrawLine(body[0], body[3], coat.Darkened(0.35f), r * 0.12f);
+        var head = ground + new Vector2(side * r * 0.04f, -r * 2.38f);
+        C.DrawCircle(head, r * 0.36f, new Color("d9b48f"));
+        Ellipse(head + new Vector2(0, -r * 0.2f), new Vector2(r * 0.6f, r * 0.16f), hat);
+        C.DrawRect(new Rect2(head + new Vector2(-r * 0.36f, -r * 0.6f), new Vector2(r * 0.72f, r * 0.4f)), hat);
+        C.DrawRect(new Rect2(head + new Vector2(-r * 0.36f, -r * 0.3f), new Vector2(r * 0.72f, r * 0.1f)), band);
+        C = keep;
+    }
+
+    private float FigureRadius => Mathf.Max(Px(4.5f), _t * 0.15f);
+
+    private void DrawActors()
     {
         float now = Clock;
-        var o = _o;
         float t = _t;
+        float radius = FigureRadius;
         foreach (var actor in _actors)
         {
             if (now < actor.Depart || now > actor.Home + 0.01f) continue;
@@ -475,11 +662,10 @@ public partial class MapView : Control
                 ahead = Along(actor.Path, f - 0.02f) - at;
             }
 
-            var pos = o + at * t;
-            float radius = Mathf.Max(5.5f, t * 0.24f);
+            var pos = at * t;
             bool atScene = now >= actor.Arrive && now <= actor.Leave;
 
-            // Outcome rings while the man is on the job.
+            // Outcome rings round his feet while the man is on the job.
             if (atScene && a.Kind != ActionKind.Guard && a.Kind != ActionKind.Collect)
             {
                 var ring = a.Result switch
@@ -490,17 +676,17 @@ public partial class MapView : Control
                     _ => Palette.Neutral,
                 };
                 float pulse = 1 + 0.35f * Mathf.Sin((now - actor.Arrive) * 9);
-                C.DrawArc(o + target * t, t * 0.4f * pulse, 0, Mathf.Tau, 24, ring, 2.5f);
+                FlatRing(target * t, t * 0.4f * pulse, ring, Px(2.5f));
             }
 
             // In a takeover the rival's man stands in the doorway, and shots are traded.
             if (a.Kind == ActionKind.Takeover && a.DefenderHoodId >= 0 && now >= actor.Arrive - 0.5f && now <= actor.Leave)
             {
-                var defPos = o + (target + new Vector2(0.3f, -0.2f)) * t;
+                var defPos = (target + new Vector2(0.3f, -0.15f)) * t;
                 var dc = Palette.Gang(World!, a.DefenderGangId);
                 DrawFigure(defPos, pos - defPos, radius, dc, new Color("1c1a19"), dc, false);
                 if (atScene && now - actor.Arrive < 0.8f && Mathf.Sin(_anim * 23 + a.HoodId) > 0.55f)
-                    Star(pos.Lerp(defPos, Hash((int)(_anim * 8), a.HoodId) < 0.5f ? 0.3f : 0.7f), radius * 0.7f, new Color("ffe28a"), 6, 0.4f);
+                    Star(pos.Lerp(defPos, Hash((int)(_anim * 8), a.HoodId) < 0.5f ? 0.3f : 0.7f) - new Vector2(0, radius * 1.6f), radius * 0.7f, new Color("ffe28a"), 6, 0.4f);
             }
 
             // Backup walks a step behind the man in front, and fans out round him on the job.
@@ -514,10 +700,10 @@ public partial class MapView : Control
                 DrawFigure(pos, ahead, radius, Palette.Police, new Color("1b2a4a"), Palette.Police.Lightened(0.3f), walking);
             else
                 DrawFigure(pos, ahead, radius, actor.Colour, new Color("1c1a19"), actor.Colour.Lightened(0.25f), walking);
-            if (a.Kind == ActionKind.Guard && atScene) C.DrawArc(pos, radius + 3, 0, Mathf.Tau, 16, actor.Colour with { A = 0.6f }, 1.5f);
+            if (a.Kind == ActionKind.Guard && atScene) FlatRing(pos, radius * 1.3f, actor.Colour with { A = 0.7f }, Px(1.5f));
         }
 
-        DrawOnTheirWay(now, o, t);
+        DrawOnTheirWay(now, t, radius);
 
         // Where someone died this week, a cross stays on the pavement.
         foreach (var actor in _actors)
@@ -525,11 +711,23 @@ public partial class MapView : Control
             var a = actor.Action;
             if (a.CasualtyHoodId < 0 || a.Result == ActionResult.Arrested || now < actor.Arrive) continue;
             if (a.Kind == ActionKind.Raid) continue;
-            var c = o + (actor.Path[^1] + new Vector2(-0.3f, 0.3f)) * t;
-            float s = t * 0.14f;
-            C.DrawLine(c - new Vector2(s, s), c + new Vector2(s, s), Palette.Bad, 2.5f);
-            C.DrawLine(c - new Vector2(s, -s), c + new Vector2(s, -s), Palette.Bad, 2.5f);
+            var c = (actor.Path[^1] + new Vector2(-0.3f, 0.15f)) * t;
+            float s = t * 0.12f;
+            C.DrawLine(c - new Vector2(s, s * 0.6f), c + new Vector2(s, s * 0.6f), Palette.Bad, Px(2.5f));
+            C.DrawLine(c - new Vector2(s, -s * 0.6f), c + new Vector2(s, -s * 0.6f), Palette.Bad, Px(2.5f));
         }
+    }
+
+    /// <summary>A ring lying on the pavement, squashed by the angle of view.</summary>
+    private void FlatRing(Vector2 centre, float radius, Color colour, float width)
+    {
+        var pts = new Vector2[25];
+        for (int i = 0; i <= 24; i++)
+        {
+            float a = Mathf.Tau * i / 24;
+            pts[i] = centre + new Vector2(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius * 0.55f);
+        }
+        C.DrawPolyline(pts, colour, width);
     }
 
     private void DrawBackup(Vector2 pos, Vector2 ahead, float radius, Color colour, int count, bool walking)
@@ -545,7 +743,7 @@ public partial class MapView : Control
     }
 
     /// <summary>Men already on their way to a job that hasn't happened yet: rivals' as well as yours.</summary>
-    private void DrawOnTheirWay(float now, Vector2 o, float t)
+    private void DrawOnTheirWay(float now, float t, float radius)
     {
         if (_sim is not { WeekRunning: true }) return;
         foreach (var job in _sim.Upcoming)
@@ -559,9 +757,8 @@ public partial class MapView : Control
             var path = StreetPath(gang.HqLotId, toLot);
             float f = (now - (job.Tick - hours)) / hours;
             var at = Along(path, f);
-            var pos = o + at * t;
+            var pos = at * t;
             var ahead = Along(path, f + 0.02f) - at;
-            float radius = Mathf.Max(5.5f, t * 0.24f);
             var colour = Palette.Gang(World, gang.Id);
             DrawBackup(pos, ahead, radius, colour, Simulation.TeamOf(job.Order).Count() - 1, true);
             DrawFigure(pos, ahead, radius, colour, new Color("1c1a19"), colour.Lightened(0.25f), true);
