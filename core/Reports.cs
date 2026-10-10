@@ -30,7 +30,35 @@ public static class Reports
         return sb.ToString();
     }
 
-    public static bool IsHeadline(GameEvent e) => e.Kind is not (EventKind.Recruited or EventKind.Bribe or EventKind.HoodReleased);
+    public static bool IsHeadline(GameEvent e) => e.Kind is not (EventKind.Recruited or EventKind.Bribe or EventKind.HoodReleased or EventKind.Street);
+
+    /// <summary>Who is about on the street, and what each of them can be for the gang.</summary>
+    public static string Street(World w, int gangId)
+    {
+        var sb = new StringBuilder();
+        var gang = w.GangById(gangId);
+        foreach (var p in w.People.OrderBy(p => p.Kind).ThenBy(p => p.Id))
+        {
+            string ward = w.Wards.ElementAtOrDefault(p.WardId)?.Name ?? "";
+            string line = p.Kind switch
+            {
+                PersonKind.Drifter => $"drifter, Int {p.Intimidation} Mus {p.Muscle} Brn {p.Brains} Stl {p.Stealth}, asks ${p.Fee}, moves on in {p.WeeksLeft}w",
+                PersonKind.BeatCop => $"beat cop in {ward}" + (p.PaidByGangId >= 0 ? $", paid by {w.GangById(p.PaidByGangId).Name} this week" : ""),
+                PersonKind.Reporter => $"writing about {w.GangById(p.GangId).Name}, goes to print in {p.WeeksLeft}w" + (p.GangId == gangId ? $", would drop it for ${Content.StoryPrice(gang.Heat)}" : ""),
+                _ => $"saw {p.About}, testifies in {p.WeeksLeft}w, nerve {p.Nerve}",
+            };
+            sb.AppendLine($"{p.Id,4} {Trim(p.Name, 40),-40} {line}");
+        }
+        return sb.Length == 0 ? "Nobody about.\n" : sb.ToString();
+    }
+
+    public static string Banks(World w, int gangId)
+    {
+        var sb = new StringBuilder();
+        foreach (var b in w.Banks)
+            sb.AppendLine($"{b.Id,3} {Trim(b.Name, 40),-40} vault ${b.Vault,-6} guards {b.Guards}" + (w.Week - b.RobbedWeek < 12 ? ", on its guard after a hold-up" : ""));
+        return sb.Length == 0 ? "No banks in this city.\n" : sb.ToString();
+    }
 
     public static string Gangs(World w)
     {

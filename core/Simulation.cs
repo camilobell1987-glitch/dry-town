@@ -5,7 +5,7 @@ namespace DryTown.Core;
 /// Sunday is collection day and the reckoning. Everything that happens on the street is
 /// written to <see cref="World.Script"/> so the live view can replay the week.
 /// </summary>
-public sealed class Simulation
+public sealed partial class Simulation
 {
     public World World { get; }
     public Director Director { get; }
@@ -105,6 +105,14 @@ public sealed class Simulation
                 case SetRateOrder o: SetRate(gang, o); break;
                 case PayoffOrder o when o.WardId >= 0 && o.WardId < w.Wards.Count: Politics.Payoff(w, gang, w.Wards[o.WardId]); break;
                 case CampaignOrder o: Politics.Campaign(w, gang, o.WardId, o.Amount); break;
+                case ArsonOrder o: Arson(gang, o); break;
+                case HitOrder o: Hit(gang, o); break;
+                case RobberyOrder o: Robbery(gang, o); break;
+                case HijackOrder o: Hijack(gang, o); break;
+                case HireOrder o: Hire(gang, o); break;
+                case PayCopOrder o: PayCop(gang, o); break;
+                case BuyStoryOrder o: BuyStory(gang, o); break;
+                case SilenceOrder o: Silence(gang, o); break;
             }
         }
         w.Tick = Math.Max(w.Tick, Math.Min(tick, Content.HoursPerWeek - 1));
@@ -122,13 +130,7 @@ public sealed class Simulation
     {
         if (!WeekRunning) return null;
         var gang = World.GangById(order.GangId);
-        int toLot = order switch
-        {
-            ExtortOrder e => World.BusinessById(e.BusinessId).LotId,
-            GuardOrder g => World.BusinessById(g.BusinessId).LotId,
-            RacketOrder r => World.BusinessById(r.BusinessId).LotId,
-            _ => gang.HqLotId,
-        };
+        int toLot = TargetLot(World, order);
         int tick = Math.Max((int)Math.Ceiling(now + WalkHours(World, gang.HqLotId, toLot)), _timeline.Take(_cursor).LastOrDefault()?.Tick ?? 0);
         if (tick > LastOrderTick) return null;
         var job = new Job(tick, gang.Id, order);
@@ -137,6 +139,24 @@ public sealed class Simulation
         while (at < _timeline.Count && _timeline[at].Tick <= tick) at++;
         _timeline.Insert(at, job);
         return tick;
+    }
+
+    /// <summary>Where the men carrying out an order are headed. Orders that need nobody to go out stay at headquarters.</summary>
+    public static int TargetLot(World w, Order order)
+    {
+        int hq = w.GangById(order.GangId).HqLotId;
+        return order switch
+        {
+            ExtortOrder e => w.BusinessById(e.BusinessId).LotId,
+            GuardOrder g => w.BusinessById(g.BusinessId).LotId,
+            RacketOrder r => w.BusinessById(r.BusinessId).LotId,
+            ArsonOrder a => w.BusinessById(a.BusinessId).LotId,
+            HijackOrder h => w.BusinessById(h.BusinessId).LotId,
+            HitOrder h => HauntOf(w, w.HoodById(h.TargetHoodId)),
+            RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
+            SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
+            _ => hq,
+        };
     }
 
     /// <summary>Men of a gang who have done a job this week or are on their way to one.</summary>
@@ -153,6 +173,11 @@ public sealed class Simulation
         ExtortOrder e => e.Team,
         GuardOrder g => g.Team,
         RacketOrder r => new[] { r.HoodId },
+        ArsonOrder a => new[] { a.HoodId },
+        HitOrder h => h.Team,
+        RobberyOrder r => r.Team,
+        HijackOrder h => h.Team,
+        SilenceOrder s => new[] { s.HoodId },
         _ => Array.Empty<int>(),
     };
 
@@ -170,6 +195,7 @@ public sealed class Simulation
         PayWages();
         w.Tick = Content.ReckoningTick;
         Police();
+        Street();
         Politics.Step(w, w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.HoodKilled));
         Feds();
         Loyalty();
@@ -206,7 +232,11 @@ public sealed class Simulation
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
-            RecruitOrder => rng.Range(0, 5) * 24 + rng.Range(10, 17),
+            RecruitOrder or HireOrder => rng.Range(0, 5) * 24 + rng.Range(10, 17),
+            PayCopOrder or BuyStoryOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
+            // Fires are set and trucks stopped after dark; banks are robbed while the doors are open.
+            ArsonOrder or HijackOrder => rng.Range(0, 5) * 24 + rng.Range(20, 23),
+            RobberyOrder => rng.Range(0, 5) * 24 + rng.Range(10, 15),
             _ => rng.Range(0, 5) * 24 + rng.Range(9, 22),
         };
     }
@@ -535,6 +565,7 @@ public sealed class Simulation
     private void Feds()
     {
         var w = World;
+        FunnyMoney();
         foreach (var gang in w.LivingGangs.ToList())
         {
             if (gang.Cash < 25_000 || !w.Rng.Chance(Math.Min(0.04, gang.Cash / 2_500_000.0))) continue;
@@ -595,7 +626,7 @@ public sealed class Simulation
             var ledger = w.Ledger(gang.Id);
             var rackets = w.TurfOf(gang.Id).Where(b => b.Racket != RacketKind.None).ToList();
             // An alderman on the payroll tips off the rackets in his ward before the wagons roll.
-            var racketSite = rackets.Where(b => !Politics.Covered(w, gang, b)).ToList();
+            var racketSite = rackets.Where(b => !Politics.Covered(w, gang, b) && !CopLooksAway(gang, b)).ToList();
             string what = rackets.Count > racketSite.Count && racketSite.Count == 0 ? ", but the rackets had been tipped off" : "";
             int targetLot = gang.HqLotId, targetBiz = -1;
             if (racketSite.Count > 0)

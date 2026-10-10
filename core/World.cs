@@ -64,6 +64,10 @@ public sealed class World
     public List<GameEvent> Events { get; } = new();
     public List<Crew> Crews { get; } = new();
 
+    /// <summary>Drifters, beat cops, reporters and witnesses: everyone on the street who isn't in a gang.</summary>
+    public List<StreetPerson> People { get; } = new();
+    public List<Bank> Banks { get; } = new();
+
     /// <summary>The city's wards and their aldermen, and the mayor's office.</summary>
     public List<Ward> Wards { get; } = new();
     public CityHall Hall { get; set; } = new() { Mayor = "" };
@@ -80,6 +84,7 @@ public sealed class World
     private int _nextHoodId;
     private int _nextGangId;
     private int _nextCrewId;
+    private int _nextPersonId;
 
     public World(WorldSettings settings)
     {
@@ -97,6 +102,9 @@ public sealed class World
     public Gang GangById(int id) => id >= 0 && id < Gangs.Count && Gangs[id].Id == id ? Gangs[id] : Gangs.First(g => g.Id == id);
     public Hood HoodById(int id) => id >= 0 && id < Hoods.Count && Hoods[id].Id == id ? Hoods[id] : Hoods.First(h => h.Id == id);
     public Business BusinessById(int id) => id >= 0 && id < Businesses.Count && Businesses[id].Id == id ? Businesses[id] : Businesses.First(b => b.Id == id);
+
+    public StreetPerson? PersonById(int id) => People.FirstOrDefault(p => p.Id == id);
+    public Bank? BankById(int id) => id >= 0 && id < Banks.Count ? Banks[id] : null;
 
     public IEnumerable<Gang> LivingGangs => Gangs.Where(g => g.Alive);
     public IEnumerable<Hood> HoodsOf(int gangId) => Hoods.Where(h => h.GangId == gangId && h.IsActive);
@@ -171,6 +179,7 @@ public sealed class World
     {
         var world = new World(settings);
         world.GenerateBusinesses();
+        world.PlaceBanks();
         Politics.Found(world);
         for (int i = 0; i < settings.StartingGangCount; i++)
         {
@@ -221,6 +230,92 @@ public sealed class World
                 LotId = lot.Id,
             });
         }
+    }
+
+    /// <summary>
+    /// A bank in every other ward, on the free lot nearest the ward's middle. Placed without
+    /// the dice, so an older saved city gets the same banks when it's loaded.
+    /// </summary>
+    public void PlaceBanks()
+    {
+        if (Banks.Count > 0) return;
+        for (int ward = 0; ward < Map.WardCount; ward += 2)
+        {
+            var lots = Map.Lots.Where(l => l.WardId == ward && l.Terrain == Terrain.Land).ToList();
+            if (lots.Count == 0) continue;
+            double cx = lots.Average(l => l.X), cy = lots.Average(l => l.Y);
+            var lot = lots.Where(l => l.IsFree).OrderBy(l => Math.Abs(l.X - cx) + Math.Abs(l.Y - cy)).ThenBy(l => l.Id).FirstOrDefault();
+            if (lot == null) continue;
+            lot.Use = LotUse.Bank;
+            int capacity = 4000 + lot.Id * 37 % 6 * 1000;
+            Banks.Add(new Bank
+            {
+                Id = Banks.Count,
+                Name = $"{Content.BankNames[Banks.Count % Content.BankNames.Length]}, {Map.StreetOf(lot)} St",
+                LotId = lot.Id,
+                Capacity = capacity,
+                Vault = capacity,
+                Guards = 1 + lot.Id % 3,
+            });
+        }
+    }
+
+    public Bank? BankAt(int lotId) => Banks.FirstOrDefault(b => b.LotId == lotId);
+
+    /// <summary>Someone new on the street, standing outside the given lot.</summary>
+    public StreetPerson NewPerson(PersonKind kind, Lot lot, int weeks, int gangId = -1, int hoodId = -1, string about = "")
+    {
+        bool drifter = kind == PersonKind.Drifter;
+        string first = Rng.Pick(Content.FirstNames), last = Rng.Pick(Content.LastNames);
+        string name = kind switch
+        {
+            PersonKind.BeatCop => $"Officer {last}",
+            PersonKind.Reporter => $"{first} {last} of {Rng.Pick(Content.Newspapers)}",
+            _ => drifter && Rng.Chance(0.3) ? $"{first} \"{Rng.Pick(Content.Nicknames)}\" {last}" : $"{first} {last}",
+        };
+        var person = new StreetPerson
+        {
+            Id = _nextPersonId++,
+            Kind = kind,
+            Name = name,
+            LotId = lot.Id,
+            WardId = lot.WardId,
+            Intimidation = drifter ? Rng.Range(2, 9) : 0,
+            Muscle = drifter ? Rng.Range(2, 9) : 0,
+            Brains = drifter ? Rng.Range(2, 9) : 0,
+            Stealth = drifter ? Rng.Range(2, 9) : 0,
+            BornWeek = Week - Rng.Range(19, 36) * Content.WeeksPerYear,
+            GangId = gangId,
+            HoodId = hoodId,
+            About = about,
+            Nerve = Rng.Range(1, 10),
+            WeeksLeft = weeks,
+        };
+        People.Add(person);
+        return person;
+    }
+
+    /// <summary>A drifter signs on: he becomes a hood with the skills he showed on the street.</summary>
+    public Hood HireDrifter(StreetPerson p, Gang gang)
+    {
+        var hood = new Hood
+        {
+            Id = _nextHoodId++,
+            Name = p.Name,
+            GangId = gang.Id,
+            Intimidation = p.Intimidation,
+            Muscle = p.Muscle,
+            Brains = p.Brains,
+            Stealth = p.Stealth,
+            Loyalty = Rng.Range(45, 85),
+            Ambition = Rng.Range(10, 90),
+            JoinedWeek = Week,
+            BornWeek = p.BornWeek,
+        };
+        hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
+        Hoods.Add(hood);
+        People.Remove(p);
+        return hood;
     }
 
     /// <summary>A free lot as far as possible from every other gang's headquarters.</summary>
@@ -360,6 +455,9 @@ public sealed class World
         NextHoodId = _nextHoodId,
         NextGangId = _nextGangId,
         NextCrewId = _nextCrewId,
+        NextPersonId = _nextPersonId,
+        People = People,
+        Banks = Banks,
         StreetNames = Map.StreetNames,
         AvenueNames = Map.AvenueNames,
         BlocksX = Map.BlocksX,
@@ -379,7 +477,7 @@ public sealed class World
 
     public static World FromSave(SaveData d)
     {
-        var w = new World(d.Settings) { Week = d.Week, _nextHoodId = d.NextHoodId, _nextGangId = d.NextGangId, _nextCrewId = d.NextCrewId };
+        var w = new World(d.Settings) { Week = d.Week, _nextHoodId = d.NextHoodId, _nextGangId = d.NextGangId, _nextCrewId = d.NextCrewId, _nextPersonId = d.NextPersonId };
         w.Rng = Rng.FromState(d.RngState);
         w.Map = CityMap.FromSave(d.Lots, d.StreetNames, d.AvenueNames, d.BlocksX, d.BlocksY, d.WardsX, d.WardsY);
         w.Wards.AddRange(d.Wards);
@@ -390,6 +488,10 @@ public sealed class World
         w.Crews.AddRange(d.Crews);
         w.Events.AddRange(d.Events);
         foreach (var (id, ledger) in d.LastLedger) w.LastLedger[id] = ledger;
+        w.People.AddRange(d.People);
+        w.Banks.AddRange(d.Banks);
+        // Cities saved before there were banks get them now.
+        w.PlaceBanks();
         return w;
     }
 

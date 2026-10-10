@@ -87,14 +87,25 @@ public static class Content
         [RacketKind.Still] = new(RacketKind.Still, "back-room still", 450, 140, 2, true),
         [RacketKind.Numbers] = new(RacketKind.Numbers, "numbers game", 350, 95, 1, false),
         [RacketKind.LoanShark] = new(RacketKind.LoanShark, "loan book", 400, 85, 1, false),
+        [RacketKind.Bookie] = new(RacketKind.Bookie, "bookie's counter", 450, 110, 1, false),
+        [RacketKind.GamblingDen] = new(RacketKind.GamblingDen, "gambling den", 900, 230, 3, false),
+        [RacketKind.Counterfeit] = new(RacketKind.Counterfeit, "counterfeiting press", 1200, 260, 1, false),
     };
+
+    /// <summary>Weekly chance the Treasury finds each counterfeiting press a gang runs.</summary>
+    public const double CounterfeitRisk = 0.015;
 
     /// <summary>Which racket a business can hide.</summary>
     public static RacketKind[] RacketsFor(BusinessKind kind) => kind switch
     {
-        BusinessKind.Diner or BusinessKind.Hotel or BusinessKind.PoolHall => new[] { RacketKind.Speakeasy, RacketKind.Numbers },
-        BusinessKind.Garage or BusinessKind.Warehouse or BusinessKind.Laundry => new[] { RacketKind.Still, RacketKind.LoanShark },
-        BusinessKind.Barber or BusinessKind.Grocer or BusinessKind.Pharmacy => new[] { RacketKind.Numbers, RacketKind.LoanShark },
+        BusinessKind.Hotel => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.GamblingDen },
+        BusinessKind.PoolHall => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.GamblingDen },
+        BusinessKind.Diner => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie },
+        BusinessKind.Warehouse => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.GamblingDen, RacketKind.Counterfeit },
+        BusinessKind.Garage or BusinessKind.Laundry => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.Counterfeit },
+        BusinessKind.Barber => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Bookie },
+        BusinessKind.Grocer or BusinessKind.Pharmacy => new[] { RacketKind.Numbers, RacketKind.LoanShark },
+        BusinessKind.Tailor => new[] { RacketKind.LoanShark, RacketKind.Bookie },
         _ => new[] { RacketKind.LoanShark },
     };
 
@@ -148,6 +159,27 @@ public static class Content
     {
         "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Railroad", "Lake",
         "Seventh", "Eighth", "Union", "Grand", "Ninth", "Tenth", "Harbor", "Elm",
+    };
+
+    // ---- The street -----------------------------------------------------------
+
+    /// <summary>What it costs to have the beat cop look the other way for a week, and the heat it takes off.</summary>
+    public const int CopPrice = 150;
+    public const int CopCooling = 8;
+
+    /// <summary>A reporter's price goes up with how much there is to write about.</summary>
+    public static int StoryPrice(int heat) => 200 + heat * 8;
+
+    public static readonly string[] Newspapers =
+    {
+        "the Daily Clarion", "the Evening Star", "the Courier", "the Tribune-Ledger", "the Sentinel",
+    };
+
+    public static readonly string[] BankNames =
+    {
+        "Merchants' Trust", "First Federal", "Corn Exchange Bank", "Union Savings", "Farmers' & Mechanics'",
+        "Citizens' National", "Lakeshore Savings", "Drovers' Bank", "Second National", "Liberty Trust",
+        "Commerce Bank", "Harbor Savings",
     };
 
     public const int HoursPerWeek = 168;

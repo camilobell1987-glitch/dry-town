@@ -60,7 +60,7 @@ public partial class Main : Control
         Palette.Reset();
         _shell = new CommandShell(Simulation.New(new WorldSettings { Seed = seed, Size = _citySize }));
         _map.World = W;
-        _map.SelectedBusiness = -1;
+        _map.Select();
         _selectedWard = W.HqOf(W.Player).WardId;
         _map.ResetView(W.HqOf(W.Player));
         _ticker.Clear();
@@ -116,6 +116,7 @@ public partial class Main : Control
     {
         PlaySound(a);
         if (a.BusinessId >= 0 && a.BusinessId == _map.SelectedBusiness) RefreshBusiness();
+        else if (a.Kind != ActionKind.Collect && (_map.SelectedPerson >= 0 || _map.SelectedHood >= 0 || _map.SelectedBank >= 0)) RefreshBusiness();
         if (a.Kind == ActionKind.Collect) return;
         int gang = a.Kind == ActionKind.Raid ? a.DefenderGangId : a.GangId;
         AppendTicker(a.Tick, gang, a.Text, a.DefenderGangId == Me);
@@ -167,6 +168,11 @@ public partial class Main : Control
             case ActionKind.Takeover: audio.Play(a.CasualtyHoodId >= 0 ? "gunshots" : "gunshot", v * 0.8f); break;
             case ActionKind.Racket: audio.Play("knock", v * 0.8f); break;
             case ActionKind.Raid: audio.Play("whistle", v * 0.6f); break;
+            case ActionKind.Hit: audio.Play(a.Result == ActionResult.Won ? "gunshots" : "gunshot", v * 0.9f); break;
+            case ActionKind.Robbery: audio.Play(a.Result == ActionResult.Success ? "cash" : "whistle", v * 0.8f); break;
+            case ActionKind.Hijack: audio.Play(a.CasualtyHoodId >= 0 ? "gunshots" : "horn", v * 0.6f); break;
+            case ActionKind.Arson when a.Result == ActionResult.Success: audio.Play("door", v * 0.8f); break;
+            case ActionKind.Hire when a.GangId == Me: audio.Play("cash", 0.5f); break;
             case ActionKind.Collect when a.GangId == Me && Time.GetTicksMsec() - _lastCashSound > 350:
                 _lastCashSound = Time.GetTicksMsec();
                 audio.Play("cash", 0.45f, 0.08f);
@@ -288,10 +294,12 @@ public partial class Main : Control
     private void RefreshBusiness()
     {
         Clear(_businessPanel);
+        if (RefreshOtherSelection()) return;
         int id = _map.SelectedBusiness;
         if (id < 0)
         {
-            AddLabel(_businessPanel, "Click a business on the map.", Palette.InkQuiet);
+            AddLabel(_businessPanel, "Click a business, a bank or someone on the street.", Palette.InkQuiet);
+            AddLabel(_businessPanel, "The people with signs over their heads can be dealt with: a yellow diamond is a drifter looking for work, a blue badge the beat cop, a white card a reporter, and a red mark a witness. Your men and your rivals' hang about outside their headquarters.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "A shop's rooftop sign is framed, and its awning striped, in the colours of the gang it pays; yours are brass. Plain ones pay nobody yet. A red badge on the roof means a racket in the back room.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "Scroll to zoom the map. Drag with the right mouse button to move it.", Palette.InkQuiet, wrap: true);
             return;
@@ -319,7 +327,7 @@ public partial class Main : Control
         else AddLabel(_businessPanel, "Pays nobody.", Palette.InkQuiet);
         AddLabel(_businessPanel, $"Resentment {b.Resentment}/100" + (b.Resentment > 60 ? " · may talk to the police" : ""), b.Resentment > 60 ? Palette.Bad : Palette.InkQuiet);
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {Content.Rackets[b.Racket].Label}", Palette.Bad);
-        if (!b.IsOpen) AddLabel(_businessPanel, $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
+        if (!b.IsOpen) AddLabel(_businessPanel, W.Week - b.BurnedWeek <= 8 ? $"Burned out. Rebuilding for {b.ShutWeeks} more weeks." : $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
 
         if (_map.Live)
             foreach (var job in _shell.Sim.Upcoming.Where(j => j.GangId == Me && BusinessOf(j.Order) == id))
@@ -337,7 +345,11 @@ public partial class Main : Control
             AddLabel(_businessPanel, "The week is under way. Men you send now set out from headquarters straight away.", Palette.InkQuiet, wrap: true);
         }
         if (b.ProtectorGangId == Me) OwnBusinessActions(b);
-        else if (b.IsOpen) TargetActions(b);
+        else if (b.IsOpen)
+        {
+            TargetActions(b);
+            if (b.IsProtected) RivalBusinessCrimes(b);
+        }
     }
 
     /// <summary>Queue an order while planning, or send the men at once during the live week.</summary>
@@ -414,7 +426,8 @@ public partial class Main : Control
             _businessPanel.AddChild(new HSeparator());
             AddLabel(_businessPanel, "Open a racket in the back room", Palette.Ink);
             var racketPick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
-            foreach (var r in rackets) racketPick.AddItem($"{r.Label} · costs ${r.SetupCost}, pays ~${r.WeeklyIncome}/week, +{r.WeeklyHeat} heat", (int)r.Kind);
+            foreach (var r in rackets)
+                racketPick.AddItem($"{r.Label} · costs ${r.SetupCost}, pays ~${r.WeeklyIncome}/week, +{r.WeeklyHeat} heat" + (r.Kind == RacketKind.Counterfeit ? ", Treasury risk" : ""), (int)r.Kind);
             _businessPanel.AddChild(racketPick);
             var who = HoodPicker(hoods, h => $"brains {h.Brains}");
             AddButton(_businessPanel, "Open it", () => Queue(new RacketOrder(Me, who.GetSelectedId(), b.Id, (RacketKind)racketPick.GetSelectedId())));
@@ -490,7 +503,7 @@ public partial class Main : Control
             AddLabel(_ordersPanel, "The week is under way. Your men still to do their jobs:", Palette.InkQuiet, wrap: true);
             foreach (var job in _shell.Sim.Upcoming.Where(j => j.GangId == Me))
                 AddLabel(_ordersPanel, $"{MapView.ClockText(job.Tick)}: {_shell.Describe(job.Order)}", Palette.Ink, wrap: true);
-            AddLabel(_ordersPanel, "To send more men, pause and click a business on the map.", Palette.InkQuiet, wrap: true);
+            AddLabel(_ordersPanel, "To send more men, pause and click a business, a bank or someone on the street.", Palette.InkQuiet, wrap: true);
             return;
         }
         var buttons = new HBoxContainer();
@@ -664,7 +677,7 @@ public partial class Main : Control
         }
         _map.EndReplay();
         _map.World = W;
-        _map.SelectedBusiness = -1;
+        _map.Select();
         _selectedWard = W.HqOf(W.Player).WardId;
         _map.ResetView(W.HqOf(W.Player));
         _ticker.Clear();
@@ -777,13 +790,10 @@ public partial class Main : Control
         var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         left.AddThemeConstantOverride("separation", 6);
         _map = new MapView { SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsStretchRatio = 2.2f, CustomMinimumSize = new Vector2(640, 400) };
-        _map.BusinessClicked += _ =>
-        {
-            // Clicking a shop mid-week stops the clock so you can decide what to do.
-            if (_map.Live && _playing) { _playing = false; _pause.Text = "Play"; }
-            _tabs.CurrentTab = TabIndex("Business");
-            RefreshBusiness();
-        };
+        _map.BusinessClicked += _ => OnMapSelection();
+        _map.PersonClicked += _ => OnMapSelection();
+        _map.HoodClicked += _ => OnMapSelection();
+        _map.BankClicked += _ => OnMapSelection();
         _map.ActionHappened += OnAction;
         left.AddChild(_map);
 
@@ -812,7 +822,7 @@ public partial class Main : Control
 
         // Right: tabs for planning.
         _tabs = new TabContainer { CustomMinimumSize = new Vector2(420, 0), SizeFlagsHorizontal = SizeFlags.ShrinkEnd };
-        _businessPanel = ScrollTab("Business");
+        _businessPanel = ScrollTab("Selected");
         // The Men tab: the roster on top, crews underneath.
         var menTab = new VSplitContainer { Name = "Men" };
         _tabs.AddChild(menTab);
@@ -971,7 +981,7 @@ public partial class Main : Control
     }
 
     // ---- Screenshots for development -----------------------------------------
-    // godot --path godot -- --seed 7 --weeks 6 --plan --select 12 --tab Business --live 40 --shot out.png
+    // godot --path godot -- --seed 7 --weeks 6 --plan --select 12 --tab Selected --live 40 --shot out.png
 
     private async void RunCommandLine()
     {
@@ -988,8 +998,28 @@ public partial class Main : Control
         if (Flag("--plan")) _shell.Execute("auto");
         if (Arg("--select") is string sel) { _map.SelectedBusiness = int.Parse(sel); }
         if (Flag("--select-mine")) _map.SelectedBusiness = W.TurfOf(Me).First().Id;
-        if (Flag("--select-rival")) _map.SelectedBusiness = W.Businesses.First(b => b.IsProtected && b.ProtectorGangId != Me).Id;
+        if (Flag("--select-rival"))
+            _map.SelectedBusiness = W.Businesses.Where(b => b.IsProtected && b.ProtectorGangId != Me && b.IsOpen)
+                .OrderByDescending(b => Simulation.CanHijack(W, W.Player, b)).ThenBy(b => W.BlocksFromHq(W.Player, b)).First().Id;
+        if (Arg("--select-person") is string kind
+            && W.People.Where(p => p.Kind == Enum.Parse<PersonKind>(kind, true) && (p.GangId < 0 || p.GangId == Me))
+                .OrderBy(p => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(p.LotId))).FirstOrDefault() is { } person)
+            _map.Select(person: person.Id);
+        if (Arg("--select-bank") is string bankArg)
+            _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));
+        if (Flag("--select-hood")) _map.Select(hood: W.Hoods.First(h => h.IsAvailable && h.GangId != Me && W.GangById(h.GangId).Alive).Id);
         if (Flag("--clear")) _shell.Pending.Clear();
+        if (Flag("--crimes"))
+        {
+            // Queue a bank job and a fire, for screenshots of the new crimes.
+            var men = FreeHoods().Where(h => h.Id != W.Player.BossHoodId).ToList();
+            var hq = W.HqOf(W.Player);
+            var bank = W.Banks.OrderBy(b => W.Map.Distance(hq, W.Map.LotAt(b.LotId))).First();
+            if (men.Count >= 3) _shell.Pending.Add(new RobberyOrder(Me, men[0].Id, bank.Id, new[] { men[1].Id, men[2].Id }));
+            var mark = W.Businesses.Where(b => b.IsProtected && b.ProtectorGangId != Me && b.IsOpen).OrderBy(b => W.BlocksFromHq(W.Player, b)).First();
+            if (men.Count >= 4) _shell.Pending.Add(new ArsonOrder(Me, men[3].Id, mark.Id));
+            if (Flag("--sure")) { foreach (var h in men) h.Brains = h.Muscle = h.Stealth = 10; }
+        }
         if (Arg("--exec") is string commands)
             foreach (var c in commands.Split(';')) GD.Print(_shell.Execute(c.Trim()));
         RefreshAll();
@@ -1031,7 +1061,21 @@ public partial class Main : Control
         if (Arg("--shot") is string shot)
         {
             for (int i = 0; i < 4; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            if (Arg("--zoom") is string zoom) { _map.ZoomCentre(float.Parse(zoom)); await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }
+            if (Arg("--focus") is string focus)
+            {
+                // Close in on your headquarters, the bank nearest it, or a business burned out this week.
+                var hq = W.HqOf(W.Player);
+                var lot = focus switch
+                {
+                    "bank" => W.Map.LotAt(W.Banks.OrderBy(b => W.Map.Distance(hq, W.Map.LotAt(b.LotId))).First().LotId),
+                    "fire" => W.Businesses.Where(b => b.BurnedWeek >= W.Week - 1).Select(W.LotOf).FirstOrDefault() ?? hq,
+                    "person" => W.PersonById(_map.SelectedPerson) is { } p ? W.Map.LotAt(p.LotId) : hq,
+                    _ => hq,
+                };
+                _map.ResetView(lot, float.Parse(Arg("--zoom") ?? "4"));
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
+            else if (Arg("--zoom") is string zoom) { _map.ZoomCentre(float.Parse(zoom)); await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }
             GetViewport().GetTexture().GetImage().SavePng(shot);
             GetTree().Quit();
         }

@@ -223,6 +223,7 @@ public partial class MapView
         {
             case LotUse.Precinct: return 0.72f;
             case LotUse.Headquarters: return 0.62f;
+            case LotUse.Bank: return 0.68f;
             case LotUse.Business:
                 return World.BusinessById(lot.BusinessId).Kind switch
                 {
@@ -516,7 +517,8 @@ public partial class MapView
             {
                 var b = w.BusinessById(lot.BusinessId);
                 var (protector, racket) = ShownState(b);
-                DrawShop(lot, b, protector >= 0 ? Palette.Gang(w, protector) : null, racket, b.IsOpen || Live);
+                if (Burnt(b)) DrawShell(lot, b);
+                else DrawShop(lot, b, protector >= 0 ? Palette.Gang(w, protector) : null, racket, b.IsOpen || Live);
                 break;
             }
             case LotUse.Headquarters:
@@ -524,6 +526,9 @@ public partial class MapView
                 break;
             case LotUse.Precinct:
                 DrawPrecinct(lot);
+                break;
+            case LotUse.Bank:
+                DrawBank(lot);
                 break;
             default:
                 DrawFiller(lot);
@@ -609,6 +614,26 @@ public partial class MapView
         DrawBillboard(lot, h, gang ?? new Color("3a332b"), gang.HasValue ? 3 : 1, open, () => { if (Fine) DrawTradeIcon(b.Kind, SignCentre(lot, h), _t * 0.11f); });
         if (racket != RacketKind.None) DrawRacketBadge(Q(x0 + 0.2f, (y0 + y1) / 2, h), racket);
         if (!open) DrawBoardedUp(lot, h);
+    }
+
+    /// <summary>What's left after a fire: blackened walls open to the sky and empty window holes.</summary>
+    private void DrawShell(Lot lot, Business b)
+    {
+        float h = HeightCached(lot) * 0.85f;
+        var (x0, y0, x1, y1) = Footprint(lot);
+        var soot = new Color("2e2824");
+        Box(x0, y0, x1, y1, 0, h, soot, soot.Lightened(0.08f), new Color("141110"));
+        // Broken roof beams across the open top, and scorch marks up the front.
+        for (int i = 0; i < 4; i++)
+        {
+            float x = x0 + 0.12f + i * 0.2f;
+            C.DrawLine(Q(x, y0 + 0.05f, h), Q(x + 0.08f * (i % 2 == 0 ? 1 : -1), y1 - 0.05f, h - 0.04f), new Color("3a2a1e"), Mathf.Max(1, _t * 0.03f));
+        }
+        if (Fine)
+            for (float z = 0.08f; z + 0.12f <= h; z += 0.2f)
+                for (float x = x0 + 0.1f; x < x1 - 0.12f; x += 0.22f)
+                    Face(x, x + 0.1f, y1, z, z + 0.1f, new Color("0e0c0b"));
+        Face(x0 + 0.05f, x1 - 0.05f, y1, h * 0.55f, h, new Color("1a1614") with { A = 0.6f });
     }
 
     /// <summary>The ground floor of a shop that faces the viewer: a big window, a door, and an awning in the protector's colours.</summary>
@@ -801,6 +826,17 @@ public partial class MapView
             case RacketKind.LoanShark: // a gold coin
                 C.DrawCircle(c, h * 0.85f, new Color("e8b84a"));
                 C.DrawArc(c, h * 0.5f, 0, Mathf.Tau, 10, new Color("5a3f10"), Mathf.Max(1, h * 0.18f));
+                break;
+            case RacketKind.Bookie: // a horseshoe
+                C.DrawArc(c + new Vector2(0, h * 0.1f), h * 0.6f, Mathf.Pi * 0.85f, Mathf.Pi * 2.15f, 12, new Color("d8d2c4"), Mathf.Max(1, h * 0.35f));
+                break;
+            case RacketKind.GamblingDen: // a playing card with a red diamond
+                C.DrawRect(new Rect2(c.X - h * 0.6f, c.Y - h * 0.85f, h * 1.2f, h * 1.7f), Colors.White);
+                C.DrawColoredPolygon(new[] { c + new Vector2(0, -h * 0.5f), c + new Vector2(h * 0.35f, 0), c + new Vector2(0, h * 0.5f), c + new Vector2(-h * 0.35f, 0) }, new Color("c0302a"));
+                break;
+            case RacketKind.Counterfeit: // a green banknote
+                C.DrawRect(new Rect2(c.X - h * 0.9f, c.Y - h * 0.5f, h * 1.8f, h * 1.0f), new Color("6aa46a"));
+                C.DrawCircle(c, h * 0.3f, new Color("2a5a2a"));
                 break;
         }
     }
