@@ -2,7 +2,7 @@
 
 An open-ended Prohibition-era crime strategy game, inspired by how *Gangsters: Organized Crime* (1998) plays. It is a new game. It uses none of the original's art, audio, text, code, data or name.
 
-There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6, the current state, adds a huge one. The city now comes in four sizes, the largest with twelve wards and seven outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out.
+There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6 added a huge one. Phase 7, the current state, draws the city at an angle the way Gangsters: Organized Crime did, with buildings standing up off the map, and adds a metropolis split by a river. The city now comes in five sizes, the largest with twenty wards and nine outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out.
 
 ![Planning a week](docs/screenshots/planning.png)
 
@@ -24,7 +24,7 @@ dotnet test tests                                                    # 44 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
-dotnet run --project sim -- soak --seeds 40 --years 10 --size Large   # Small, Medium, Large or Huge
+dotnet run --project sim -- soak --seeds 40 --years 10 --size Large   # Small, Medium, Large, Huge or Metropolis
 ```
 
 ## How a week works
@@ -51,7 +51,7 @@ Rival outfits play too. They buy the alderman where they do most of their busine
 
 ## City sizes
 
-**Game → New city** offers four sizes. A new game starts in a large city, zoomed in on your headquarters; scroll out to see all of it.
+**Game → New city** offers five sizes. A new game starts in a large city, zoomed in on your headquarters; scroll out to see all of it.
 
 | Size | Blocks | Wards | Precincts | Businesses | Outfits at the start / at most |
 | --- | --- | --- | --- | --- | --- |
@@ -59,11 +59,13 @@ Rival outfits play too. They buy the alderman where they do most of their busine
 | Medium | 7 × 5 | 4 | 2 | 90 | 4 / 8 |
 | Large | 9 × 7 | 6 | 3 | 150 | 5 / 10 |
 | Huge | 13 × 10 | 12 | 5 | 300 | 7 / 14 |
+| Metropolis | 18 × 14 | 20 | 8 | 600 | 9 / 20 |
 
-Police answer a raid from the nearest precinct house. In a big city that thins out to a few outfits, newcomers move in sooner. Fitted whole on the screen, a huge city leaves out the smallest details, such as trade-sign pictures and paving joints, and they come back as you zoom in. Saves from earlier versions load as a small city split into two wards.
+The metropolis has a river through the middle, crossed by every avenue on a bridge, with factories along the waterfront. Nobody builds on the river or in the city parks; huge cities have two parks and the metropolis three. Police answer a raid from the nearest precinct house. In a big city that thins out to a few outfits, newcomers move in sooner. Fitted whole on the screen, a big city leaves out the smallest details, such as windows, trade-sign pictures and paving joints, and they come back as you zoom in. Saves from earlier versions load as a small city split into two wards.
 
 ![A large city](docs/screenshots/large-city.png)
 ![A huge city, all of it on screen](docs/screenshots/huge-city.png)
+![The metropolis, with the river and the docks](docs/screenshots/metropolis.png)
 
 ## Bosses grow old
 
@@ -95,7 +97,11 @@ All of it is synthesised by `tools/make_audio.py` (Python and numpy) into `godot
 
 ## The map
 
-The map is drawn in code from simple shapes, so it uses no image files. Each business is a rooftop with a sign showing its trade, such as a barber pole, a coffee cup or a tyre for a garage. Its awning is striped in the colours of the gang it pays. A red badge on the roof marks a racket in the back room: a bottle for a speakeasy, a copper pot for a still, a die for numbers and a coin for loans. The empty lots are parks, parking lots and vacant ground. Each gang headquarters has a neon sign and the boss's car parked outside, and the precinct house has patrol cars at the kerb. Traffic and people on the pavements keep the streets moving. During the live week the light follows the clock, so streetlamps and shop windows come on at dusk.
+The map is drawn in code from simple shapes, so it uses no image files. It is seen at an angle, the way Gangsters: Organized Crime showed its city: streets and pavements lie flat, and buildings stand up with their front and west walls showing, so a tall building hides what is behind it and people walk behind it too. Downtown has stone office towers, which are taller in the big cities. Elsewhere, the lots that aren't businesses are brick tenements with fire escapes, churches, factories with smoking chimneys, parks, parking lots and vacant ground.
+
+Each business has a sign on its roof showing its trade, such as a barber pole, a coffee cup or a tyre for a garage. The sign is framed in the colours of the gang it pays, and shops facing the viewer have an awning striped in the same colours. A red badge on the roof marks a racket in the back room: a bottle for a speakeasy, a copper pot for a still, a die for numbers and a coin for loans. Each gang headquarters has a neon sign and the boss's car parked outside, and the precinct house has columns, blue lamps and patrol cars at the kerb. Cities of five block rows or more have an elevated railway with trains running along it. Traffic, barges on the river and people on the pavements keep the city moving. During the live week the light follows the clock, so streetlamps and windows come on at dusk.
+
+The city is recorded once into layers, one row of buildings at a time from back to front, and panning or zooming only moves those layers. Only the part of the city where something changed, such as a shop changing hands, is drawn again. Each layer goes to the graphics card as one batch of triangles, so a whole metropolis takes fewer draw calls than the flat huge city did before.
 
 Scroll to zoom, and drag with the right or middle mouse button to pan. Trackpad pinch and two-finger scroll also work.
 
@@ -107,7 +113,7 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 
 ## Systems
 
-- **The city.** It is a grid of blocks, four lots wide and two deep, in one of four sizes (see above). Most lots are businesses; the rest are empty lots, gang headquarters and precinct houses. Owners take a gang less seriously the further its headquarters is: each block beyond the second costs a few points of extortion chance.
+- **The city.** It is a grid of blocks, four lots wide and two deep, in one of five sizes (see above). Most lots are businesses; the rest are empty lots, gang headquarters and precinct houses. Owners take a gang less seriously the further its headquarters is: each block beyond the second costs a few points of extortion chance.
 - **Protection.** A hood leans on a shop. Success depends on his Intimidation against the owner's toughness. Higher rates pay more but build resentment, and resentful owners talk to the police.
 - **Rackets.** These hide behind protected businesses: speakeasies, stills, numbers games and loan books. Liquor rackets only pay well until repeal in 1934.
 - **Turf wars and guards.** A hood sent at a rival's business fights whoever answers the door. That is the guard posted there, otherwise the business's handler. A guard fights harder than a handler who gets called in. The rest of the rival gang only backs him up if it isn't spread thin. Losers can die.

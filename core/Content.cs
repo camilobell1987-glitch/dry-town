@@ -26,13 +26,14 @@ public static class Content
     public const int HeatPerBribeUnit = 4;
 
     /// <summary>The city's shape for each size: blocks, wards, precinct houses, businesses and how many gangs it holds.</summary>
-    public record CityShape(int BlocksX, int BlocksY, int WardsX, int WardsY, int Precincts, int Businesses, int StartingGangs, int MaxGangs);
+    public record CityShape(int BlocksX, int BlocksY, int WardsX, int WardsY, int Precincts, int Businesses, int StartingGangs, int MaxGangs, bool River = false, int Parks = 0);
 
     public static CityShape Shape(CitySize size) => size switch
     {
         CitySize.Medium => new(7, 5, 2, 2, 2, 90, 4, 8),
         CitySize.Large => new(9, 7, 3, 2, 3, 150, 5, 10),
-        CitySize.Huge => new(13, 10, 4, 3, 5, 300, 7, 14),
+        CitySize.Huge => new(13, 10, 4, 3, 5, 300, 7, 14, Parks: 2),
+        CitySize.Metropolis => new(18, 14, 5, 4, 8, 600, 9, 20, River: true, Parks: 3),
         _ => new(5, 4, 2, 1, 1, 48, 3, 6),
     };
 

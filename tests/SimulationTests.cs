@@ -422,6 +422,7 @@ public class Phase5Tests
     [InlineData(CitySize.Medium, 7, 5, 4, 2, 4)]
     [InlineData(CitySize.Large, 9, 7, 6, 3, 5)]
     [InlineData(CitySize.Huge, 13, 10, 12, 5, 7)]
+    [InlineData(CitySize.Metropolis, 18, 14, 20, 8, 9)]
     public void CitiesComeInThreeSizes(CitySize size, int blocksX, int blocksY, int wards, int precincts, int gangs)
     {
         var w = World.Create(new WorldSettings { Seed = 3, Size = size });
@@ -436,6 +437,24 @@ public class Phase5Tests
         var a = w.Map.Lots.First();
         var b = w.Map.Lots.Last();
         foreach (var (x, y) in w.Map.Path(a, b).Skip(1).SkipLast(1)) Assert.True(CityMap.IsRoad(x, y));
+    }
+
+    [Fact]
+    public void TheMetropolisHasARiverAndParksThatNobodyBuildsOn()
+    {
+        var w = World.Create(new WorldSettings { Seed = 5, Size = CitySize.Metropolis });
+        Assert.Equal(7, w.Map.RiverRow);
+        Assert.Equal(18 * 8, w.Map.Lots.Count(l => l.Terrain == Terrain.Water));
+        Assert.Equal(3 * 8, w.Map.Lots.Count(l => l.Terrain == Terrain.Park));
+        Assert.All(w.Map.Lots.Where(l => l.Terrain != Terrain.Land), l => Assert.Equal(LotUse.Empty, l.Use));
+
+        // Gangs that come later don't set up in the river either, and a save keeps the water where it was.
+        var sim = new Simulation(w);
+        for (int i = 0; i < 30; i++) sim.AdvanceWeek(playerAutopilot: true);
+        Assert.All(w.Map.Lots.Where(l => l.Terrain != Terrain.Land), l => Assert.Equal(LotUse.Empty, l.Use));
+        var loaded = SaveGame.Restore(SaveGame.Read(SaveGame.Write(sim, Array.Empty<Order>()))).World;
+        Assert.Equal(7, loaded.Map.RiverRow);
+        Assert.Equal(w.Map.Lots.Select(l => l.Terrain), loaded.Map.Lots.Select(l => l.Terrain));
     }
 
     [Fact]
