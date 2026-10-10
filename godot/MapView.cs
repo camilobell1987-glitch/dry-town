@@ -84,12 +84,12 @@ public partial class MapView : Control
     }
 
     /// <summary>Fit the whole city, or on a big one, start zoomed in on a lot (usually your headquarters).</summary>
-    public void ResetView(Lot? focus)
+    public void ResetView(Lot? focus, float? zoomTo = null)
     {
         _zoom = 1;
         _pan = Vector2.Zero;
-        if (focus == null || Map.BlocksX <= 5 || Size.X <= 0) return;
-        float zoom = Map.BlocksX >= 15 ? 3 : 2;
+        if (focus == null || (Map.BlocksX <= 5 && zoomTo == null) || Size.X <= 0) return;
+        float zoom = zoomTo ?? (Map.BlocksX >= 15 ? 3 : 2);
         ZoomAt(Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile, zoom);
         // Bring the lot towards the middle of the view.
         _pan += Size / 2 - (Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile);
@@ -132,6 +132,7 @@ public partial class MapView : Control
         Clock = 0;
         _actors = new List<Actor>();
         _fired.Clear();
+        _burntNow.Clear();
         _collectIndex = 0;
         Step();
     }
@@ -168,7 +169,8 @@ public partial class MapView : Control
         }
     }
 
-    private static Vector2 Doorstep(Lot lot) => new(lot.X + 0.5f, lot.FrontY < lot.Y ? lot.Y - 0.1f : lot.Y + 1.1f);
+    /// <summary>Where men stand at a door. A door facing away from the viewer is hidden by its own building, so they wait out in the street.</summary>
+    private static Vector2 Doorstep(Lot lot) => new(lot.X + 0.5f, lot.FrontY < lot.Y ? lot.Y - 0.72f : lot.Y + 1.1f);
 
     public void EndReplay()
     {
@@ -176,6 +178,7 @@ public partial class MapView : Control
         _sim = null;
         _actors.Clear();
         _fired.Clear();
+        _burntNow.Clear();
     }
 
     /// <summary>Advance the live clock by some hours of game time.</summary>
@@ -208,9 +211,11 @@ public partial class MapView : Control
                     { Kind: ActionKind.Takeover, Result: ActionResult.Won } => (a.GangId, was.Racket),
                     { Kind: ActionKind.Racket, Result: ActionResult.Success } => (was.Gang, World!.BusinessById(a.BusinessId).Racket is var k and not RacketKind.None ? k : RacketKind.Numbers),
                     { Kind: ActionKind.Raid } => (was.Gang, RacketKind.None),
+                    { Kind: ActionKind.Arson, Result: ActionResult.Success } => (was.Gang, RacketKind.None),
                     _ => was,
                 };
             }
+            if (a is { Kind: ActionKind.Arson, Result: ActionResult.Success }) _burntNow.Add(a.BusinessId);
             ActionHappened?.Invoke(a);
         }
     }
@@ -239,11 +244,25 @@ public partial class MapView : Control
         else if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } click)
         {
             if (ShowWards && WardAtTile((click.Position - Origin) / Tile) is int ward and >= 0) WardClicked?.Invoke(ward);
-            int lotId = LotUnder(click.Position);
-            if (lotId >= 0 && World.Map.LotAt(lotId).BusinessId is int biz and >= 0)
+            // People stand in front of the buildings, so they're found first.
+            if (!ShowWards && PickAt(click.Position) is { } who)
             {
-                SelectedBusiness = biz;
+                if (who.Kind == Pickable.Person) { Select(person: who.Id); PersonClicked?.Invoke(who.Id); }
+                else { Select(hood: who.Id); HoodClicked?.Invoke(who.Id); }
+                return;
+            }
+            int lotId = LotUnder(click.Position);
+            if (lotId < 0) return;
+            var lot = World.Map.LotAt(lotId);
+            if (lot.BusinessId is int biz and >= 0)
+            {
+                Select(business: biz);
                 BusinessClicked?.Invoke(biz);
+            }
+            else if (lot.Use == LotUse.Bank && World.BankAt(lotId) is { } bank)
+            {
+                Select(bank: bank.Id);
+                BankClicked?.Invoke(bank.Id);
             }
         }
     }
@@ -272,6 +291,7 @@ public partial class MapView : Control
     public override string _GetTooltip(Vector2 atPosition)
     {
         if (World == null) return "";
+        if (PickAt(atPosition) is { } who) return PersonTooltip(who);
         int lotId = LotUnder(atPosition);
         if (lotId < 0) return "";
         var lot = World.Map.LotAt(lotId);
@@ -288,6 +308,9 @@ public partial class MapView : Control
                 return $"Headquarters of {g.Name}";
             case LotUse.Precinct:
                 return "Precinct house" + WardLine(lot);
+            case LotUse.Bank:
+                var bank = World.BankAt(lot.Id);
+                return bank == null ? "" : $"{bank.Name}\nAbout ${bank.Vault / 500 * 500:N0} in the vault · {bank.Guards} guard{(bank.Guards == 1 ? "" : "s")}{WardLine(lot)}";
             default:
                 return lot.Terrain == Terrain.Land ? FillerName(lot) : "";
         }
@@ -426,6 +449,7 @@ public partial class MapView : Control
             s = s * 31 + gang;
             s = s * 31 + (int)racket;
             s = s * 31 + (b.IsOpen || Live ? 1 : 0);
+            s = s * 31 + (Burnt(b) ? 1 : 0);
         }
         return s;
     }
@@ -533,6 +557,10 @@ public partial class MapView : Control
         DrawTraffic(night, view);
         DrawParkedOfficials(night, view);
         DrawPassersBy(view);
+        _clickables.Clear();
+        DrawStreetPeople(view);
+        DrawLoiterers(view);
+        DrawFires(view);
         DrawRiverTraffic(view);
         DrawTrain(night, view);
         DrawSmoke(view);
@@ -582,7 +610,8 @@ public partial class MapView : Control
         var closed = outline.Append(outline[0]).ToArray();
         if (rim is Color r) C.DrawPolyline(closed, r with { A = 0.9f }, width);
 
-        bool selected = lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness;
+        bool selected = (lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness)
+            || (lot.Use == LotUse.Bank && SelectedBank >= 0 && w.BankById(SelectedBank)?.LotId == lot.Id);
         if (selected)
         {
             float pulse = 0.75f + 0.25f * Mathf.Sin(_anim * 4);
@@ -680,7 +709,7 @@ public partial class MapView : Control
             }
 
             // In a takeover the rival's man stands in the doorway, and shots are traded.
-            if (a.Kind == ActionKind.Takeover && a.DefenderHoodId >= 0 && now >= actor.Arrive - 0.5f && now <= actor.Leave)
+            if (a.Kind is ActionKind.Takeover or ActionKind.Hit && a.DefenderHoodId >= 0 && now >= actor.Arrive - 0.5f && now <= actor.Leave)
             {
                 var defPos = (target + new Vector2(0.3f, -0.15f)) * t;
                 var dc = Palette.Gang(World!, a.DefenderGangId);
@@ -748,10 +777,9 @@ public partial class MapView : Control
         if (_sim is not { WeekRunning: true }) return;
         foreach (var job in _sim.Upcoming)
         {
-            if (job.Order is not (ExtortOrder or GuardOrder or RacketOrder)) continue;
+            if (!Simulation.TeamOf(job.Order).Any()) continue;
             var gang = World!.GangById(job.GangId);
-            int bizId = job.Order switch { ExtortOrder e => e.BusinessId, GuardOrder g => g.BusinessId, RacketOrder r => r.BusinessId, _ => -1 };
-            int toLot = World.BusinessById(bizId).LotId;
+            int toLot = Simulation.TargetLot(World, job.Order);
             float hours = Simulation.WalkHours(World, gang.HqLotId, toLot);
             if (now < job.Tick - hours || now >= job.Tick) continue;
             var path = StreetPath(gang.HqLotId, toLot);

@@ -39,7 +39,7 @@ public sealed partial class Simulation
     public static double HijackChance(World w, Hood hood, IEnumerable<Hood> backup, Business biz)
     {
         var rival = w.GangById(biz.ProtectorGangId);
-        return TakeoverChance(hood.Strength + BackupStrength(backup) + hood.Stealth * 0.3, DefenceStrength(w, rival, biz) * 0.7);
+        return TakeoverChance(hood.Strength + BackupStrength(backup) + hood.Stealth * 0.2, DefenceStrength(w, rival, biz) * 0.85);
     }
 
     /// <summary>Chance a witness can be talked out of testifying.</summary>
@@ -68,6 +68,7 @@ public sealed partial class Simulation
         {
             string lost = biz.Racket != RacketKind.None ? $" and its {Content.Rackets[biz.Racket].Label}" : "";
             biz.ShutWeeks = 8;
+            biz.BurnedWeek = w.Week;
             biz.Racket = RacketKind.None;
             biz.Resentment = Math.Min(100, biz.Resentment + 10);
             gang.Heat = Math.Min(100, gang.Heat + 8);
@@ -370,8 +371,9 @@ public sealed partial class Simulation
 
         // Drifters drift in, more in a bigger city.
         int drifters = Math.Max(2, w.Map.BlocksX * w.Map.BlocksY / 12);
-        if (w.People.Count(p => p.Kind == PersonKind.Drifter) < drifters && w.Rng.Chance(0.6))
+        for (int i = 0; i < 2 && w.People.Count(p => p.Kind == PersonKind.Drifter) < drifters; i++)
         {
+            if (!w.Rng.Chance(0.7)) continue;
             var lot = StreetCorner(-1);
             if (lot != null) w.NewPerson(PersonKind.Drifter, lot, w.Rng.Range(4, 8));
         }

@@ -130,18 +130,7 @@ public sealed partial class Simulation
     {
         if (!WeekRunning) return null;
         var gang = World.GangById(order.GangId);
-        int toLot = order switch
-        {
-            ExtortOrder e => World.BusinessById(e.BusinessId).LotId,
-            GuardOrder g => World.BusinessById(g.BusinessId).LotId,
-            RacketOrder r => World.BusinessById(r.BusinessId).LotId,
-            ArsonOrder a => World.BusinessById(a.BusinessId).LotId,
-            HijackOrder h => World.BusinessById(h.BusinessId).LotId,
-            HitOrder h => HauntOf(World, World.HoodById(h.TargetHoodId)),
-            RobberyOrder r => World.BankById(r.BankId)?.LotId ?? gang.HqLotId,
-            SilenceOrder s => World.PersonById(s.PersonId)?.LotId ?? gang.HqLotId,
-            _ => gang.HqLotId,
-        };
+        int toLot = TargetLot(World, order);
         int tick = Math.Max((int)Math.Ceiling(now + WalkHours(World, gang.HqLotId, toLot)), _timeline.Take(_cursor).LastOrDefault()?.Tick ?? 0);
         if (tick > LastOrderTick) return null;
         var job = new Job(tick, gang.Id, order);
@@ -150,6 +139,24 @@ public sealed partial class Simulation
         while (at < _timeline.Count && _timeline[at].Tick <= tick) at++;
         _timeline.Insert(at, job);
         return tick;
+    }
+
+    /// <summary>Where the men carrying out an order are headed. Orders that need nobody to go out stay at headquarters.</summary>
+    public static int TargetLot(World w, Order order)
+    {
+        int hq = w.GangById(order.GangId).HqLotId;
+        return order switch
+        {
+            ExtortOrder e => w.BusinessById(e.BusinessId).LotId,
+            GuardOrder g => w.BusinessById(g.BusinessId).LotId,
+            RacketOrder r => w.BusinessById(r.BusinessId).LotId,
+            ArsonOrder a => w.BusinessById(a.BusinessId).LotId,
+            HijackOrder h => w.BusinessById(h.BusinessId).LotId,
+            HitOrder h => HauntOf(w, w.HoodById(h.TargetHoodId)),
+            RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
+            SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
+            _ => hq,
+        };
     }
 
     /// <summary>Men of a gang who have done a job this week or are on their way to one.</summary>

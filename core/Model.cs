@@ -62,6 +62,9 @@ public sealed class Business
     public RacketKind Racket { get; set; } = RacketKind.None;
     public int ShutWeeks { get; set; }
 
+    /// <summary>The week it was last burned out, for the charred shell the map shows while it's shut.</summary>
+    public int BurnedWeek { get; set; } = -1000;
+
     public int LotId { get; init; } = -1;
 
     public bool IsProtected => ProtectorGangId >= 0;

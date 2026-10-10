@@ -34,6 +34,8 @@ int Soak()
 {
     int stalled = 0, aliveAt3 = 0, aliveAtEnd = 0;
     var politics = new List<string>();
+    var crimes = new Dictionary<EventKind, int>();
+    var rackets = new Dictionary<RacketKind, int>();
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
     {
         var sim = Simulation.New(new WorldSettings { Seed = s, Difficulty = difficulty, Size = size, PoliticsEnabled = !args.Contains("--no-politics") });
@@ -49,12 +51,19 @@ int Soak()
         politics.Add($"seed {s}: payoffs {ev.Count(e => e.Kind == EventKind.Politics && e.Text.Contains("on the payroll"))}, " +
             $"reformers {ev.Count(e => e.Text.StartsWith("Reformer"))}, gang-won wards {ev.Count(e => e.Text.Contains("money behind him"))}, " +
             $"mayor friends {ev.Count(e => e.Text.Contains("paid for it"))}, wards owned at end {sim.World.Wards.Count(x => x.OwnerGangId >= 0)}/{sim.World.Wards.Count}");
+        foreach (var e in ev.Where(e => e.Kind is EventKind.Arson or EventKind.Hit or EventKind.Robbery or EventKind.Hijack))
+            crimes[e.Kind] = crimes.GetValueOrDefault(e.Kind) + 1;
+        foreach (var e in ev.Where(e => e.Kind == EventKind.RacketOpened && e.Text.Contains(" opened a ")))
+            foreach (var info in Content.Rackets.Values.Where(r => e.Text.Contains($" opened a {r.Label} ")))
+                rackets[info.Kind] = rackets.GetValueOrDefault(info.Kind) + 1;
         var samples = sim.Metrics.Samples;
         if (samples[Math.Min(samples.Count, 3 * Content.WeeksPerYear) - 1].PlayerAlive) aliveAt3++;
         if (samples[^1].PlayerAlive) aliveAtEnd++;
     }
     Console.WriteLine($"{seeds - stalled}/{seeds} runs stayed contested.");
     Console.WriteLine("Politics:\n  " + string.Join("\n  ", politics));
+    Console.WriteLine($"Street crime per city-year: {string.Join(", ", crimes.OrderBy(c => c.Key).Select(c => $"{c.Key} {c.Value / (double)(seeds * years):0.0}"))}.");
+    Console.WriteLine($"Rackets opened: {string.Join(", ", rackets.OrderBy(c => c.Key).Select(c => $"{Content.Rackets[c.Key].Label} {c.Value}"))}.");
     Console.WriteLine($"Your gang on autopilot ({difficulty}): alive after 3 years in {aliveAt3}/{seeds}, after {years} years in {aliveAtEnd}/{seeds}.");
     return stalled == 0 ? 0 : 1;
 }

@@ -22,7 +22,7 @@ public static class AiPlanner
 
         int wanted = Math.Max(5, 3 + turf.Count / 3);
         // A good man on the street is worth his asking price over a stranger off the boat.
-        var hires = w.People.Where(p => p.Kind == PersonKind.Drifter && p.Intimidation + p.Muscle + p.Brains + p.Stealth >= 22)
+        var hires = w.People.Where(p => p.Kind == PersonKind.Drifter && p.Intimidation + p.Muscle + p.Brains + p.Stealth >= 24)
             .OrderByDescending(p => p.Intimidation + p.Muscle + p.Brains + p.Stealth).ThenBy(p => p.Id).ToList();
         for (int i = 0; i < 2 && active + i < wanted && cash > Content.RecruitCost * 4; i++)
         {
