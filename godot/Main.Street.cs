@@ -21,6 +21,8 @@ public partial class Main
         // Clicking something mid-week stops the clock so you can decide what to do.
         if (_map.Live && _playing) { _playing = false; _pause.Text = "Play"; }
         _tabs.CurrentTab = TabIndex("Selected");
+        // One of yours clicked on the map: turn the rolodex to his card.
+        if (_map.SelectedHood >= 0 && W.HoodById(_map.SelectedHood).GangId == Me) _rolodex.Show(_map.SelectedHood);
         RefreshBusiness();
     }
 
