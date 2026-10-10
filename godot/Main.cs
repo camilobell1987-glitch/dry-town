@@ -17,6 +17,7 @@ public partial class Main : Control
     private int Me => W.Player.Id;
 
     private MapView _map = null!;
+    private Rolodex _rolodex = null!;
     private Label _gangName = null!, _date = null!, _cash = null!, _heat = null!, _turf = null!, _men = null!;
     private Button _endWeek = null!;
     private HBoxContainer _liveBar = null!;
@@ -284,6 +285,7 @@ public partial class Main : Control
 
         RefreshBusiness();
         RefreshMen();
+        RefreshRolodex();
         RefreshOrders();
         RefreshCrews();
         RefreshGangs();
@@ -493,6 +495,18 @@ public partial class Main : Control
             if (h.State == HoodState.Jailed) it.SetCustomColor(8, Palette.Police);
             else if (busy.Contains(h.Id)) it.SetCustomColor(8, Palette.Player);
         }
+    }
+
+    private void RefreshRolodex()
+    {
+        var jobs = new Dictionary<int, string>();
+        var orders = _map.Live ? _shell.Sim.Upcoming.Where(j => j.GangId == Me).Select(j => j.Order) : _shell.Pending;
+        foreach (var o in orders)
+            foreach (var id in Simulation.TeamOf(o)) jobs.TryAdd(id, (_map.Live ? "On the way: " : "") + _shell.Describe(o));
+        _rolodex.World = W;
+        _rolodex.GangId = Me;
+        _rolodex.JobOf = id => jobs.GetValueOrDefault(id);
+        _rolodex.Refresh();
     }
 
     private void RefreshOrders()
@@ -786,10 +800,15 @@ public partial class Main : Control
         body.AddThemeConstantOverride("separation", 10);
         rows.AddChild(body);
 
+        // Far left: the crew on a rolodex.
+        _rolodex = new Rolodex { SizeFlagsVertical = SizeFlags.ExpandFill };
+        _rolodex.HoodPicked += id => { _map.Select(hood: id); OnMapSelection(); };
+        body.AddChild(_rolodex);
+
         // Left: the map, the live controls and the street ticker.
         var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         left.AddThemeConstantOverride("separation", 6);
-        _map = new MapView { SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsStretchRatio = 2.2f, CustomMinimumSize = new Vector2(640, 400) };
+        _map = new MapView { SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsStretchRatio = 2.2f, CustomMinimumSize = new Vector2(540, 400) };
         _map.BusinessClicked += _ => OnMapSelection();
         _map.PersonClicked += _ => OnMapSelection();
         _map.HoodClicked += _ => OnMapSelection();
@@ -1008,6 +1027,7 @@ public partial class Main : Control
         if (Arg("--select-bank") is string bankArg)
             _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));
         if (Flag("--select-hood")) _map.Select(hood: W.Hoods.First(h => h.IsAvailable && h.GangId != Me && W.GangById(h.GangId).Alive).Id);
+        if (Arg("--card") is string card) { RefreshAll(); _rolodex.Show(W.HoodsOf(Me).OrderBy(h => h.Id).ElementAt(int.Parse(card)).Id); }
         if (Flag("--clear")) _shell.Pending.Clear();
         if (Flag("--crimes"))
         {
