@@ -44,6 +44,9 @@ public sealed class Hood
     public Weapon Weapon { get; set; }
     public Car Car { get; set; }
 
+    /// <summary>The charge he's held on until his trial, or null. While it's open, JailWeeks counts down to the trial.</summary>
+    public Case? Case { get; set; }
+
     public bool IsAvailable => State == HoodState.Free;
     public bool IsActive => State is HoodState.Free or HoodState.Jailed;
 
@@ -119,6 +122,32 @@ public sealed class Gang
     public int LastFamilyWeek { get; set; } = -1000;
 
     public int HqLotId { get; set; } = -1;
+
+    /// <summary>The lawyer the gang keeps on retainer for its men's trials.</summary>
+    public Lawyer Lawyer { get; set; }
+}
+
+public enum Lawyer { None, Storefront, Mouthpiece }
+
+/// <summary>A man held for trial: what he's charged with, what he faces, and what has been done to help him.</summary>
+public sealed class Case
+{
+    public string Charge { get; set; } = "";
+
+    /// <summary>Weeks he serves if the jury convicts.</summary>
+    public int Sentence { get; set; }
+
+    /// <summary>A federal case: the Treasury's own court, where no judge can be bought.</summary>
+    public bool Federal { get; set; }
+
+    /// <summary>How likely a jury is to convict before anyone helps him, 0 to 1.</summary>
+    public double Strength { get; set; }
+
+    /// <summary>The gang already had a lawyer when he was arrested, so the defence had time to prepare.</summary>
+    public bool Prepared { get; set; }
+
+    public bool JudgePaid { get; set; }
+    public bool JuryFixed { get; set; }
 }
 
 /// <summary>
@@ -165,7 +194,7 @@ public enum EventKind
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
     Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
-    Arson, Hit, Robbery, Hijack, Street, Gear, Front,
+    Arson, Hit, Robbery, Hijack, Street, Gear, Front, Trial,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

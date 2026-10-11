@@ -358,7 +358,7 @@ public class Phase4Tests
     [Fact]
     public void OverDecadesMenDieOfOldAgeAndGangsCarryOn()
     {
-        var sim = Run(2, 40 * Content.WeeksPerYear);
+        var sim = Run(3, 40 * Content.WeeksPerYear);
         Assert.Contains(sim.World.Events, e => e.Kind == EventKind.DiedNaturally);
         Assert.Contains(sim.World.Events, e => e.Kind == EventKind.Succession);
         Assert.False(sim.Metrics.Check().Stalled);

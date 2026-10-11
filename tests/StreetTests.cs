@@ -270,7 +270,7 @@ public class Phase7Tests
     [Fact]
     public void TheShellTakesTheNewOrders()
     {
-        var shell = new CommandShell(Run(2, 8, CitySize.Medium));
+        var shell = new CommandShell(Run(3, 8, CitySize.Medium));
         var w = shell.Sim.World;
         var me = w.Player;
         var men = w.AvailableHoodsOf(me.Id).Where(h => h.Id != me.BossHoodId).ToList();
