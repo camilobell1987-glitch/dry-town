@@ -83,6 +83,7 @@ public sealed partial class Simulation
         _cursor = 0;
 
         _protectorAtPlanning = w.Businesses.ToDictionary(b => b.Id, b => b.ProtectorGangId);
+        WordFromInside(plans);
         WeekRunning = true;
     }
 
@@ -125,6 +126,11 @@ public sealed partial class Simulation
                 case JuryOrder o: Jury(gang, o); break;
                 case LawyerOrder o: w.Retain(gang, o.Lawyer); break;
                 case JudgeOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.DefendantId) is { } man: w.PayJudge(gang, man); break;
+                case HuntOrder o: Hunt(gang, o); break;
+                case SeenToOrder o: SeeTo(gang, o); break;
+                case PlantOrder o: Plant(gang, o); break;
+                case RecallOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Recall(gang, man); break;
+                case FamilyOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.LookAfter(gang, man); break;
                 case FrontOrder o when o.BusinessId >= 0 && o.BusinessId < w.Businesses.Count: w.BuyFront(gang, w.Businesses[o.BusinessId]); break;
             }
         }
@@ -169,6 +175,9 @@ public sealed partial class Simulation
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
             JuryOrder => w.PrecinctNear(w.Map.LotAt(hq)).Id,
+            SeenToOrder s when w.Hoods.FirstOrDefault(h => h.Id == s.TargetHoodId) is { } t =>
+                t.State == HoodState.Jailed ? w.PrecinctNear(w.Map.LotAt(hq)).Id : HauntOf(w, t),
+            PlantOrder p when w.Gangs.FirstOrDefault(g => g.Id == p.TargetGangId) is { HqLotId: >= 0 } host => host.HqLotId,
             PollsOrder p when p.WardId >= 0 && p.WardId < w.Wards.Count => Politics.PollingPlace(w, w.Wards[p.WardId], hq),
             _ => hq,
         };
@@ -195,6 +204,9 @@ public sealed partial class Simulation
         SilenceOrder s => new[] { s.HoodId },
         JuryOrder j => new[] { j.HoodId },
         PollsOrder p => new[] { p.HoodId },
+        HuntOrder h => new[] { h.HoodId },
+        SeenToOrder s => new[] { s.HoodId },
+        PlantOrder p => new[] { p.HoodId },
         _ => Array.Empty<int>(),
     };
 
@@ -215,6 +227,7 @@ public sealed partial class Simulation
         Diplomacy();
         w.Tick = Content.ReckoningTick;
         Police();
+        Rats();
         Street();
         Politics.Step(w, w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.HoodKilled));
         Feds();
@@ -249,7 +262,7 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or RecallOrder or FamilyOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
@@ -367,7 +380,9 @@ public sealed partial class Simulation
         _guards.TryGetValue(biz.Id, out var guard);
         bool guarded = guard.Hood is { IsAvailable: true } && guard.Hood.GangId == rival.Id;
         double defence = DefenceStrength(w, rival, biz, guarded ? guard.Hood : null, guarded ? guard.Backup : 0);
-        double attack = StormingStrength(hood, backup) + w.Rng.Range(0, 6);
+        // A man inside opens a door for his own side, or warns them who's coming.
+        if (w.HasManInside(rival.Id, gang.Id)) defence += Content.TippedOffDefence;
+        double attack = StormingStrength(hood, backup) + (w.HasManInside(gang.Id, rival.Id) ? Content.InsideStorm : 0) + w.Rng.Range(0, 6);
         double roll = defence + w.Rng.Range(0, 6);
         gang.Heat = Math.Min(100, gang.Heat + 5 + GunHeat(backup.Prepend(hood)));
         rival.Heat = Math.Min(100, rival.Heat + 2);
@@ -653,13 +668,15 @@ public sealed partial class Simulation
             int aldermen = Math.Min(2, w.Wards.Count(x => x.OwnerGangId == gang.Id));
             int cooling = w.HeatStays ? 0 : 2 + aldermen + (w.Hall.FriendGangId == gang.Id ? 2 : 0);
             gang.Heat = Math.Clamp(gang.Heat - cooling + size / 10, 0, 100);
-            int threshold = (w.Hall.Reform ? 30 : 35) - w.RaidSooner;
+            // A man on the inside tells the precinct where to look and when.
+            bool informer = w.AvailableHoodsOf(gang.Id).Any(h => h.Informer);
+            int threshold = (w.Hall.Reform ? 30 : 35) - w.RaidSooner - (informer ? 8 : 0);
             if (gang.Heat <= threshold || !w.Rng.Chance((gang.Heat - threshold) / 120.0)) continue;
 
             var ledger = w.Ledger(gang.Id);
             var rackets = w.TurfOf(gang.Id).Where(b => b.Racket != RacketKind.None).ToList();
             // An alderman on the payroll tips off the rackets in his ward before the wagons roll.
-            var racketSite = rackets.Where(b => !Politics.Covered(w, gang, b) && !CopLooksAway(gang, b)).ToList();
+            var racketSite = rackets.Where(b => informer || !Politics.Covered(w, gang, b) && !CopLooksAway(gang, b)).ToList();
             string what = rackets.Count > racketSite.Count && racketSite.Count == 0 ? ", but the rackets had been tipped off" : "";
             int targetLot = gang.HqLotId, targetBiz = -1;
             if (racketSite.Count > 0)
@@ -676,6 +693,11 @@ public sealed partial class Simulation
             ledger.Fines += fine;
             string text = $"Police raided {gang.Name}{what}. Fines ${fine}.";
             w.Log(EventKind.Raid, gang.Id, text);
+            if (informer && w.Rng.Chance(0.5))
+            {
+                gang.TalkWeek = w.Week;
+                w.Log(EventKind.Whisper, gang.Id, $"The police knew just where to look. Somebody in {gang.Name} is talking.");
+            }
 
             int arrested = -1;
             var suspects = w.AvailableHoodsOf(gang.Id).ToList();
@@ -694,7 +716,10 @@ public sealed partial class Simulation
             if (--hood.JailWeeks > 0) continue;
             if (hood.Case != null) { Trial(hood); continue; }
             hood.State = HoodState.Free;
+            hood.LookedAfter = false;
             hood.Loyalty = Math.Max(0, hood.Loyalty - 10);
+            // The detectives had weeks to work on him.
+            if (hood.Loyalty < Content.InformerLoyalty && !hood.Family && w.Rng.Chance(0.15)) hood.Informer = true;
             w.Log(EventKind.HoodReleased, hood.GangId, $"{hood.Name} is out of jail.");
         }
     }

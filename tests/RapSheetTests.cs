@@ -52,6 +52,8 @@ public class RapSheetTests
         {
             var (sim, w, man) = Start(seed);
             Convict(man, Content.HabitualOffender);
+            // A loyal man, so he doesn't take the DA's deal instead.
+            man.Loyalty = 100;
             sim.Jail(man, 20, "with attempted arson", strength: 1);
             Assert.True(man.Case!.Life);
             for (int i = 0; i < Content.WeeksToTrial; i++) sim.AdvanceWeek();

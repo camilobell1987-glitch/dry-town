@@ -27,13 +27,13 @@ public static class Reports
         }
         sb.AppendLine();
         sb.AppendLine("Headlines:");
-        var news = w.Events.Where(e => e.Week == week && IsHeadline(e)).ToList();
+        var news = w.Events.Where(e => e.Week == week && (IsHeadline(e) || e.Kind == EventKind.Whisper && e.GangId == player.Id)).ToList();
         if (news.Count == 0) sb.AppendLine("  A quiet week in the district.");
         foreach (var e in news) sb.AppendLine($"  {(e.GangId == player.Id ? "*" : "-")} {e.Text}");
         return sb.ToString();
     }
 
-    public static bool IsHeadline(GameEvent e) => e.Kind is not (EventKind.Recruited or EventKind.Bribe or EventKind.HoodReleased or EventKind.Street or EventKind.Gear or EventKind.Front);
+    public static bool IsHeadline(GameEvent e) => e.Kind is not (EventKind.Recruited or EventKind.Bribe or EventKind.HoodReleased or EventKind.Street or EventKind.Gear or EventKind.Front or EventKind.Whisper);
 
     /// <summary>Who is about on the street, and what each of them can be for the gang.</summary>
     public static string Street(World w, int gangId)
@@ -92,6 +92,30 @@ public static class Reports
             string help = (c.JudgePaid ? ", judge paid" : "") + (c.JuryFixed ? ", jury leaned on" : "");
             sb.AppendLine($"  {h.Id,4} {h.Name,-28} charged {c.Charge}; trial in {h.JailWeeks}w, faces {(c.Life ? "life" : $"{c.Sentence}w")}{(c.Federal ? " (federal)" : "")}; " +
                 $"{Simulation.ConvictionChance(w, h) * 100:0}% to convict{help}" + (c.Federal || c.JudgePaid ? "" : $"; the judge wants ${w.JudgePrice(h):N0}"));
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Men in cells talking to the DA, rats found out, and the gang's men planted in other outfits.</summary>
+    public static string Rats(World w, int gangId)
+    {
+        var sb = new StringBuilder();
+        var talking = w.TalkingOf(gangId).ToList();
+        foreach (var h in talking)
+            sb.AppendLine($"  {h.Id,4} {h.Name,-28} talking to the DA; signs in {h.Talking}w unless his loyalty ({h.Loyalty}) reaches {Content.RatLine(h)}" +
+                (h.LookedAfter ? "" : $"; his family needs ${Content.FamilyCare(h):N0}"));
+        var exposed = w.ExposedIn(gangId).ToList();
+        foreach (var h in exposed)
+            sb.AppendLine($"  {h.Id,4} {h.Name,-28} " + (h.State == HoodState.Inside ? $"one of {w.GangById(h.GangId).Name}'s men, planted on you" : "talking to the police")
+                + $"; runs in {Math.Max(0, Content.RunWeeks - (w.Week - h.ExposedWeek))}w");
+        if (talking.Count + exposed.Count == 0) sb.AppendLine("Nobody you know of is talking.");
+        var plants = w.PlantsOf(gangId).ToList();
+        if (plants.Count == 0) sb.AppendLine("You have nobody inside another outfit.");
+        foreach (var h in plants)
+        {
+            var host = w.GangById(h.InsideGangId);
+            sb.AppendLine($"  {h.Id,4} {h.Name,-28} inside {host.Name} since {Date(w, h.InsideSinceWeek)}" + (h.Exposed ? ", found out" : "")
+                + $": ${host.Cash:N0} in the safe, heat {host.Heat}, {w.HoodsOf(host.Id).Count()} men");
         }
         return sb.ToString();
     }

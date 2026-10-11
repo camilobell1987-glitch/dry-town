@@ -19,7 +19,12 @@ public sealed partial class Simulation
     /// <summary>Chance a hit comes off: stealth to get close, then strength against the target's.</summary>
     public static double HitChance(World w, Hood hood, IEnumerable<Hood> backup, Hood target) =>
         Math.Clamp(0.45 + hood.Stealth * 0.03 + (hood.Strength + BackupStrength(backup) - target.Strength) * 0.03
-            - (IsGuardedBoss(w, target) ? 0.25 : 0) - (target.Car == Car.Cadillac ? Content.ArmouredCar : 0), 0.05, 0.9);
+            - (IsGuardedBoss(w, target) ? 0.25 : 0) - (target.Car == Car.Cadillac ? Content.ArmouredCar : 0)
+            + Inside(w, hood.GangId, target.GangId, w.GangById(target.GangId).BossHoodId == target.Id ? Content.InsideBossHit : Content.InsideHit), 0.05, 0.9);
+
+    /// <summary>What men planted on either side do to a job's chances: help their own side's, spoil the other's.</summary>
+    public static double Inside(World w, int gangId, int targetGangId, double help) =>
+        (w.HasManInside(gangId, targetGangId) ? help : 0) - (w.HasManInside(targetGangId, gangId) ? Content.TippedOff : 0);
 
     /// <summary>
     /// Chance of getting into a vault and out again. The man in front plans it; the backup holds
@@ -39,7 +44,8 @@ public sealed partial class Simulation
     public static double HijackChance(World w, Hood hood, IEnumerable<Hood> backup, Business biz)
     {
         var rival = w.GangById(biz.ProtectorGangId);
-        return TakeoverChance(hood.Strength + BackupStrength(backup) + hood.Stealth * 0.2, DefenceStrength(w, rival, biz) * 0.85);
+        return Math.Clamp(TakeoverChance(hood.Strength + BackupStrength(backup) + hood.Stealth * 0.2, DefenceStrength(w, rival, biz) * 0.85)
+            + Inside(w, hood.GangId, rival.Id, Content.InsideJob), 0, 1);
     }
 
     /// <summary>Chance a witness can be talked out of testifying.</summary>
@@ -66,7 +72,7 @@ public sealed partial class Simulation
         bool guarded = guard.Hood is { IsAvailable: true } && guard.Hood.GangId == rival.Id;
         var lot = w.LotOf(biz);
 
-        if (w.Rng.Chance(ArsonChance(hood, guarded)))
+        if (w.Rng.Chance(Math.Clamp(ArsonChance(hood, guarded) + Inside(w, gang.Id, biz.ProtectorGangId, Content.InsideJob), 0.05, 0.95)))
         {
             string lost = biz.Racket != RacketKind.None ? $" and its {Content.Rackets[biz.Racket].Label}" : "";
             biz.ShutWeeks = 8;
