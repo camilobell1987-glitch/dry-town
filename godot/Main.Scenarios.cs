@@ -9,6 +9,9 @@ public partial class Main
 
     private const int ScenarioMenuId = 40;
 
+    /// <summary>The briefing card while it's up.</summary>
+    private PopupPanel? _briefing;
+
     private void FillScenarioMenu(PopupMenu menu)
     {
         for (int i = 0; i < Scenarios.All.Length; i++)
@@ -56,6 +59,7 @@ public partial class Main
         go.Pressed += page.Hide;
         col.AddChild(go);
         page.PopupHide += page.QueueFree;
+        _briefing = page;
         AddChild(page);
         page.PopupCentered();
     }

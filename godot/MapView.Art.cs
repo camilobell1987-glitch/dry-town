@@ -624,6 +624,26 @@ public partial class MapView
         if (b.IsFront) DrawFrontBadge(Q(x1 - 0.2f, (y0 + y1) / 2, h), Palette.Gang(World!, b.OwnerGangId));
         if (!open) DrawBoardedUp(lot, h);
         if (World!.StrikeAt(b) != null) DrawPickets(lot, h);
+        if (World.IsWireRoom(b)) DrawWireMast(lot, h);
+    }
+
+    /// <summary>The wire room: a telegraph mast on the roof, its wires running off to the street.</summary>
+    private void DrawWireMast(Lot lot, float h)
+    {
+        var (x0, y0, x1, y1) = Footprint(lot);
+        var wood = new Color("5a4632");
+        float x = x0 + 0.3f, y = y0 + 0.3f, lw = Mathf.Max(2, _t * 0.045f);
+        C.DrawLine(Q(x, y, h), Q(x, y, h + 0.8f), wood, lw * 1.4f);
+        for (int i = 0; i < 2; i++)
+        {
+            float z = h + 0.62f + i * 0.13f;
+            C.DrawLine(Q(x - 0.16f, y, z), Q(x + 0.16f, y, z), wood, lw);
+            foreach (float dx in new[] { -0.13f, 0.13f })
+            {
+                C.DrawCircle(Q(x + dx, y, z + 0.02f), Mathf.Max(1.5f, _t * 0.022f), new Color("7ab0c0"));
+                C.DrawLine(Q(x + dx, y, z), Q(x1 + 0.15f + dx, y1 - 0.1f, h * 0.6f), new Color("1a1714"), Mathf.Max(1, _t * 0.015f));
+            }
+        }
     }
 
     /// <summary>A strike: a placard over the roof that the whole street can see, and men with placards outside a shop that faces it.</summary>
@@ -868,6 +888,20 @@ public partial class MapView
             case RacketKind.GamblingDen: // a playing card with a red diamond
                 C.DrawRect(new Rect2(c.X - h * 0.6f, c.Y - h * 0.85f, h * 1.2f, h * 1.7f), Colors.White);
                 C.DrawColoredPolygon(new[] { c + new Vector2(0, -h * 0.5f), c + new Vector2(h * 0.35f, 0), c + new Vector2(0, h * 0.5f), c + new Vector2(-h * 0.35f, 0) }, new Color("c0302a"));
+                break;
+            case RacketKind.Slots: // a one-armed bandit
+                C.DrawRect(new Rect2(c.X - h * 0.65f, c.Y - h * 0.75f, h * 1.3f, h * 1.5f), new Color("b8b8c0"));
+                for (int i = -1; i <= 1; i++) C.DrawRect(new Rect2(c.X + i * h * 0.38f - h * 0.15f, c.Y - h * 0.3f, h * 0.3f, h * 0.45f), i == 0 ? new Color("c0302a") : Colors.White);
+                C.DrawLine(c + new Vector2(h * 0.65f, -h * 0.1f), c + new Vector2(h * 0.95f, -h * 0.7f), new Color("e8b84a"), Mathf.Max(1, h * 0.15f));
+                break;
+            case RacketKind.Casino: // a roulette wheel
+                C.DrawCircle(c, h * 0.9f, new Color("6a3a1a"));
+                for (int i = 0; i < 8; i++)
+                {
+                    float a0 = i * Mathf.Tau / 8, a1 = a0 + Mathf.Tau / 8;
+                    C.DrawColoredPolygon(new[] { c, c + Vector2.FromAngle(a0) * h * 0.75f, c + Vector2.FromAngle(a1) * h * 0.75f }, i % 2 == 0 ? new Color("c0302a") : new Color("1a1a1a"));
+                }
+                C.DrawCircle(c, h * 0.25f, new Color("e8b84a"));
                 break;
             case RacketKind.Counterfeit: // a green banknote
                 C.DrawRect(new Rect2(c.X - h * 0.9f, c.Y - h * 0.5f, h * 1.8f, h * 1.0f), new Color("6aa46a"));

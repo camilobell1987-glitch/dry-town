@@ -49,6 +49,7 @@ int Soak()
     long trials = 0, acquittals = 0, judgesPaid = 0, juries = 0, lawyered = 0, gangsAtEnd = 0;
     long truces = 0, alliances = 0, tributes = 0, broken = 0, pactsAtEnd = 0;
     long lifers = 0, repeat = 0, convictedAtEnd = 0;
+    long playerNamed = 0, playerArrests = 0, wireMoves = 0, enemiesNamed = 0, gmenArrests = 0, bossesTaken = 0, casinosAtEnd = 0, slotsAtEnd = 0, wireHeld = 0, aliveAtRepeal = 0, aliveAfterRepeal = 0;
     long cityEvents = 0, running = 0, ownMenWon = 0, pollsWorked = 0, pollsCaught = 0, reformDAs = 0, ownSeatsAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
     {
@@ -127,7 +128,22 @@ int Soak()
         linesTotal += sim.World.SupplyLines.Count;
         foreach (var (label, phrase) in RatLines)
             ratCounts[label] = ratCounts.GetValueOrDefault(label) + ev.Count(e => e.Kind is EventKind.Rat or EventKind.Whisper && e.Text.Contains(phrase));
+        wireMoves += ev.Count(e => e.Kind == EventKind.Gmen && e.Text.Contains(" runs the racing wire now"));
+        enemiesNamed += ev.Count(e => e.Kind == EventKind.Gmen && e.Text.Contains(" Public Enemy Number One. "));
+        gmenArrests += ev.Count(e => e.Kind == EventKind.Gmen && e.Text.StartsWith("G-men picked up "));
+        playerNamed += ev.Count(e => e.Kind == EventKind.Gmen && e.GangId == sim.World.Player.Id && e.Text.Contains(" Public Enemy Number One. "));
+        playerArrests += ev.Count(e => e.Kind == EventKind.Gmen && e.GangId == sim.World.Player.Id && e.Text.StartsWith("G-men picked up "));
+        bossesTaken += ev.Count(e => e.Kind == EventKind.Gmen && e.Text.Contains("Public Enemy Number One himself"));
+        casinosAtEnd += sim.World.Businesses.Count(b => b.Racket == RacketKind.Casino);
+        slotsAtEnd += sim.World.Businesses.Count(b => b.Racket == RacketKind.Slots);
+        if (sim.World.WireGangId >= 0) wireHeld++;
         var samples = sim.Metrics.Samples;
+        int repealWeek = (Content.RepealYear - Content.StartYear) * Content.WeeksPerYear;
+        if (samples.Count > repealWeek && samples[repealWeek - 1].PlayerAlive)
+        {
+            aliveAtRepeal++;
+            if (samples[^1].PlayerAlive) aliveAfterRepeal++;
+        }
         if (samples[Math.Min(samples.Count, 3 * Content.WeeksPerYear) - 1].PlayerAlive) aliveAt3++;
         if (samples[^1].PlayerAlive) aliveAtEnd++;
     }
@@ -147,6 +163,10 @@ int Soak()
     Console.WriteLine($"Wars per city-year: declared {warsDeclared / cy:0.00} ({warsOnPlayer / cy:0.00} on your gang), called off {warsCalledOff / cy:0.00}, ended in a pact {warsMadePeace / cy:0.00}, ended with one side finished {warsFinished / cy:0.00}; still going at the end: {warsAtEnd}/{seeds}.");
     Console.WriteLine($"Rum-running per city-year: lines bought {linesBought / cy:0.00}, shipments stopped {shipmentsStopped / cy:0.00}, lines changing hands after one {linesSwitched / cy:0.00}, bad batches {badBatches / cy:0.00}; lines held at the end: {linesHeld}/{linesTotal}.");
     Console.WriteLine($"Rats per city-year: {string.Join(", ", RatLines.Select(r => $"{r.Label} {ratCounts.GetValueOrDefault(r.Label) / cy:0.00}"))}.");
+    double ry = seeds * Math.Max(0, years - (Content.RepealYear - Content.StartYear));
+    if (ry > 0)
+        Console.WriteLine($"After repeal, per city-year: the wire changing hands {wireMoves / ry:0.00}, public enemies named {enemiesNamed / ry:0.00}, G-men arrests {gmenArrests / ry:0.00} ({bossesTaken / ry:0.00} of the boss); the player's gang named {playerNamed} times, with {playerArrests} arrests; " +
+            $"at the end: casinos {casinosAtEnd / (double)seeds:0.0} and slot machines {slotsAtEnd / (double)seeds:0.0} a city, the wire run by an outfit in {wireHeld}/{seeds}; the player's gang, alive at repeal in {aliveAtRepeal}, was still alive at the end in {aliveAfterRepeal}.");
     Console.WriteLine($"Rackets opened: {string.Join(", ", rackets.OrderBy(c => c.Key).Select(c => $"{Content.Rackets[c.Key].Label} {c.Value}"))}.");
     Console.WriteLine($"Your gang on autopilot ({difficulty}): alive after 3 years in {aliveAt3}/{seeds}, after {years} years in {aliveAtEnd}/{seeds}.");
     return stalled == 0 ? 0 : 1;

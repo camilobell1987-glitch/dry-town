@@ -106,7 +106,7 @@ public static partial class Content
     };
     public const int DefaultRatePercent = 12;
 
-    public record RacketInfo(RacketKind Kind, string Label, int SetupCost, int WeeklyIncome, int WeeklyHeat, bool NeedsProhibition);
+    public record RacketInfo(RacketKind Kind, string Label, int SetupCost, int WeeklyIncome, int WeeklyHeat, bool NeedsProhibition, bool AfterRepeal = false);
 
     public static readonly IReadOnlyDictionary<RacketKind, RacketInfo> Rackets = new Dictionary<RacketKind, RacketInfo>
     {
@@ -117,6 +117,8 @@ public static partial class Content
         [RacketKind.Bookie] = new(RacketKind.Bookie, "bookie's counter", 450, 110, 1, false),
         [RacketKind.GamblingDen] = new(RacketKind.GamblingDen, "gambling den", 900, 230, 3, false),
         [RacketKind.Counterfeit] = new(RacketKind.Counterfeit, "counterfeiting press", 1200, 260, 1, false),
+        [RacketKind.Slots] = new(RacketKind.Slots, "row of slot machines", 300, 100, 1, false, AfterRepeal: true),
+        [RacketKind.Casino] = new(RacketKind.Casino, "casino", 5000, 600, 1, false, AfterRepeal: true),
     };
 
     /// <summary>Weekly chance the Treasury finds each counterfeiting press a gang runs.</summary>
@@ -125,15 +127,15 @@ public static partial class Content
     /// <summary>Which racket a business can hide.</summary>
     public static RacketKind[] RacketsFor(BusinessKind kind) => kind switch
     {
-        BusinessKind.Hotel => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.GamblingDen },
-        BusinessKind.PoolHall => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.GamblingDen },
-        BusinessKind.Diner => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie },
+        BusinessKind.Hotel => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.GamblingDen, RacketKind.Slots, RacketKind.Casino },
+        BusinessKind.PoolHall => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.GamblingDen, RacketKind.Slots },
+        BusinessKind.Diner => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.Slots },
         BusinessKind.Warehouse => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.GamblingDen, RacketKind.Counterfeit },
         BusinessKind.Garage or BusinessKind.Laundry => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.Counterfeit },
-        BusinessKind.Barber => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Bookie },
-        BusinessKind.Grocer or BusinessKind.Pharmacy => new[] { RacketKind.Numbers, RacketKind.LoanShark },
+        BusinessKind.Barber => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Bookie, RacketKind.Slots },
+        BusinessKind.Grocer or BusinessKind.Pharmacy => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Slots },
         BusinessKind.Tailor => new[] { RacketKind.LoanShark, RacketKind.Bookie },
-        _ => new[] { RacketKind.LoanShark },
+        _ => new[] { RacketKind.LoanShark, RacketKind.Slots },
     };
 
     public static (int min, int max) TakingsFor(BusinessKind kind) => kind switch

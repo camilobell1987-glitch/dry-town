@@ -13,7 +13,8 @@ public static partial class AiPlanner
         int active = w.HoodsOf(g.Id).Count();
         long cash = g.Cash;
 
-        if (g.Heat > 45 && cash > 600)
+        // The G-men can't be bought, but a public enemy who keeps his head down gives them less to go on.
+        if (g.Heat > (w.PublicEnemy == g ? 25 : 45) && cash > 600)
         {
             int units = Math.Min(5, (g.Heat - 30) / Content.HeatPerBribeUnit);
             int amount = (int)Math.Min(units * Content.BribeUnit, cash / 3 / Content.BribeUnit * Content.BribeUnit);
@@ -64,23 +65,27 @@ public static partial class AiPlanner
         if (hoods.Count >= 3) hoods.RemoveAll(h => h.Id == g.BossHoodId || Politics.StandingIn(w, h) != null);
         hoods = hoods.OrderByDescending(h => h.Strength).ThenBy(h => h.Id).ToList();
 
-        if (g.Heat < 50 && hoods.Count > 0)
+        if (g.Heat < 50 && hoods.Count > 0 && PlanCasino(w, g, hoods, cash, orders) is var casino && casino > 0)
+            cash -= casino;
+        else if (g.Heat < 50 && hoods.Count > 0)
         {
             var site = turf
-                .Where(b => b.Racket == RacketKind.None && b.IsOpen)
+                .Where(b => w.FreeBackRoom(b) && b.IsOpen)
                 .OrderByDescending(b => b.Takings).ThenBy(b => b.Id)
                 .FirstOrDefault();
             if (site != null)
             {
                 var racket = Content.RacketsFor(site.Kind)
                     .Select(k => Content.Rackets[k])
-                    .Where(r => !r.NeedsProhibition || w.Prohibition)
+                    .Where(r => r.Kind != RacketKind.Casino && w.CannotOpenRacket(g, site, r.Kind) == null)
                     // The dearer setups are for outfits with money behind them, and a press only for the well off.
                     .Where(r => cash > (r.SetupCost >= 900 ? r.SetupCost * 2 : r.SetupCost) + 400)
                     .Where(r => r.Kind != RacketKind.Counterfeit || cash > 5000)
                     .OrderByDescending(r => r.WeeklyIncome - r.WeeklyHeat * 15 - (r.Kind == RacketKind.Counterfeit ? 60 : 0)
                         // A line with room to spare makes a speakeasy worth more.
-                        + (r.Kind == RacketKind.Speakeasy && w.LinesOf(g.Id).Sum(l => l.Capacity) > w.Supplied(g.Id, thisWeek: false).Count ? (int)(r.WeeklyIncome * Content.LineBonus) : 0))
+                        + (r.Kind == RacketKind.Speakeasy && w.LinesOf(g.Id).Sum(l => l.Capacity) > w.Supplied(g.Id, thisWeek: false).Count ? (int)(r.WeeklyIncome * Content.LineBonus) : 0)
+                        // So does the wire, for a bookie.
+                        + (r.Kind == RacketKind.Bookie && w.WireGangId == g.Id ? (int)(r.WeeklyIncome * Content.WireBonus) : 0))
                     .FirstOrDefault();
                 if (racket != null)
                 {
@@ -128,7 +133,7 @@ public static partial class AiPlanner
             foreach (var biz in w.Businesses)
             {
                 if (!biz.IsOpen || biz.ProtectorGangId == g.Id || taken.Contains(biz.Id)) continue;
-                double value = (biz.Takings * 0.12 + (biz.Racket != RacketKind.None ? 80 : 0)) * 10;
+                double value = (biz.Takings * 0.12 + (biz.Racket is not (RacketKind.None or RacketKind.Casino) ? 80 : 0) + (w.IsWireRoom(biz) ? w.WireWorth(g.Id) / 2 : 0)) * 10;
                 if (!biz.IsProtected)
                 {
                     double score = value * Simulation.ExtortChance(w, g, hood, biz);
@@ -181,6 +186,11 @@ public static partial class AiPlanner
     /// </summary>
     private static long PlanFronts(World w, Gang g, List<Business> turf, long cash, List<Order> orders)
     {
+        if (BuyCasino(w, g, turf, cash) is { } hotel)
+        {
+            orders.Add(new FrontOrder(g.Id, hotel.Id));
+            return Content.FrontPrice(hotel);
+        }
         if (TopDog(w, g) || g.Dirty < Content.TaxCaseDirty) return 0;
         if (w.FrontsOf(g.Id).Count() >= 1 + turf.Count / 8) return 0;
         var buy = turf.Where(b => w.CannotBuyFront(g, b) == null && Content.FrontPrice(b) * 2 <= cash - 6000)
