@@ -231,4 +231,21 @@ public static class Content
         BusinessKind.PoolHall => "Pool Hall",
         _ => kind.ToString(),
     };
+
+    // ---- Fronts and laundering -------------------------------------------------
+
+    /// <summary>What the owner of a business the gang already protects will sell it for: about half a year's takings.</summary>
+    public static int FrontPrice(Business b) => b.Takings * 25;
+
+    /// <summary>A front's own honest profit, as a share of its takings. It comes in clean.</summary>
+    public const int FrontProfitPercent = 15;
+
+    /// <summary>Dirty money a front can pass off as its own takings in a week: half of what it really takes.</summary>
+    public static int LaunderCapacity(Business b) => b.Takings / 2;
+
+    /// <summary>The bookkeeper's cut of every dirty dollar he runs through the books.</summary>
+    public const int LaunderFeePercent = 15;
+
+    /// <summary>Dirty money above this draws the Treasury's tax men. Clean money is beyond them.</summary>
+    public const int TaxCaseDirty = 25_000;
 }

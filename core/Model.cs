@@ -78,7 +78,11 @@ public sealed class Business
 
     public int LotId { get; init; } = -1;
 
+    /// <summary>The gang that owns it outright as a front, or -1. Owning it is separate from protecting it.</summary>
+    public int OwnerGangId { get; set; } = -1;
+
     public bool IsProtected => ProtectorGangId >= 0;
+    public bool IsFront => OwnerGangId >= 0;
     public bool IsOpen => ShutWeeks == 0;
 }
 
@@ -93,6 +97,12 @@ public sealed class Gang
 
     public int BossHoodId { get; set; } = -1;
     public long Cash { get; set; }
+
+    /// <summary>The part of the cash that has been through a front's books. Spent last, and the tax men can't touch it.</summary>
+    public long CleanCash { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore] public long Clean => Math.Clamp(CleanCash, 0, Math.Max(0, Cash));
+    [System.Text.Json.Serialization.JsonIgnore] public long Dirty => Math.Max(0, Cash) - Clean;
 
     /// <summary>Police attention, 0 to 100.</summary>
     public int Heat { get; set; }
@@ -137,7 +147,17 @@ public sealed class WeekLedger
     public long Wages { get; set; }
     public long Spending { get; set; }
     public long Fines { get; set; }
-    public long Net => Protection + Rackets - Wages - Spending - Fines;
+
+    /// <summary>The fronts' own honest profit, which comes in clean.</summary>
+    public long Legit { get; set; }
+
+    /// <summary>The bookkeeper's cut for running dirty money through the fronts.</summary>
+    public long LaunderFee { get; set; }
+
+    /// <summary>Dirty money that went through the books this week. Not income: it was already in the safe.</summary>
+    public long Laundered { get; set; }
+
+    public long Net => Protection + Rackets + Legit - Wages - Spending - Fines - LaunderFee;
 }
 
 public enum EventKind
@@ -145,7 +165,7 @@ public enum EventKind
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
     Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
-    Arson, Hit, Robbery, Hijack, Street, Gear,
+    Arson, Hit, Robbery, Hijack, Street, Gear, Front,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

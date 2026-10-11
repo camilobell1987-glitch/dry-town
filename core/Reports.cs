@@ -15,8 +15,10 @@ public static class Reports
         sb.AppendLine($"=== Week {week % Content.WeeksPerYear + 1}, {year} ===");
         if (player.Alive && w.LastLedger.TryGetValue(player.Id, out var l))
         {
-            sb.AppendLine($"Protection ${l.Protection}  Rackets ${l.Rackets}  Wages -${l.Wages}  Spending -${l.Spending}  Fines -${l.Fines}  Net ${l.Net}");
-            sb.AppendLine($"Cash ${player.Cash}  Heat {player.Heat}  Turf {w.TurfOf(player.Id).Count()}/{w.Businesses.Count}  Men {w.HoodsOf(player.Id).Count()}");
+            sb.AppendLine($"Protection ${l.Protection}  Rackets ${l.Rackets}  Wages -${l.Wages}  Spending -${l.Spending}  Fines -${l.Fines}" +
+                (l.Legit + l.LaunderFee > 0 ? $"  Fronts ${l.Legit}  Bookkeeper -${l.LaunderFee}" : "") + $"  Net ${l.Net}");
+            if (l.Laundered > 0) sb.AppendLine($"Washed ${l.Laundered} through the fronts.");
+            sb.AppendLine($"Cash ${player.Cash} (${player.Clean} clean)  Heat {player.Heat}  Turf {w.TurfOf(player.Id).Count()}/{w.Businesses.Count}  Men {w.HoodsOf(player.Id).Count()}");
         }
         else if (!player.Alive)
         {
@@ -30,7 +32,7 @@ public static class Reports
         return sb.ToString();
     }
 
-    public static bool IsHeadline(GameEvent e) => e.Kind is not (EventKind.Recruited or EventKind.Bribe or EventKind.HoodReleased or EventKind.Street or EventKind.Gear);
+    public static bool IsHeadline(GameEvent e) => e.Kind is not (EventKind.Recruited or EventKind.Bribe or EventKind.HoodReleased or EventKind.Street or EventKind.Gear or EventKind.Front);
 
     /// <summary>Who is about on the street, and what each of them can be for the gang.</summary>
     public static string Street(World w, int gangId)
@@ -70,6 +72,24 @@ public static class Reports
         foreach (var (kind, c) in Content.Cars.Where(x => x.Key != Car.None))
             sb.AppendLine($"  {kind,-9} {c.Label,-18} ${c.Price,-5} {c.Speed:0.#}x as fast, {c.Getaway * 100:0}% better getaway" + (kind == Car.Cadillac ? ", bulletproof" : ""));
         sb.AppendLine($"Trading in what a man has already gets back half its price.");
+        return sb.ToString();
+    }
+
+    /// <summary>The gang's fronts, what they wash, and how much of the safe is still dirty.</summary>
+    public static string Fronts(World w, int gangId)
+    {
+        var g = w.GangById(gangId);
+        var sb = new StringBuilder();
+        sb.AppendLine($"Cash ${g.Cash:N0}: ${g.Clean:N0} clean, ${g.Dirty:N0} dirty." +
+            (g.Dirty >= Content.TaxCaseDirty ? " The Treasury could bring a tax case." : ""));
+        var fronts = w.FrontsOf(gangId).ToList();
+        if (fronts.Count == 0) sb.AppendLine("No fronts yet. Buy a business you protect with 'buy <biz>'.");
+        foreach (var b in fronts)
+            sb.AppendLine($"  {b.Id,3} {b.Name,-40} washes ${Content.LaunderCapacity(b)}/week, profit ${b.Takings * Content.FrontProfitPercent / 100}" +
+                (World.Working(b) ? "" : b.IsOpen ? " (not yours to watch now: idle)" : " (shut: idle)"));
+        sb.AppendLine($"For sale to you (price = 25 weeks' takings; the bookkeeper keeps {Content.LaunderFeePercent}% of what he washes):");
+        foreach (var b in w.TurfOf(gangId).Where(b => !b.IsFront && b.IsOpen).OrderByDescending(b => b.Takings).Take(8))
+            sb.AppendLine($"  {b.Id,3} {b.Name,-40} ${Content.FrontPrice(b):N0}");
         return sb.ToString();
     }
 
@@ -116,6 +136,7 @@ public static class Reports
             string owner = b.IsProtected ? w.GangById(b.ProtectorGangId).Name : "nobody";
             string racket = b.Racket != RacketKind.None ? $", {Content.Rackets[b.Racket].Label}" : "";
             string shut = b.IsOpen ? "" : $" (shut {b.ShutWeeks}w)";
+            if (b.IsFront) shut += $", front for {w.GangById(b.OwnerGangId).Name}";
             string rate = b.IsProtected ? $"{b.ProtectionRate}%" : "";
             sb.AppendLine($"{b.Id,3} {Trim(b.Name, 36),-36} {b.Takings,5} {b.Toughness,3} {rate,4} {b.Resentment,3}  {owner}{racket}{shut}");
         }

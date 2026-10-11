@@ -115,6 +115,7 @@ public sealed partial class Simulation
                 case SilenceOrder o: Silence(gang, o); break;
                 case ArmOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Arm(gang, man, o.Weapon); break;
                 case CarOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Drive(gang, man, o.Car); break;
+                case FrontOrder o when o.BusinessId >= 0 && o.BusinessId < w.Businesses.Count: w.BuyFront(gang, w.Businesses[o.BusinessId]); break;
             }
         }
         w.Tick = Math.Max(w.Tick, Math.Min(tick, Content.HoursPerWeek - 1));
@@ -195,6 +196,7 @@ public sealed partial class Simulation
         w.Tick = Content.CollectionTick;
         Collect();
         PayWages();
+        Launder();
         w.Tick = Content.ReckoningTick;
         Police();
         Street();
@@ -230,7 +232,7 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder or ArmOrder or CarOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder or FrontOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
@@ -494,7 +496,9 @@ public sealed partial class Simulation
             var ledger = w.Ledger(gang.Id);
             if (!KeepHandler(gang, biz)) continue;
             bool hasMuscle = w.AvailableHoodsOf(gang.Id).Any();
-            if (hasMuscle)
+            // Nobody collects from his own front: its money comes in through the books instead.
+            bool own = biz.OwnerGangId == gang.Id;
+            if (hasMuscle && !own)
             {
                 int pay = biz.Takings * biz.ProtectionRate / 100;
                 gang.Cash += pay;
@@ -503,7 +507,7 @@ public sealed partial class Simulation
                     $"Collected ${pay} from {biz.Name}."));
             }
 
-            biz.Resentment = Math.Clamp(biz.Resentment + (biz.ProtectionRate - 12) / 2 - 1, 0, 100);
+            biz.Resentment = own ? 0 : Math.Clamp(biz.Resentment + (biz.ProtectionRate - 12) / 2 - 1, 0, 100);
 
             if (biz.Racket != RacketKind.None)
             {
@@ -571,8 +575,10 @@ public sealed partial class Simulation
         FunnyMoney();
         foreach (var gang in w.LivingGangs.ToList())
         {
-            if (gang.Cash < 25_000 || !w.Rng.Chance(Math.Min(0.04, gang.Cash / 2_500_000.0))) continue;
-            long seized = gang.Cash * 4 / 10;
+            // Money that has been through a front's books has a story behind it; the rest doesn't.
+            long dirty = gang.Dirty;
+            if (dirty < Content.TaxCaseDirty || !w.Rng.Chance(Math.Min(0.04, dirty / 2_500_000.0))) continue;
+            long seized = dirty * 4 / 10;
             gang.Cash -= seized;
             w.Ledger(gang.Id).Fines += seized;
             var boss = w.HoodById(gang.BossHoodId);
@@ -858,6 +864,7 @@ public sealed partial class Simulation
                 biz.HandlerHoodId = -1;
                 biz.Racket = RacketKind.None;
             }
+            foreach (var biz in w.FrontsOf(gang.Id).ToList()) biz.OwnerGangId = -1;
             w.Log(EventKind.GangDissolved, gang.Id, $"{gang.Name} is finished.");
         }
     }

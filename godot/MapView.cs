@@ -307,7 +307,8 @@ public partial class MapView : Control
                 string owner = b.IsProtected ? World.GangById(b.ProtectorGangId).Name : "Nobody's paying anyone";
                 string racket = b.Racket != RacketKind.None ? $"\nBack room: {Content.Rackets[b.Racket].Label}" : "";
                 string shut = b.IsOpen ? "" : $"\nClosed by police for {b.ShutWeeks} more weeks";
-                return $"{b.Name}\nTakes ${b.Takings} a week · owner toughness {b.Toughness}/10\n{owner}{racket}{shut}{WardLine(lot)}";
+                string front = b.IsFront ? $"\nA front for {World.GangById(b.OwnerGangId).Name}" : "";
+                return $"{b.Name}\nTakes ${b.Takings} a week · owner toughness {b.Toughness}/10\n{owner}{front}{racket}{shut}{WardLine(lot)}";
             case LotUse.Headquarters:
                 var g = World.Gangs.First(x => x.Id == lot.GangId);
                 return $"Headquarters of {g.Name}";
