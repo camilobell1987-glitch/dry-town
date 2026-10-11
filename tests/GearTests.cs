@@ -147,7 +147,7 @@ public class GearTests
     [Fact]
     public void GearSurvivesASaveAndOldSavesGetShops()
     {
-        var sim = Run(5, 10, CitySize.Large);
+        var sim = Run(9, 10, CitySize.Large);
         var w = sim.World;
         w.Player.Cash = 10_000;
         var man = Soldier(w, w.Player);

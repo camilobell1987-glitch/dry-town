@@ -20,11 +20,12 @@ public class CityEventTests
         while (w.Week < WeekOf(1930, 1)) sim.AdvanceWeek(playerAutopilot: true);
         Assert.False(w.Happening(CityEventKind.Crash));
         Assert.True(w.Happening(CityEventKind.Depression));
-        var biz = w.Businesses[0];
+        // A shop with no pickets outside.
+        var biz = w.Businesses.First(b => w.StrikeAt(b) == null);
         Assert.Equal(0.8, w.TakingsFactor(biz), 6);
         Assert.Equal(2, w.RacketFactor(RacketKind.LoanShark), 6);
         Assert.Equal(1, w.RacketFactor(RacketKind.Speakeasy), 6);
-        Assert.Equal(WeekOf(1934, 1), w.CityEvents.Single().UntilWeek);
+        Assert.Equal(WeekOf(1934, 1), w.CityEvents.Single(e => e.Kind == CityEventKind.Depression).UntilWeek);
     }
 
     [Fact]

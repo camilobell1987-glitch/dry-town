@@ -19,6 +19,7 @@ public static class Reports
                 (l.Legit + l.LaunderFee > 0 ? $"  Fronts ${l.Legit}  Bookkeeper -${l.LaunderFee}" : "") + $"  Net ${l.Net}");
             if (l.Laundered > 0) sb.AppendLine($"Washed ${l.Laundered} through the fronts.");
             if (l.TributePaid + l.TributeIn > 0) sb.AppendLine($"Tribute: paid ${l.TributePaid}, received ${l.TributeIn}.");
+            if (l.Dues > 0) sb.AppendLine($"Union dues: ${l.Dues}.");
             sb.AppendLine($"Cash ${player.Cash} (${player.Clean} clean)  Heat {player.Heat}  Turf {w.TurfOf(player.Id).Count()}/{w.Businesses.Count}  Men {w.HoodsOf(player.Id).Count()}");
         }
         else if (!player.Alive)
@@ -194,6 +195,25 @@ public static class Reports
         sb.AppendLine(speakeasies == 0 ? "You run no speakeasies." : $"{real.Count} of your {speakeasies} speakeasies pour real liquor ({Content.LineBonus:+0%} takings); the rest sell bathtub gin.");
         if (mine.Count > 0)
             sb.AppendLine($"Chance of a bad batch somewhere this week: {1 - mine.Aggregate(1.0, (p, b) => p * (1 - w.BadBatchChance(b, g, real))):P1}.");
+        return sb.ToString();
+    }
+
+    /// <summary>The city's union locals: whose trades, who runs them, what the dues bring in, and any strike.</summary>
+    public static string Unions(World w, int gangId)
+    {
+        var sb = new StringBuilder();
+        foreach (var l in w.Locals)
+        {
+            string who = l.OwnerGangId == gangId ? "yours" : l.OwnerGangId >= 0 ? $"run by {w.GangById(l.OwnerGangId).Name}" : "run by its members";
+            string trades = string.Join(", ", l.Trades.Select(Content.Plural));
+            sb.AppendLine($"{l.Id,3} {Trim(World.Capital(l.Name), 40),-40} {who}, dues ${w.DuesOf(l)} a week" +
+                (l.OnStrike ? $", out at {w.BusinessById(l.StrikeBusinessId).Name}" : "") + $"\n      {w.MembersOf(l).Count()} shops: {trades}");
+        }
+        int docks = w.DocksGangId;
+        if (w.Prohibition && docks >= 0)
+            sb.AppendLine(docks == gangId
+                ? $"You run the docks: other outfits pay you ${Content.Wharfage} for every boat that lands, and your men hear when a rival's is due."
+                : $"{w.GangById(docks).Name} runs the docks: every boat that lands pays them ${Content.Wharfage}.");
         return sb.ToString();
     }
 

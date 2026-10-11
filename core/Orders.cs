@@ -36,6 +36,8 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(WaylayOrder), "waylay")]
 [JsonDerivedType(typeof(LineOrder), "line")]
 [JsonDerivedType(typeof(CutOrder), "cut")]
+[JsonDerivedType(typeof(UnionOrder), "union")]
+[JsonDerivedType(typeof(StrikeOrder), "strike")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -154,3 +156,12 @@ public sealed record LineOrder(int GangId, int LineId) : Order(GangId);
 
 /// <summary>Change how far the gang stretches its liquor.</summary>
 public sealed record CutOrder(int GangId, Cut Cut) : Order(GangId);
+
+/// <summary>Go down to a union hall and take over the local, from its members or from the outfit that runs it.</summary>
+public sealed record UnionOrder(int GangId, int HoodId, int LocalId, int[]? Backup = null) : Order(GangId)
+{
+    [JsonIgnore] public IEnumerable<int> Team => (Backup ?? Array.Empty<int>()).Prepend(HoodId);
+}
+
+/// <summary>Pull a local the gang runs out of a shop until its owner pays.</summary>
+public sealed record StrikeOrder(int GangId, int LocalId, int BusinessId) : Order(GangId);

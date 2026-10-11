@@ -13,6 +13,8 @@ public sealed partial class World
     /// <summary>What a shop takes in this week, as a share of its usual takings.</summary>
     public double TakingsFactor(Business b)
     {
+        // Nobody crosses a picket line.
+        if (StrikeAt(b) != null) return 0;
         double f = 1;
         foreach (var e in CityEvents)
             f *= e.Kind switch

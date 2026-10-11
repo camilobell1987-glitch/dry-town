@@ -10,15 +10,17 @@ public sealed partial class Simulation
     /// <summary>
     /// Chance of stopping a shipment and getting away with it. The escort is the owner's muscle,
     /// as for a beer truck; a boat landing has more men on the beach than a truck has in the cab.
+    /// Whoever runs the docks hears when a rival's boat is due, and the longshoremen look after his own.
     /// </summary>
     public static double WaylayChance(World w, Hood hood, IEnumerable<Hood> backup, SupplyLine line)
     {
         var owner = w.GangById(line.OwnerGangId);
         var drop = w.DropOf(line);
         if (drop == null) return 0;
-        double escort = DefenceStrength(w, owner, drop) * (line.Kind == LineKind.Boat ? 1.0 : 0.85);
+        bool boat = line.Kind == LineKind.Boat;
+        double escort = DefenceStrength(w, owner, drop) * (boat ? 1.0 : 0.85) * (boat && w.DocksGangId == owner.Id ? Content.DocksEscort : 1);
         return Math.Clamp(TakeoverChance(hood.Strength + BackupStrength(backup) + hood.Stealth * 0.2, escort)
-            + Inside(w, hood.GangId, owner.Id, Content.InsideJob), 0, 1);
+            + Inside(w, hood.GangId, owner.Id, Content.InsideJob) + (boat && w.DocksGangId == hood.GangId ? Content.DocksWaylay : 0), 0, 1);
     }
 
     /// <summary>What a stopped shipment sells for.</summary>

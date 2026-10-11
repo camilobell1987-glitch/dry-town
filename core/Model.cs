@@ -304,10 +304,13 @@ public sealed class WeekLedger
     public long TributePaid { get; set; }
     public long TributeIn { get; set; }
 
+    /// <summary>Skimmed from the union locals the gang runs, and the longshoremen's cut of other outfits' boats.</summary>
+    public long Dues { get; set; }
+
     /// <summary>Dirty money that went through the books this week. Not income: it was already in the safe.</summary>
     public long Laundered { get; set; }
 
-    public long Net => Protection + Rackets + Legit + TributeIn - Wages - Spending - Fines - LaunderFee - TributePaid;
+    public long Net => Protection + Rackets + Legit + TributeIn + Dues - Wages - Spending - Fines - LaunderFee - TributePaid;
 }
 
 public enum EventKind
@@ -320,6 +323,8 @@ public enum EventKind
     Booze,
     /// <summary>Something only the gang itself knows: what its men inside hear, who it suspects, what it paid to keep a man quiet.</summary>
     Whisper,
+    /// <summary>Union locals taken over, strikes, and the docks.</summary>
+    Union,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);
@@ -352,6 +357,8 @@ public enum ActionKind
     Hire,
     /// <summary>A hood leans on voters outside a polling place.</summary>
     Polls,
+    /// <summary>A hood goes to a union hall to take over the local.</summary>
+    Union,
 }
 
 public enum ActionResult { None, Success, Failed, Won, Lost, BackedOff, Killed, Arrested }
@@ -473,4 +480,40 @@ public sealed class War
 
     public bool Involves(int gangId) => A == gangId || B == gangId;
     public int Other(int gangId) => A == gangId ? B : A;
+}
+
+/// <summary>
+/// A union local: the men who work one set of trades across the city. An outfit that runs it skims
+/// the dues, and can pull the members out of any shop in those trades until the owner pays.
+/// </summary>
+public sealed class UnionLocal
+{
+    public int Id { get; init; }
+    public required string Name { get; init; }
+
+    /// <summary>The kinds of business whose workers belong to it.</summary>
+    public BusinessKind[] Trades { get; init; } = Array.Empty<BusinessKind>();
+
+    /// <summary>How hard its own men are to push around, 1 to 10.</summary>
+    public int Toughness { get; init; }
+
+    /// <summary>What the outfit skims from the dues of each member shop, a week.</summary>
+    public int DuesPerShop { get; init; }
+
+    /// <summary>Where the hall is: the lot of its oldest member shop.</summary>
+    public int LotId { get; init; } = -1;
+
+    /// <summary>The outfit that runs it, or -1.</summary>
+    public int OwnerGangId { get; set; } = -1;
+
+    /// <summary>The outfit's man in the hall, or -1.</summary>
+    public int PresidentHoodId { get; set; } = -1;
+
+    /// <summary>The shop the members have walked out of, or -1, and the week they walked.</summary>
+    public int StrikeBusinessId { get; set; } = -1;
+    public int StrikeWeek { get; set; }
+
+    /// <summary>The longshoremen: whoever runs them has a say in what comes off the boats.</summary>
+    public bool IsDocks => Trades.Contains(BusinessKind.Warehouse);
+    public bool OnStrike => StrikeBusinessId >= 0;
 }

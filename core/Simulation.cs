@@ -120,6 +120,8 @@ public sealed partial class Simulation
                 case WaylayOrder o: Waylay(gang, o); break;
                 case LineOrder o when w.LineById(o.LineId) is { } line: w.BuyLine(gang, line); break;
                 case CutOrder o: w.SetCut(gang, o.Cut); break;
+                case UnionOrder o: TakeLocal(gang, o); break;
+                case StrikeOrder o when w.LocalById(o.LocalId) is { } local && o.BusinessId >= 0 && o.BusinessId < w.Businesses.Count: w.CallStrike(gang, local, w.BusinessById(o.BusinessId)); break;
                 case HireOrder o: Hire(gang, o); break;
                 case PayCopOrder o: PayCop(gang, o); break;
                 case BuyStoryOrder o: BuyStory(gang, o); break;
@@ -175,6 +177,7 @@ public sealed partial class Simulation
             ArsonOrder a => w.BusinessById(a.BusinessId).LotId,
             HijackOrder h => w.BusinessById(h.BusinessId).LotId,
             WaylayOrder l when w.LineById(l.LineId) is { } line && w.DropOf(line) is { } drop => drop.LotId,
+            UnionOrder u when w.LocalById(u.LocalId) is { LotId: >= 0 } local => local.LotId,
             HitOrder h => HauntOf(w, w.HoodById(h.TargetHoodId)),
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
@@ -206,6 +209,7 @@ public sealed partial class Simulation
         RobberyOrder r => r.Team,
         HijackOrder h => h.Team,
         WaylayOrder l => l.Team,
+        UnionOrder u => u.Team,
         SilenceOrder s => new[] { s.HoodId },
         JuryOrder j => new[] { j.HoodId },
         PollsOrder p => new[] { p.HoodId },
@@ -227,6 +231,7 @@ public sealed partial class Simulation
         w.Tick = Content.CollectionTick;
         Collect();
         Booze();
+        Unions();
         PayWages();
         PayLawyers();
         Launder();
@@ -274,7 +279,7 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder or StrikeOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),

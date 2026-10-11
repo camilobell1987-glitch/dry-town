@@ -623,6 +623,32 @@ public partial class MapView
         if (racket != RacketKind.None) DrawRacketBadge(Q(x0 + 0.2f, (y0 + y1) / 2, h), racket);
         if (b.IsFront) DrawFrontBadge(Q(x1 - 0.2f, (y0 + y1) / 2, h), Palette.Gang(World!, b.OwnerGangId));
         if (!open) DrawBoardedUp(lot, h);
+        if (World!.StrikeAt(b) != null) DrawPickets(lot, h);
+    }
+
+    /// <summary>A strike: a placard over the roof that the whole street can see, and men with placards outside a shop that faces it.</summary>
+    private void DrawPickets(Lot lot, float h)
+    {
+        var (x0, y0, x1, y1) = Footprint(lot);
+        var card = new Color("efe8d6");
+        var pole = new Color("6a5440");
+        void Placard(float x, float y, float z, float w, float tall)
+        {
+            C.DrawLine(Q(x + w / 2, y, z - tall * 0.9f), Q(x + w / 2, y, z), pole, Mathf.Max(1, _t * 0.022f));
+            C.DrawColoredPolygon(new[] { Q(x, y, z), Q(x + w, y, z), Q(x + w, y, z + tall), Q(x, y, z + tall) }, card);
+            C.DrawColoredPolygon(new[] { Q(x + w * 0.1f, y, z + tall * 0.35f), Q(x + w * 0.9f, y, z + tall * 0.35f), Q(x + w * 0.9f, y, z + tall * 0.65f), Q(x + w * 0.1f, y, z + tall * 0.65f) }, Palette.Bad);
+        }
+        Placard(x1 - 0.42f, (y0 + y1) / 2 + 0.1f, h + 0.22f, 0.3f, 0.16f);
+        if (!FacesSouth(lot)) return;
+        var coat = new Color("2b2a33");
+        float y = y1 + 0.2f;
+        for (int i = 0; i < 3; i++)
+        {
+            float x = x0 + 0.16f + (x1 - x0 - 0.32f) * i / 2f;
+            C.DrawLine(Q(x, y, 0), Q(x, y, 0.11f), coat, Mathf.Max(1, _t * 0.045f));
+            C.DrawCircle(Q(x, y, 0.15f), _t * 0.028f, new Color("d9b48f"));
+            Placard(x - 0.03f, y, 0.2f, 0.16f, 0.1f);
+        }
     }
 
     /// <summary>What's left after a fire: blackened walls open to the sky and empty window holes.</summary>
