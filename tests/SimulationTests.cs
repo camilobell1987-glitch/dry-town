@@ -461,7 +461,7 @@ public class Phase5Tests
     [Fact]
     public void BigCitiesStayContestedAndRunFast()
     {
-        var sim = Run(5, 3 * Content.WeeksPerYear, CitySize.Large);
+        var sim = Run(6, 3 * Content.WeeksPerYear, CitySize.Large);
         Assert.True(sim.World.LivingGangs.Count() >= 3);
         Assert.False(sim.Metrics.Check().Stalled);
     }

@@ -343,6 +343,7 @@ public partial class Main : Control
         if (!b.IsFront || b.OwnerGangId != b.ProtectorGangId) AddLabel(_businessPanel, $"Resentment {b.Resentment}/100" + (b.Resentment > 60 ? " · may talk to the police" : ""), b.Resentment > 60 ? Palette.Bad : Palette.InkQuiet);
         FrontLines(b);
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {Content.Rackets[b.Racket].Label}", Palette.Bad);
+        BoozeLine(b);
         if (!b.IsOpen) AddLabel(_businessPanel, W.Week - b.BurnedWeek <= 8 ? $"Burned out. Rebuilding for {b.ShutWeeks} more weeks." : $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
 
         if (_map.Live)
@@ -360,7 +361,7 @@ public partial class Main : Control
             if (_map.Clock >= Simulation.LastOrderTick - 1) { AddLabel(_businessPanel, "It's too late in the week to send anyone. Orders resume Monday.", Palette.InkQuiet, wrap: true); return; }
             AddLabel(_businessPanel, "The week is under way. Men you send now set out from headquarters straight away.", Palette.InkQuiet, wrap: true);
         }
-        if (b.ProtectorGangId == Me) { FrontOffer(b); OwnBusinessActions(b); }
+        if (b.ProtectorGangId == Me) { BoozeActions(b); FrontOffer(b); OwnBusinessActions(b); }
         else if (b.IsOpen)
         {
             TargetActions(b);
@@ -1131,6 +1132,34 @@ public partial class Main : Control
             var shop = W.Shops(shopUse).OrderBy(l => W.Map.Distance(W.HqOf(W.Player), l)).First();
             _map.Select(shop: shop.Id);
             _shopFor = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderByDescending(h => h.Strength).Skip(int.Parse(Arg("--for") ?? "0")).First().Id;
+        }
+        if (Arg("--booze") is string booze)
+        {
+            // Your best spot as a speakeasy on a supply line, watered; or a rival's speakeasy on one, to stop its shipment.
+            W.Player.Cash += 10_000;
+            if (booze == "rival")
+            {
+                var line = W.SupplyLines.FirstOrDefault(l => l.OwnerGangId != Me && l.OwnerGangId >= 0 && W.DropOf(l) != null);
+                if (line == null)
+                {
+                    // Nobody has one yet: set the biggest rival up with a speakeasy and a line into it.
+                    var rival = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(g => W.TurfOf(g.Id).Count()).First();
+                    var bar = W.TurfOf(rival.Id).Where(b => b.IsOpen).OrderByDescending(b => Content.RacketsFor(b.Kind).Contains(RacketKind.Speakeasy)).First();
+                    bar.Racket = RacketKind.Speakeasy;
+                    line = W.SupplyLines.OrderBy(l => l.OwnerGangId >= 0).First();
+                    line.OwnerGangId = rival.Id;
+                }
+                _map.SelectedBusiness = W.DropOf(line)!.Id;
+            }
+            else
+            {
+                var spot = W.TurfOf(Me).Where(b => b.IsOpen && Content.RacketsFor(b.Kind).Contains(RacketKind.Speakeasy)).OrderByDescending(b => b.Takings).First();
+                spot.Racket = RacketKind.Speakeasy;
+                var line = W.SupplyLines.FirstOrDefault(l => W.CannotBuyLine(W.Player, l) == null);
+                if (line != null) W.BuyLine(W.Player, line);
+                W.SetCut(W.Player, Cut.Watered);
+                _map.SelectedBusiness = spot.Id;
+            }
         }
         if (Flag("--rats"))
         {

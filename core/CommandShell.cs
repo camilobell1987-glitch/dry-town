@@ -37,6 +37,7 @@ public sealed class CommandShell
         "torch <hood> <biz> | hit <hood> <target hood> [backup..] | banks | rob <hood> <bank> [backup..] | hijack <hood> <biz> [backup..]\n" +
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
+        "booze (supply lines and your pour) | buyline <line> | waylay <hood> <line> [backup..] | cut <straight|watered|hard>\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
         "sheet <hood> (any man's rap sheet) | news (what's going on in the city)\n" +
         "rats (who's talking, and your men inside) | care <hood> (look after a jailed man's family) | seeto <hood> <rat>\n" +
@@ -86,6 +87,12 @@ public sealed class CommandShell
                 case "shops": return Reports.Shops(W, Me);
                 case "fronts": return Reports.Fronts(W, Me);
                 case "buy": return BuyFront(int.Parse(p[1]));
+                case "booze": return Reports.Booze(W, Me);
+                case "buyline": return BuyLine(int.Parse(p[1]));
+                case "waylay": return Queue(new WaylayOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
+                case "cut":
+                    W.SetCut(W.Player, Enum.Parse<Cut>(p[1], true));
+                    return $"Your liquor is {Content.Label(W.Player.Cut)} now.\n";
                 case "cases": return Reports.Cases(W, Me);
                 case "relations": return Reports.Relations(W, Me);
                 case "sheet":
@@ -195,6 +202,14 @@ public sealed class CommandShell
         if (W.CannotBuyFront(W.Player, b) is string no) return no + "\n";
         int price = W.BuyFront(W.Player, b);
         return $"{b.Name} is yours, for ${price:N0}. It can wash ${Content.LaunderCapacity(b)} a week.\n";
+    }
+
+    private string BuyLine(int lineId)
+    {
+        if (W.LineById(lineId) is not { } line) return "There's no such line. Type 'booze'.\n";
+        if (W.CannotBuyLine(W.Player, line) is string no) return no + "\n";
+        int price = W.BuyLine(W.Player, line);
+        return $"You hold {line.Name} now, for ${price:N0}. It keeps {line.Capacity} speakeasies in real liquor.\n";
     }
 
     private string Hand(int fromId, int toId, bool car)
@@ -332,6 +347,7 @@ public sealed class CommandShell
             ExtortOrder e when e.BusinessId >= 0 && e.BusinessId < W.Businesses.Count => W.Businesses[e.BusinessId].ProtectorGangId,
             ArsonOrder a when a.BusinessId >= 0 && a.BusinessId < W.Businesses.Count => W.Businesses[a.BusinessId].ProtectorGangId,
             HijackOrder h when h.BusinessId >= 0 && h.BusinessId < W.Businesses.Count => W.Businesses[h.BusinessId].ProtectorGangId,
+            WaylayOrder l when W.LineById(l.LineId) is { } line => line.OwnerGangId,
             HitOrder h when W.Hoods.FirstOrDefault(x => x.Id == h.TargetHoodId) is { } t => t.GangId,
             _ => -1,
         };
@@ -357,6 +373,9 @@ public sealed class CommandShell
         HitOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "go" : "goes")} after {HoodName(h.TargetHoodId)}",
         RobberyOrder r => $"{HoodName(r.HoodId)}{With(r.Backup)} {(Sim.WeekRunning ? "hold" : "holds")} up {W.BankById(r.BankId)?.Name ?? "a bank"}",
         HijackOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "stop" : "stops")} the beer truck for {BizName(h.BusinessId)}",
+        WaylayOrder l => $"{HoodName(l.HoodId)}{With(l.Backup)} {(Sim.WeekRunning ? "stop" : "stops")} the shipment on {W.LineById(l.LineId)?.Name ?? "a supply line"}",
+        LineOrder l => $"take over {W.LineById(l.LineId)?.Name ?? "a supply line"}",
+        CutOrder c => $"serve the liquor {Content.Label(c.Cut)}",
         HireOrder h => $"sign on {PersonName(h.PersonId)} (${W.PersonById(h.PersonId)?.Fee ?? 0})",
         PayCopOrder c => $"pay {PersonName(c.PersonId)} ${Content.CopPrice} to look away",
         BuyStoryOrder b => $"buy {PersonName(b.PersonId)}'s story (${Content.StoryPrice(W.Player.Heat)})",
@@ -432,6 +451,15 @@ public sealed class CommandShell
                 if (!W.Prohibition) return "Since repeal, nobody's beer is worth stealing.";
                 if (!Simulation.CanHijack(W, W.Player, biz)) return "Only a rival's speakeasy or still gets beer trucks worth stopping.";
                 return h.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
+            }
+            case WaylayOrder l:
+            {
+                if (W.LineById(l.LineId) is not { } line) return "There's no such line. Type 'booze'.";
+                if (!W.Prohibition) return "Since repeal, nobody's liquor is worth stealing.";
+                if (line.OwnerGangId == Me) return "That's your own line.";
+                if (!Simulation.CanWaylay(W, W.Player, line)) return line.OwnerGangId < 0 ? "Nobody holds that line, so nothing's coming in on it." : $"{W.GangById(line.OwnerGangId).Name} has no speakeasy for it to supply.";
+                if (Already(o => o is WaylayOrder q && q.LineId == l.LineId)) return "You're already sending men after it.";
+                return l.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
             }
             default:
                 return null;

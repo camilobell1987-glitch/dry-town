@@ -175,6 +175,28 @@ public static class Reports
         return sb.ToString();
     }
 
+    /// <summary>The supply lines into the city, who holds them, and how the gang pours its liquor.</summary>
+    public static string Booze(World w, int gangId)
+    {
+        var g = w.GangById(gangId);
+        var sb = new StringBuilder();
+        if (!w.Prohibition) return "Since repeal, liquor comes in by the front door like anything else.\n";
+        foreach (var l in w.SupplyLines)
+        {
+            string who = l.OwnerGangId == gangId ? "yours" : l.OwnerGangId >= 0 ? $"held by {w.GangById(l.OwnerGangId).Name}" : $"for sale, ${l.Price:N0}";
+            sb.AppendLine($"{l.Id,3} {Trim(l.Name, 20),-20} {l.Kind.ToString().ToLowerInvariant(),-5} {l.Capacity} speakeasies, {who}" +
+                (l.WaylaidWeek == w.Week ? ", stopped this week" : "") + $"\n      {l.Cargo}");
+        }
+        var mine = w.TurfOf(gangId).Where(b => World.Liquor(b.Racket) && b.IsOpen).ToList();
+        var real = w.Supplied(gangId, thisWeek: false);
+        int speakeasies = mine.Count(b => b.Racket == RacketKind.Speakeasy);
+        sb.AppendLine($"Your liquor is {Content.Label(g.Cut)}: {Content.CutIncome(g.Cut):+0%;-0%;+0%} on every speakeasy and still.");
+        sb.AppendLine(speakeasies == 0 ? "You run no speakeasies." : $"{real.Count} of your {speakeasies} speakeasies pour real liquor ({Content.LineBonus:+0%} takings); the rest sell bathtub gin.");
+        if (mine.Count > 0)
+            sb.AppendLine($"Chance of a bad batch somewhere this week: {1 - mine.Aggregate(1.0, (p, b) => p * (1 - w.BadBatchChance(b, g, real))):P1}.");
+        return sb.ToString();
+    }
+
     public static string Banks(World w, int gangId)
     {
         var sb = new StringBuilder();
