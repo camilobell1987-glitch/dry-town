@@ -203,8 +203,12 @@ public partial class Main : Control
             Line("Wages", l.Wages, true);
             Line("Spending", l.Spending, true);
             Line("Fines and seizures", l.Fines, true);
+            Line("Fronts' own profit", l.Legit, false);
+            Line("Bookkeeper", l.LaunderFee, true);
             var net = l.Net >= 0 ? Palette.Good : Palette.Bad;
-            sb.Append($"[b]Net [color={C(net)}]{(l.Net >= 0 ? "+" : "-")}${Math.Abs(l.Net):N0}[/color][/b]   Cash ${p.Cash:N0} · Heat {p.Heat}\n\n");
+            sb.Append($"[b]Net [color={C(net)}]{(l.Net >= 0 ? "+" : "-")}${Math.Abs(l.Net):N0}[/color][/b]   Cash ${p.Cash:N0} (${p.Clean:N0} clean) · Heat {p.Heat}\n");
+            if (l.Laundered > 0) sb.Append($"[color={C(Palette.InkQuiet)}]Washed ${l.Laundered:N0} through your fronts.[/color]\n");
+            sb.Append('\n');
         }
         else if (!p.Alive) sb.Append($"[color={C(Palette.Bad)}]Your outfit is finished. The city goes on without you.[/color]\n\n");
 
@@ -274,7 +278,7 @@ public partial class Main : Control
             var boss = W.HoodById(p.BossHoodId);
             _date.Text += $" · {boss.Name}, {boss.Age(W.Week)}";
         }
-        _cash.Text = $"${p.Cash:N0}";
+        CashLabel(p);
         _heat.Text = $"Heat {p.Heat}";
         _heat.AddThemeColorOverride("font_color", p.Heat > 60 ? Palette.Bad : p.Heat > 35 ? Palette.Player : Palette.Ink);
         _turf.Text = $"Turf {W.TurfOf(Me).Count()}/{W.Businesses.Count}";
@@ -322,12 +326,14 @@ public partial class Main : Control
         if (b.IsProtected)
         {
             var g = W.GangById(b.ProtectorGangId);
-            AddLabel(_businessPanel, $"Pays {g.Name}: {b.ProtectionRate}% (${b.Takings * b.ProtectionRate / 100}/week)", Palette.Gang(W, g.Id));
+            if (b.OwnerGangId == g.Id) AddLabel(_businessPanel, $"Run by {g.Name}'s own people.", Palette.Gang(W, g.Id));
+            else AddLabel(_businessPanel, $"Pays {g.Name}: {b.ProtectionRate}% (${b.Takings * b.ProtectionRate / 100}/week)", Palette.Gang(W, g.Id));
             var handler = W.Hoods.FirstOrDefault(h => h.Id == b.HandlerHoodId);
             if (handler != null) AddLabel(_businessPanel, $"Handled by {handler.Name}", Palette.InkQuiet);
         }
         else AddLabel(_businessPanel, "Pays nobody.", Palette.InkQuiet);
-        AddLabel(_businessPanel, $"Resentment {b.Resentment}/100" + (b.Resentment > 60 ? " · may talk to the police" : ""), b.Resentment > 60 ? Palette.Bad : Palette.InkQuiet);
+        if (!b.IsFront || b.OwnerGangId != b.ProtectorGangId) AddLabel(_businessPanel, $"Resentment {b.Resentment}/100" + (b.Resentment > 60 ? " · may talk to the police" : ""), b.Resentment > 60 ? Palette.Bad : Palette.InkQuiet);
+        FrontLines(b);
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {Content.Rackets[b.Racket].Label}", Palette.Bad);
         if (!b.IsOpen) AddLabel(_businessPanel, W.Week - b.BurnedWeek <= 8 ? $"Burned out. Rebuilding for {b.ShutWeeks} more weeks." : $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
 
@@ -346,7 +352,7 @@ public partial class Main : Control
             if (_map.Clock >= Simulation.LastOrderTick - 1) { AddLabel(_businessPanel, "It's too late in the week to send anyone. Orders resume Monday.", Palette.InkQuiet, wrap: true); return; }
             AddLabel(_businessPanel, "The week is under way. Men you send now set out from headquarters straight away.", Palette.InkQuiet, wrap: true);
         }
-        if (b.ProtectorGangId == Me) OwnBusinessActions(b);
+        if (b.ProtectorGangId == Me) { FrontOffer(b); OwnBusinessActions(b); }
         else if (b.IsOpen)
         {
             TargetActions(b);
@@ -409,13 +415,17 @@ public partial class Main : Control
             return;
         }
 
-        AddLabel(_businessPanel, "Protection rate", Palette.Ink);
-        var rateRow = new HBoxContainer();
-        var rate = new SpinBox { MinValue = 5, MaxValue = 30, Value = b.ProtectionRate, Suffix = "%" };
-        rateRow.AddChild(rate);
-        AddButton(rateRow, "Set rate", () => Queue(new SetRateOrder(Me, b.Id, (int)rate.Value)));
-        _businessPanel.AddChild(rateRow);
-        AddLabel(_businessPanel, "Above 12% the owner grows resentful; below it he warms to you.", Palette.InkQuiet, wrap: true);
+        // Nobody charges himself for protection.
+        if (b.OwnerGangId != Me)
+        {
+            AddLabel(_businessPanel, "Protection rate", Palette.Ink);
+            var rateRow = new HBoxContainer();
+            var rate = new SpinBox { MinValue = 5, MaxValue = 30, Value = b.ProtectionRate, Suffix = "%" };
+            rateRow.AddChild(rate);
+            AddButton(rateRow, "Set rate", () => Queue(new SetRateOrder(Me, b.Id, (int)rate.Value)));
+            _businessPanel.AddChild(rateRow);
+            AddLabel(_businessPanel, "Above 12% the owner grows resentful; below it he warms to you.", Palette.InkQuiet, wrap: true);
+        }
 
         if (hoods.Count == 0 && crews.Count == 0) { AddLabel(_businessPanel, "All your men have jobs this week. Cancel one on the Orders tab to free him.", Palette.InkQuiet, wrap: true); return; }
 
@@ -1015,7 +1025,19 @@ public partial class Main : Control
         if (Arg("--load") is string slot) GD.Print(LoadGame(int.Parse(slot)) ? $"Loaded {SlotPath(int.Parse(slot))}" : "Load failed");
         int weeks = int.Parse(Arg("--weeks") ?? "0");
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
+        if (Arg("--fronts") is string fronts)
+        {
+            // Buy the richest places on your turf as fronts, then let a few weeks wash money through them.
+            W.Player.Cash += 30_000;
+            foreach (var b in W.TurfOf(Me).Where(b => b.IsOpen).OrderByDescending(b => b.Takings).Take(int.Parse(fronts)).ToList()) W.BuyFront(W.Player, b);
+            int then = int.Parse(Arg("--then") ?? "0");
+            for (int i = 0; i < then; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
+        }
         if (Flag("--plan")) _shell.Execute("auto");
+        if (Arg("--select-front") is string which)
+            _map.SelectedBusiness = (which == "offer"
+                ? W.TurfOf(Me).Where(b => !b.IsFront && b.IsOpen).OrderByDescending(b => b.Takings).First()
+                : W.FrontsOf(Me).First()).Id;
         if (Arg("--select") is string sel) { _map.SelectedBusiness = int.Parse(sel); }
         if (Flag("--select-mine")) _map.SelectedBusiness = W.TurfOf(Me).First().Id;
         if (Flag("--select-rival"))
@@ -1108,6 +1130,7 @@ public partial class Main : Control
                     "fire" => W.Businesses.Where(b => b.BurnedWeek >= W.Week - 1).Select(W.LotOf).FirstOrDefault() ?? hq,
                     "person" => W.PersonById(_map.SelectedPerson) is { } p ? W.Map.LotAt(p.LotId) : hq,
                     "shop" => _map.SelectedShop >= 0 ? W.Map.LotAt(_map.SelectedShop) : hq,
+                    "biz" => _map.SelectedBusiness >= 0 ? W.LotOf(W.BusinessById(_map.SelectedBusiness)) : hq,
                     "job" => _shell.Sim.Upcoming.FirstOrDefault(j => j.GangId == Me && Simulation.TeamOf(j.Order).Any()) is { } job
                         ? W.Map.LotAt(Simulation.TargetLot(W, job.Order)) : hq,
                     _ => hq,

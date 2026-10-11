@@ -22,6 +22,7 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(SilenceOrder), "silence")]
 [JsonDerivedType(typeof(ArmOrder), "arm")]
 [JsonDerivedType(typeof(CarOrder), "car")]
+[JsonDerivedType(typeof(FrontOrder), "front")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -95,3 +96,6 @@ public sealed record ArmOrder(int GangId, int HoodId, Weapon Weapon) : Order(Gan
 
 /// <summary>Buy a man a car first thing Monday, trading in the one he has.</summary>
 public sealed record CarOrder(int GangId, int HoodId, Car Car) : Order(GangId);
+
+/// <summary>Buy a business the gang protects outright, as a front to wash money through.</summary>
+public sealed record FrontOrder(int GangId, int BusinessId) : Order(GangId);

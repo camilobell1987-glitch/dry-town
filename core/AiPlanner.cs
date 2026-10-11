@@ -40,6 +40,7 @@ public static class AiPlanner
 
         cash -= PlanStreet(w, g, cash, orders);
         cash -= PlanGear(w, g, cash, orders);
+        cash -= PlanFronts(w, g, turf, cash, orders);
 
         // An aging boss with money to spare brings his family into the business.
         if (w.HoodById(g.BossHoodId).Age(w.Week) >= 45 && cash > Content.FamilyCost * 5 && Simulation.CanBringInFamily(w, g))
@@ -156,6 +157,24 @@ public static class AiPlanner
     /// Arm the men, best first, out of money the gang can spare: revolvers all round, then a car
     /// to get away in, then heavier guns for the hard men, and armour for a rich boss.
     /// </summary>
+    private static bool TopDog(World w, Gang g) => w.Businesses.Count(b => b.ProtectorGangId == g.Id) * 3 > w.Businesses.Count;
+
+    /// <summary>
+    /// Once the safe holds more dirty money than is comfortable, buy the best place on the books
+    /// to wash it through. The biggest outfit in town is the one the Treasury wants, and it knows it
+    /// can't hide that much, so it doesn't try.
+    /// </summary>
+    private static long PlanFronts(World w, Gang g, List<Business> turf, long cash, List<Order> orders)
+    {
+        if (TopDog(w, g) || g.Dirty < Content.TaxCaseDirty) return 0;
+        if (w.FrontsOf(g.Id).Count() >= 1 + turf.Count / 8) return 0;
+        var buy = turf.Where(b => w.CannotBuyFront(g, b) == null && Content.FrontPrice(b) * 2 <= cash - 6000)
+            .OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault();
+        if (buy == null) return 0;
+        orders.Add(new FrontOrder(g.Id, buy.Id));
+        return Content.FrontPrice(buy);
+    }
+
     private static long PlanGear(World w, Gang g, long cash, List<Order> orders)
     {
         long budget = Math.Max(0, (cash - 10000) / 12);
@@ -166,7 +185,7 @@ public static class AiPlanner
         int CarCost(Car from, Car to) => Content.Cars[to].Price - Content.TradeIn(Content.Cars[from].Price);
 
         // An outfit that already runs a third of the city spends on holding it: no more iron, and a few cars.
-        bool topDog = w.Businesses.Count(b => b.ProtectorGangId == g.Id) * 3 > w.Businesses.Count;
+        bool topDog = TopDog(w, g);
         // Half the men armed is plenty; the rest are collectors and lookouts.
         int armed = men.Count(h => h.Weapon != Weapon.None);
         if (!topDog && armed * 2 < men.Count && men.FirstOrDefault(h => h.Weapon == Weapon.None) is { } bare && Buy(Cost(bare.Weapon, Weapon.Pistol)))

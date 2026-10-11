@@ -37,6 +37,7 @@ int Soak()
     var crimes = new Dictionary<EventKind, int>();
     var rackets = new Dictionary<RacketKind, int>();
     long gearBought = 0, armedAtEnd = 0, menAtEnd = 0;
+    long frontsBought = 0, taxCases = 0, cleanAtEnd = 0, cashAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
     {
         var sim = Simulation.New(new WorldSettings { Seed = s, Difficulty = difficulty, Size = size, PoliticsEnabled = !args.Contains("--no-politics") });
@@ -57,6 +58,10 @@ int Soak()
         gearBought += ev.Count(e => e.Kind == EventKind.Gear);
         armedAtEnd += sim.World.Hoods.Count(h => h.IsActive && h.Weapon != Weapon.None);
         menAtEnd += sim.World.Hoods.Count(h => h.IsActive);
+        frontsBought += ev.Count(e => e.Kind == EventKind.Front);
+        taxCases += ev.Count(e => e.Text.StartsWith("Treasury agents brought a tax case") || e.Text.StartsWith("Treasury agents seized"));
+        cleanAtEnd += sim.World.LivingGangs.Sum(g => g.Clean);
+        cashAtEnd += sim.World.LivingGangs.Sum(g => Math.Max(0, g.Cash));
         foreach (var e in ev.Where(e => e.Kind == EventKind.RacketOpened && e.Text.Contains(" opened a ")))
             foreach (var info in Content.Rackets.Values.Where(r => e.Text.Contains($" opened a {r.Label} ")))
                 rackets[info.Kind] = rackets.GetValueOrDefault(info.Kind) + 1;
@@ -68,6 +73,7 @@ int Soak()
     Console.WriteLine("Politics:\n  " + string.Join("\n  ", politics));
     Console.WriteLine($"Street crime per city-year: {string.Join(", ", crimes.OrderBy(c => c.Key).Select(c => $"{c.Key} {c.Value / (double)(seeds * years):0.0}"))}.");
     Console.WriteLine($"Guns and cars bought per city-year: {gearBought / (double)(seeds * years):0.0}; men carrying a gun at the end: {armedAtEnd * 100 / Math.Max(1, menAtEnd)}%.");
+    Console.WriteLine($"Fronts bought per city-year: {frontsBought / (double)(seeds * years):0.0}; tax cases per city-year: {taxCases / (double)(seeds * years):0.00}; gangs' cash clean at the end: {cleanAtEnd * 100 / Math.Max(1, cashAtEnd)}%.");
     Console.WriteLine($"Rackets opened: {string.Join(", ", rackets.OrderBy(c => c.Key).Select(c => $"{Content.Rackets[c.Key].Label} {c.Value}"))}.");
     Console.WriteLine($"Your gang on autopilot ({difficulty}): alive after 3 years in {aliveAt3}/{seeds}, after {years} years in {aliveAtEnd}/{seeds}.");
     return stalled == 0 ? 0 : 1;
