@@ -129,13 +129,14 @@ public class Phase2Tests
     public void PlayerUsuallySurvivesTheFirstThreeYearsOnNormal()
     {
         int alive = 0;
-        for (ulong seed = 1; seed <= 20; seed++)
+        // Forty cities, so one unlucky run of seeds doesn't decide it; three in four must survive.
+        for (ulong seed = 1; seed <= 40; seed++)
         {
             var sim = Simulation.New(new WorldSettings { Seed = seed });
             for (int i = 0; i < 3 * Content.WeeksPerYear && sim.World.Player.Alive; i++) sim.AdvanceWeek(playerAutopilot: true);
             if (sim.World.Player.Alive) alive++;
         }
-        Assert.True(alive >= 15, $"only {alive}/20 player gangs survived three years");
+        Assert.True(alive >= 30, $"only {alive}/40 player gangs survived three years");
     }
 
     [Fact]

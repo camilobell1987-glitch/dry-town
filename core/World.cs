@@ -39,6 +39,9 @@ public sealed class WorldSettings
     /// <summary>When false, nobody buys aldermen or backs candidates, and the mayor never changes. For comparison runs.</summary>
     public bool PoliticsEnabled { get; init; } = true;
 
+    /// <summary>Heat waves, strikes, crusades and the Crash. Off for tests that need a quiet city.</summary>
+    public bool CityEventsEnabled { get; init; } = true;
+
     /// <summary>When true, the rival director seeds new gangs and splits when the district goes quiet.</summary>
     public bool DirectorEnabled { get; init; } = true;
 }
@@ -477,6 +480,8 @@ public sealed partial class World
         Pacts = Pacts,
         Grudges = Grudges,
         Offers = Offers,
+        CityEvents = CityEvents,
+        CityEventLast = CityEventLast,
     };
 
     public static World FromSave(SaveData d)
@@ -497,6 +502,8 @@ public sealed partial class World
         w.Pacts.AddRange(d.Pacts);
         w.Grudges.AddRange(d.Grudges);
         w.Offers.AddRange(d.Offers);
+        w.CityEvents.AddRange(d.CityEvents);
+        foreach (var (kind, week) in d.CityEventLast) w.CityEventLast[kind] = week;
         // Cities saved before there were banks get them now.
         w.PlaceBanks();
         w.PlaceShops();

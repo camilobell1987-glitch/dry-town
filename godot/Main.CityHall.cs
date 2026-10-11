@@ -18,6 +18,7 @@ public partial class Main
         var p = W.Player;
 
         AddLabel(_hallPanel, "City Hall", Palette.Player, 17);
+        NewsSection();
         string mayor = hall.Reform
             ? $"Mayor {hall.Mayor} won on a clean-up ticket. His police raid sooner, and aldermen want twice as much to look the other way."
             : $"Mayor {hall.Mayor} is a machine man. The town is wide open.";

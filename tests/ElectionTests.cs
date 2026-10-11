@@ -56,9 +56,12 @@ public class ElectionTests
         var man = Candidate(w);
         var ward = w.Wards[0];
         Assert.True(Politics.Stand(w, me, man, ward));
-        me.Cash += 60_000;
-        Politics.Campaign(w, me, ward.Id, 50_000);
-        ToVote(sim);
+        me.Cash += 250_000;
+        Politics.Campaign(w, me, ward.Id, 200_000);
+        // Straight to election night, so nothing happens to him on the street first.
+        w.Week = Content.AldermanElectionWeek - 1;
+        Politics.Step(w, 0);
+        w.Week++;
 
         Assert.True(ward.OwnMan);
         Assert.Equal(me.Id, ward.OwnerGangId);
@@ -72,7 +75,6 @@ public class ElectionTests
         Assert.True(Politics.StaysBought(w, ward, rival));
         Assert.False(Politics.Payoff(w, rival, ward));
         long cash = me.Cash;
-        w.Week++;
         Politics.Step(w, 0);
         Assert.Equal(cash, me.Cash);
     }

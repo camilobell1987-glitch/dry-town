@@ -287,4 +287,18 @@ public static class Reports
         }
         return sb.ToString();
     }
+
+    /// <summary>The city events in progress: the headline, what it does, and how long it has left.</summary>
+    public static string News(World w)
+    {
+        if (w.CityEvents.Count == 0) return "Nothing out of the ordinary is going on in the city.\n";
+        var sb = new StringBuilder();
+        foreach (var e in w.CityEvents.OrderBy(e => e.StartWeek))
+        {
+            var info = Content.CityEvents[e.Kind];
+            int left = e.UntilWeek - w.Week;
+            sb.AppendLine($"  {w.Describe(e, info.Headline)} {w.Describe(e, info.Effect)} ({left} week{(left == 1 ? "" : "s")} left)");
+        }
+        return sb.ToString();
+    }
 }

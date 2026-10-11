@@ -218,6 +218,7 @@ public sealed partial class Simulation
         Street();
         Politics.Step(w, w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.HoodKilled));
         Feds();
+        CityNews();
         Loyalty();
         Aging();
         Successions();
@@ -523,7 +524,7 @@ public sealed partial class Simulation
             bool own = biz.OwnerGangId == gang.Id;
             if (hasMuscle && !own)
             {
-                int pay = biz.Takings * biz.ProtectionRate / 100;
+                int pay = (int)(biz.Takings * w.TakingsFactor(biz)) * biz.ProtectionRate / 100;
                 gang.Cash += pay;
                 ledger.Protection += pay;
                 w.Act(new ScriptAction(ActionKind.Collect, gang.Id, biz.HandlerHoodId, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Success,
@@ -536,8 +537,8 @@ public sealed partial class Simulation
             {
                 var info = Content.Rackets[biz.Racket];
                 bool legalNow = info.NeedsProhibition && !w.Prohibition;
-                int income = legalNow ? info.WeeklyIncome * 3 / 10 : info.WeeklyIncome;
-                int heat = legalNow ? 0 : info.WeeklyHeat;
+                int income = (int)((legalNow ? info.WeeklyIncome * 3 / 10 : info.WeeklyIncome) * w.RacketFactor(biz.Racket));
+                int heat = legalNow ? 0 : info.WeeklyHeat * w.RacketHeatFactor(biz.Racket);
                 gang.Cash += income;
                 ledger.Rackets += income;
                 gang.Heat = Math.Min(100, gang.Heat + heat);
@@ -600,7 +601,7 @@ public sealed partial class Simulation
         {
             // Money that has been through a front's books has a story behind it; the rest doesn't.
             long dirty = gang.Dirty;
-            if (dirty < Content.TaxCaseDirty || !w.Rng.Chance(Math.Min(0.04, dirty / 2_500_000.0))) continue;
+            if (dirty < Content.TaxCaseDirty || !w.Rng.Chance(Math.Min(0.04, dirty / 2_500_000.0) * w.TaxCaseFactor)) continue;
             long seized = dirty * 4 / 10;
             gang.Cash -= seized;
             w.Ledger(gang.Id).Fines += seized;
@@ -650,9 +651,9 @@ public sealed partial class Simulation
             int size = w.TurfOf(gang.Id).Count();
             // Friends at City Hall cool things down; a reform mayor keeps the precincts on their toes.
             int aldermen = Math.Min(2, w.Wards.Count(x => x.OwnerGangId == gang.Id));
-            int cooling = 2 + aldermen + (w.Hall.FriendGangId == gang.Id ? 2 : 0);
+            int cooling = w.HeatStays ? 0 : 2 + aldermen + (w.Hall.FriendGangId == gang.Id ? 2 : 0);
             gang.Heat = Math.Clamp(gang.Heat - cooling + size / 10, 0, 100);
-            int threshold = w.Hall.Reform ? 30 : 35;
+            int threshold = (w.Hall.Reform ? 30 : 35) - w.RaidSooner;
             if (gang.Heat <= threshold || !w.Rng.Chance((gang.Heat - threshold) / 120.0)) continue;
 
             var ledger = w.Ledger(gang.Id);
