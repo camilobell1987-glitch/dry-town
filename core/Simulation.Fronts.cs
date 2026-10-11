@@ -14,7 +14,7 @@ public sealed partial class Simulation
             if (fronts.Count == 0) continue;
             var ledger = w.Ledger(gang.Id);
 
-            long profit = fronts.Sum(b => (long)b.Takings * Content.FrontProfitPercent / 100);
+            long profit = fronts.Sum(b => (long)(b.Takings * w.TakingsFactor(b)) * Content.FrontProfitPercent / 100);
             gang.Cash += profit;
             gang.CleanCash += profit;
             ledger.Legit += profit;

@@ -102,6 +102,7 @@ public partial class Main : Control
         Audio.Instance?.Play("paper");
         SaveGameTo(0);
         AnnounceNewBoss();
+        AnnounceNews();
         RefreshAll();
     }
 
@@ -215,6 +216,7 @@ public partial class Main : Control
         }
         else if (!p.Alive) sb.Append($"[color={C(Palette.Bad)}]Your outfit is finished. The city goes on without you.[/color]\n\n");
 
+        sb.Append(InThePapers());
         sb.Append($"[color={C(Palette.InkQuiet)}]HEADLINES[/color]\n");
         foreach (var e in W.Events.Where(e => e.Week == week && Reports.IsHeadline(e)).OrderBy(e => e.Tick))
         {
@@ -1043,6 +1045,15 @@ public partial class Main : Control
             W.Put(rivals[1], OfferKind.Truce, Content.TributeAsk(W.Income(rivals[1])));
             _talkTo = rivals[0].Id;
             W.AddGrudge(rivals[0].Id, Me, 30 - W.GrudgeOf(rivals[0].Id, Me));
+        }
+        if (Arg("--event") is string news)
+        {
+            // Break the news on Sunday night, as the game would, and show the front page.
+            _shell.Sim.Begin(Enum.Parse<CityEventKind>(news, true));
+            foreach (var e in W.CityEvents.Where(e => e.StartWeek == W.Week + 1).ToList())
+                W.CityEvents[W.CityEvents.IndexOf(e)] = new CityEvent { Kind = e.Kind, StartWeek = W.Week, UntilWeek = e.UntilWeek - 1, WardId = e.WardId };
+            _news.Text = WeekReport(Math.Max(0, W.Week - 1));
+            AnnounceNews();
         }
         if (Flag("--ballot"))
         {

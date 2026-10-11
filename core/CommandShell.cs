@@ -38,7 +38,7 @@ public sealed class CommandShell
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
-        "sheet <hood> (any man's rap sheet)\n" +
+        "sheet <hood> (any man's rap sheet) | news (what's going on in the city)\n" +
         "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
@@ -70,6 +70,7 @@ public sealed class CommandShell
                 case "stand": return Queue(new StandOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "polls": return Queue(new PollsOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "results": return Reports.Results(W);
+                case "news": return Reports.News(W);
                 case "street": return Reports.Street(W, Me);
                 case "banks": return Reports.Banks(W, Me);
                 case "hire": return Queue(new HireOrder(Me, int.Parse(p[1])));

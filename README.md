@@ -2,7 +2,7 @@
 
 An open-ended Prohibition-era crime strategy game, inspired by how *Gangsters: Organized Crime* (1998) plays. It is a new game. It uses none of the original's art, audio, text, code, data or name.
 
-There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6 added a huge one. Phase 7, the current state, draws the city at an angle the way Gangsters: Organized Crime did, with buildings standing up off the map, and adds a metropolis split by a river. It also puts people on the street you can deal with (drifters to hire, beat cops to pay off, reporters to buy and witnesses to lean on) and harder crimes: arson, hits, bank jobs and hijacked beer trucks, plus bookies, gambling dens and counterfeiting presses. The city now comes in five sizes, the largest with twenty wards and nine outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out. Since then the crew has a rolodex of mugshots down the side of the screen, your men can carry guns and drive cars bought from the city's gun shops and motor dealers, you can buy businesses outright as fronts to wash your money before the tax men come for it, and a man charged with anything serious goes before a jury, where a lawyer, a paid judge or a visit to the jurors can still get him off. The outfits also talk to each other now: they hold grudges, agree truces, pay or demand tribute, and band together against whoever runs too much of the city. Every man has a rap sheet, and a man with three convictions behind him who is convicted again goes away for life. Elections are bigger too: you can run one of your own men for alderman, send men to lean on voters, and back a district attorney on the mayor's ballot, and every vote is counted ward by ward.
+There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6 added a huge one. Phase 7, the current state, draws the city at an angle the way Gangsters: Organized Crime did, with buildings standing up off the map, and adds a metropolis split by a river. It also puts people on the street you can deal with (drifters to hire, beat cops to pay off, reporters to buy and witnesses to lean on) and harder crimes: arson, hits, bank jobs and hijacked beer trucks, plus bookies, gambling dens and counterfeiting presses. The city now comes in five sizes, the largest with twenty wards and nine outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out. Since then the crew has a rolodex of mugshots down the side of the screen, your men can carry guns and drive cars bought from the city's gun shops and motor dealers, you can buy businesses outright as fronts to wash your money before the tax men come for it, and a man charged with anything serious goes before a jury, where a lawyer, a paid judge or a visit to the jurors can still get him off. The outfits also talk to each other now: they hold grudges, agree truces, pay or demand tribute, and band together against whoever runs too much of the city. Every man has a rap sheet, and a man with three convictions behind him who is convicted again goes away for life. Elections are bigger too: you can run one of your own men for alderman, send men to lean on voters, and back a district attorney on the mayor's ballot, and every vote is counted ward by ward. The city has its own news, too: the Crash and the Depression come on the calendar, and heat waves, conventions, title fights, newspaper crusades, police shake-ups, strikes and fires come when they please.
 
 ![Planning a week](docs/screenshots/planning.png)
 ![The crew rolodex](docs/screenshots/rolodex.png)
@@ -21,7 +21,7 @@ There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). To play the game, install the **.NET edition** of Godot 4.7, open `godot/project.godot` and press Play. If your editor is a different 4.x version, it updates the version in `DryTown.csproj` when it opens the project.
 
 ```sh
-dotnet test tests                                                    # 125 tests
+dotnet test tests                                                    # 132 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
@@ -177,6 +177,35 @@ The console has `wards`, `stand <hood> <ward>`, `polls <hood> <ward>` and `resul
 ![City Hall during the aldermen's campaign](docs/screenshots/city-hall.png)
 ![Your man on the ballot, the polls open and the last count](docs/screenshots/elections.png)
 
+## The city in the news
+
+Things happen to the city that no outfit controls. When one breaks, the Tribune puts out an extra, and for as long as it lasts it is listed under **In the papers** on the Sunday report and at the top of the City Hall tab. The console's `news` command lists them too.
+
+Some are on the calendar:
+
+| When | What happens | For how long |
+| --- | --- | --- |
+| January 1920 | The Volstead Act takes effect. This one is news and nothing more: the city is dry from the start. | |
+| May 1924 | A federal dry squad comes to town. Speakeasies and stills draw twice the heat. | Half a year |
+| October 1929 | Stocks crash. Shops take in a tenth less. | The rest of the year |
+| 1930 | The Depression. Shops take in a fifth less, but loan books bring in twice as much and numbers games a quarter more. | Four years |
+| October 1931 | A big-city boss goes away for tax evasion, and the Treasury brings tax cases twice as often. | A year |
+| December 1933 | Repeal is ratified. Prohibition ends with the year. | |
+
+The rest come at random, two or three a year, never more than two at once, and never the same one twice in half a year:
+
+| Event | What it does | For how long |
+| --- | --- | --- |
+| Heat wave (summer only) | Speakeasies and stills bring in half as much again. | 4 weeks |
+| Convention | Shops take in a fifth more; gambling dens and bookies half as much again. | 3 weeks |
+| Title fight | Bookies and gambling dens bring in three times as much. | 1 week |
+| Newspaper crusade | Public outrage jumps 15 points, the outfit that runs the most of the city takes 20 points of heat, and the police raid at 10 points less heat. | 8 weeks |
+| Police shake-up | Every outfit's heat jumps 10 points and doesn't cool off by itself. | 6 weeks |
+| Strike | Shops in one ward take in half as much. | 4 weeks |
+| Fire | Three neighbouring shops in one ward burn and are shut for 6 to 10 weeks. | Once |
+
+![An extra on the newsstands](docs/screenshots/news.png)
+
 ## City sizes
 
 **Game → New city** offers five sizes. A new game starts in a large city, zoomed in on your headquarters; scroll out to see all of it.
@@ -263,16 +292,19 @@ All gangs, including the player's, were run by the AI planner. A city counts as 
 | --- | --- | --- | --- | --- | --- |
 | 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 | 80/80 | 20/20 (seeds 100–119) |
 | 50-year cities contested (Phase 6, before the street) | 10/10 | | 10/10 | 8/8 | |
-| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 71/80 / 59/80 | 65/80 / 35/80 | 56/80 / 37/80 | 66/80 / 63/80 | 15/20 / 14/20 (seeds 100–119) |
-| Arson / hits / bank jobs / hijacks per city per year | 1.3 / 0.1 / 0.1 / 2.0 | 1.8 / 0.1 / 0.2 / 2.3 | 2.2 / 0.1 / 0.2 / 2.0 | 1.3 / 0.1 / 0.4 / 0.8 | 1.1 / 0.2 / 0.6 / 0.6 |
-| Guns and cars bought per city per year; men carrying a gun after 10 years | 50; 48% | 45; 34% | 45; 27% | 52; 22% | 101; 32% |
-| Fronts bought and tax cases per city per year; gangs' cash that is clean after 10 years | 1.4, 0.72; 57% | 1.5, 0.89; 53% | 1.5, 1.08; 66% | 1.8, 1.30; 78% | 4.9, 1.20; 90% |
-| Trials per city per year; acquitted | 29; 24% | 36; 21% | 36; 19% | 39; 18% | 49; 17% |
-| Life sentences for a fourth conviction per city per year; men with a conviction / two or more after 10 years | 0.35; 55% / 20% | 0.29; 47% / 16% | 0.30; 42% / 13% | 0.18; 33% / 9% | 0.15; 28% / 7% |
-| Truces / tribute deals / alliances / broken pacts per city per year; pacts standing after 10 years | 3.3 / 14 / 2.0 / 1.0; 6.2 | 2.4 / 17 / 3.1 / 1.3; 7.5 | 1.5 / 15 / 3.5 / 1.4; 6.3 | 0.9 / 14 / 3.2 / 1.0; 4.4 | 1.2 / 18 / 2.9 / 0.9; 6.5 |
-| Men run for alderman / own men elected / weeks worked at the polls per city per year; seats held by an outfit's own man after 10 years | 0.70 / 0.18 / 1.2; 0.3 | 0.95 / 0.31 / 2.1; 0.7 | 0.92 / 0.43 / 2.7; 1.1 | 0.96 / 0.46 / 3.0; 1.6 | 1.17 / 0.60 / 3.6; 1.8 |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 68/80 / 53/80 | 68/80 / 34/80 | 67/80 / 46/80 | 69/80 / 62/80 | 16/20 / 16/20 (seeds 100–119) |
+| Arson / hits / bank jobs / hijacks per city per year | 1.3 / 0.1 / 0.1 / 1.9 | 1.8 / 0.1 / 0.2 / 2.0 | 2.1 / 0.1 / 0.3 / 1.9 | 1.2 / 0.1 / 0.4 / 0.7 | 1.4 / 0.1 / 0.6 / 0.8 |
+| Guns and cars bought per city per year; men carrying a gun after 10 years | 48; 51% | 42; 34% | 44; 27% | 53; 22% | 104; 35% |
+| Fronts bought and tax cases per city per year; gangs' cash that is clean after 10 years | 1.4, 0.70; 55% | 1.5, 0.91; 53% | 1.5, 1.07; 68% | 1.9, 1.29; 80% | 5.0, 1.11; 91% |
+| Trials per city per year; acquitted | 30; 24% | 35; 20% | 37; 19% | 39; 18% | 50; 17% |
+| Life sentences for a fourth conviction per city per year; men with a conviction / two or more after 10 years | 0.40; 56% / 22% | 0.33; 48% / 16% | 0.29; 42% / 14% | 0.18; 30% / 8% | 0.17; 29% / 7% |
+| Truces / tribute deals / alliances / broken pacts per city per year; pacts standing after 10 years | 3.1 / 14 / 2.0 / 1.0; 6.2 | 2.1 / 16 / 3.1 / 1.3; 6.6 | 1.5 / 15 / 3.5 / 1.3; 6.6 | 0.9 / 13 / 3.2 / 1.0; 4.6 | 1.2 / 17 / 3.2 / 1.1; 7.0 |
+| Men run for alderman / own men elected / weeks worked at the polls per city per year; seats held by an outfit's own man after 10 years | 0.71 / 0.19 / 1.2; 0.5 | 0.95 / 0.34 / 2.2; 0.7 | 0.95 / 0.42 / 2.7; 1.2 | 0.98 / 0.51 / 3.0; 1.5 | 1.11 / 0.60 / 3.5; 1.7 |
+| Random city events per city per year | 2.7 | 2.5 | 2.5 | 2.6 | 2.5 |
 
-These runs include the bigger elections. Outfits now run their own men for alderman, and in a big city one or two wards end up held by an outfit's own man. About one man in sixteen sent to work the polls is picked up. The ten-year figures move about as much as they do between any two sets of seeds: the large city's three-year survival fell to 255 of 320 runs on seeds 1–320 against 267 on main, but rose to 268 against 260 on seeds 321–640, and turning off the new candidates and poll workers altogether gave 257 and 265. Before the bigger elections, with rap sheets, the player's gang was alive after 3 / 10 years in 72/52 small, 71/34 medium, 66/47 large, 66/63 huge and 19/19 metropolis runs.
+These runs include city events. Ten-year runs stop at the end of 1929, so they see the dry squad and the Crash but not the Depression; 40 medium cities run for fifteen years, through the Depression, all stayed contested. The first version left one medium city in 80 (seed 15) run by a single outfit, the player's own on autopilot, for all of 1921. Newspaper crusades now go after whoever runs the most of the city, and that city stays contested. The player's gang lasts about as long as before: alive after three years in 274 of 320 medium cities against 269 before, and in 568 of 640 small ones against 573. In the test of the player's survival on Normal, the small city's first 20 seeds fell from 17 survivors to 14. The test now runs 40 cities and still asks that three in four survive; 33 do. Before city events, with the bigger elections, the player's gang was alive after 3 / 10 years in 71/59 small, 65/35 medium, 56/37 large, 66/63 huge and 15/14 metropolis runs.
+
+The bigger elections came in the change before. Outfits now run their own men for alderman, and in a big city one or two wards end up held by an outfit's own man. About one man in sixteen sent to work the polls is picked up. The ten-year figures move about as much as they do between any two sets of seeds: the large city's three-year survival fell to 255 of 320 runs on seeds 1–320 against 267 on main, but rose to 268 against 260 on seeds 321–640, and turning off the new candidates and poll workers altogether gave 257 and 265. Before the bigger elections, with rap sheets, the player's gang was alive after 3 / 10 years in 72/52 small, 71/34 medium, 66/47 large, 66/63 huge and 19/19 metropolis runs.
 
 Rap sheets came in the change before. Longer sentences for repeat offenders, and life for a fourth conviction, barely move the numbers: about one man goes away for life every three years in a small city, and the player's gang lasts about as long as it did before them (alive after 3 / 10 years in 69/52 small, 71/37 medium, 67/49 large, 66/62 huge and 17/16 metropolis runs). On 160 three-year runs each, the player's gang survived in 134 medium cities against 136 before, and in 133 large ones against 133.
 

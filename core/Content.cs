@@ -4,7 +4,7 @@ namespace DryTown.Core;
 /// Tunable numbers and name pools. Everything here is original to this project.
 /// Phase 4 moves these into moddable data files.
 /// </summary>
-public static class Content
+public static partial class Content
 {
     public const int StartYear = 1920;
     public const int WeeksPerYear = 52;
