@@ -10,7 +10,7 @@ public static partial class AiPlanner
     private static void PlanUnions(World w, Gang g, List<Hood> hoods, List<Order> orders)
     {
         bool Wary(int gangId) => w.AtPeace(g.Id, gangId)
-            || w.GangById(gangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1;
+            || w.GangById(gangId).IsPlayer && w.RivalWariness < 1;
 
         foreach (var local in w.LocalsOf(g.Id).Where(l => !l.OnStrike && (w.Week + g.Id * 3 + l.Id) % 4 == 0))
         {

@@ -20,7 +20,7 @@ public static partial class AiPlanner
             return done;
         }
         if (g.IsPlayer || g.Aggression <= 0.5 || w.TopDog(g)) return false;
-        bool wary = w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1;
+        bool wary = w.RivalWariness < 1;
         var enemy = w.LivingGangs
             .Where(r => w.CannotDeclare(g, r) == null && w.GrudgeOf(g.Id, r.Id) >= 60 && w.Power(g) >= w.Power(r) * 0.9 && !(r.IsPlayer && wary))
             .OrderByDescending(r => w.GrudgeOf(g.Id, r.Id)).ThenBy(r => r.Id).FirstOrDefault();

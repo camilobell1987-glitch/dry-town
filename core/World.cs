@@ -44,6 +44,12 @@ public sealed class WorldSettings
 
     /// <summary>When true, the rival director seeds new gangs and splits when the district goes quiet.</summary>
     public bool DirectorEnabled { get; init; } = true;
+
+    /// <summary>A set start with a goal, or None for the open city.</summary>
+    public ScenarioKind Scenario { get; init; }
+
+    /// <summary>The week the city starts in: 0 is January 1920.</summary>
+    public int StartWeek { get; init; }
 }
 
 /// <summary>The whole simulation state for one district. Pure data plus id lookups.</summary>
@@ -99,7 +105,13 @@ public sealed partial class World
     public int WeekOfYear => Week % Content.WeeksPerYear + 1;
     public bool Prohibition => Year < Content.RepealYear;
 
+    /// <summary>How hard rivals push into the player's turf this year, counted from the year the city started.</summary>
+    public double RivalWariness => Settings.RivalWariness((Week - Settings.StartWeek) / Content.WeeksPerYear);
+
     public Gang Player => Gangs.First(g => g.IsPlayer);
+
+    /// <summary>How the scenario stands, if this city is one.</summary>
+    public ScenarioState Goal { get; set; } = new();
 
     // Ids are handed out in order and nothing is ever removed, so an id is usually its index.
     public Gang GangById(int id) => id >= 0 && id < Gangs.Count && Gangs[id].Id == id ? Gangs[id] : Gangs.First(g => g.Id == id);
@@ -180,7 +192,7 @@ public sealed partial class World
 
     public static World Create(WorldSettings settings)
     {
-        var world = new World(settings);
+        var world = new World(settings) { Week = settings.StartWeek };
         world.GenerateBusinesses();
         world.PlaceBanks();
         Politics.Found(world);
@@ -483,6 +495,7 @@ public sealed partial class World
         LastLedger = LastLedger,
         Pacts = Pacts,
         Wars = Wars,
+        Goal = Goal,
         Grudges = Grudges,
         Offers = Offers,
         CityEvents = CityEvents,
@@ -506,6 +519,7 @@ public sealed partial class World
         w.Banks.AddRange(d.Banks);
         w.Pacts.AddRange(d.Pacts);
         w.Wars.AddRange(d.Wars);
+        if (d.Goal != null) w.Goal = d.Goal;
         w.Grudges.AddRange(d.Grudges);
         w.Offers.AddRange(d.Offers);
         w.CityEvents.AddRange(d.CityEvents);

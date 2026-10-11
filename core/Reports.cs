@@ -13,6 +13,7 @@ public static class Reports
         var player = w.Player;
         int year = Content.StartYear + week / Content.WeeksPerYear;
         sb.AppendLine($"=== Week {week % Content.WeeksPerYear + 1}, {year} ===");
+        if (w.Settings.Scenario != ScenarioKind.None) sb.AppendLine(Scenarios.Summary(w));
         if (player.Alive && w.LastLedger.TryGetValue(player.Id, out var l))
         {
             sb.AppendLine($"Protection ${l.Protection}  Rackets ${l.Rackets}  Wages -${l.Wages}  Spending -${l.Spending}  Fines -${l.Fines}" +

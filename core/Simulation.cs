@@ -17,7 +17,12 @@ public sealed partial class Simulation
         Director = new Director(world);
     }
 
-    public static Simulation New(WorldSettings settings) => new(World.Create(settings));
+    public static Simulation New(WorldSettings settings)
+    {
+        var sim = new Simulation(World.Create(settings));
+        if (settings.Scenario != ScenarioKind.None) Scenarios.Setup(sim);
+        return sim;
+    }
 
     /// <summary>Run one week with the given orders. Gangs with no entry get AI orders, including the player when autopilot is true.</summary>
     public void AdvanceWeek(IReadOnlyDictionary<int, List<Order>>? orders = null, bool playerAutopilot = false)
@@ -254,6 +259,7 @@ public sealed partial class Simulation
         Director.Step();
 
         Metrics.Record(w, takeoversThisWeek);
+        Scenarios.Check(w);
 
         int yearBefore = w.Year;
         w.Week++;

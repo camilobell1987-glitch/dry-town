@@ -22,7 +22,8 @@ public sealed class CommandShell
 
     public string Prompt => $"[{Reports.Date(W)} | ${W.Player.Cash} | heat {W.Player.Heat} | {Pending.Count} orders]";
 
-    public string Welcome => $"You run {W.Player.Name}. {Reports.Date(W)}. Type 'help' for commands.\n";
+    public string Welcome => $"You run {W.Player.Name}. {Reports.Date(W)}. Type 'help' for commands.\n" +
+        (W.Settings.Scenario == ScenarioKind.None ? "" : $"{Scenarios.Info(W.Settings.Scenario).Briefing}\n{Scenarios.Summary(W)}\n");
 
     public static readonly string Help =
         "gangs | hoods | turf | targets | log\n" +
@@ -45,6 +46,7 @@ public sealed class CommandShell
         "hunt <hood> (look for a rat) | plant <hood> <gang> (sign him on with a rival) | recall <hood> (bring him home)\n" +
         "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
         "war <gang> (go to the mattresses against them) | calloff (end a war you started)\n" +
+        "goal (the scenario's goal and how you stand)\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -96,6 +98,7 @@ public sealed class CommandShell
                     W.SetCut(W.Player, Enum.Parse<Cut>(p[1], true));
                     return $"Your liquor is {Content.Label(W.Player.Cut)} now.\n";
                 case "unions": return Reports.Unions(W, Me);
+                case "goal": return W.Settings.Scenario == ScenarioKind.None ? "This is the open city: no goal but the one you set yourself.\n" : Scenarios.Summary(W) + "\n";
                 case "local": return Queue(new UnionOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "strike": return Strike(int.Parse(p[1]), p[2]);
                 case "cases": return Reports.Cases(W, Me);
