@@ -103,6 +103,7 @@ public partial class Main
         AddLabel(_talkPanel, (hate > Content.GrudgeTooDeep ? $"They hate you ({hate}): it will cost you to make peace." : hate > 0 ? $"They hold a grudge against you ({hate})." : "They have nothing against you.")
             + (mine > 0 ? $" Your men have their own score to settle with them ({mine})." : ""), hate > Content.GrudgeTooDeep ? Palette.Bad : Palette.InkQuiet, 13, wrap: true);
         AddLabel(_talkPanel, Capital(Reports.Standing(W, me, them)) + ".", W.AtPeace(Me, them.Id) ? Palette.Good : Palette.InkQuiet);
+        CrewsOf(them);
 
         if (W.PactBetween(Me, them.Id) is { } pact)
         {
@@ -120,6 +121,23 @@ public partial class Main
             AddButton(_talkPanel, $"Demand ${demand} a week to leave them alone", () => Say(W.Demand(me, them, demand)));
         }
         if (_answer.Length > 0) AddLabel(_talkPanel, _answer, Palette.Player, wrap: true);
+    }
+
+    /// <summary>A rival's lieutenants and their crews. A man inside can say which lieutenants are sour on their boss.</summary>
+    private void CrewsOf(Gang them)
+    {
+        var crews = W.CrewsOf(them.Id).ToList();
+        if (crews.Count == 0) { AddLabel(_talkPanel, "They keep no standing crews.", Palette.InkQuiet, 13); return; }
+        bool inside = W.HasManInside(Me, them.Id);
+        AddLabel(_talkPanel, $"Their crews{(inside ? ", as your man inside tells it" : "")}:", Palette.Ink, 13);
+        foreach (var c in crews)
+        {
+            var lt = W.HoodById(c.LieutenantHoodId);
+            string men = c.MemberIds.Count == 0 ? "nobody yet" : string.Join(", ", c.MemberIds.Select(id => W.HoodById(id).Name));
+            string mood = !inside ? "" : lt.Loyalty < 30 && lt.Ambition > 60 ? " He's sour on the boss and might break away." : lt.Loyalty < 30 ? " He's sour on the boss." : "";
+            AddLabel(_talkPanel, $"{lt.Name}'s crew · {men} · strength {Reports.CrewStrength(W, c):0} together.{mood}",
+                mood.Length > 0 ? Palette.Bad : Palette.InkQuiet, 13, wrap: true);
+        }
     }
 
     private void Say(string answer)

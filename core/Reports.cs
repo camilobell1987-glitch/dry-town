@@ -275,6 +275,29 @@ public static class Reports
         return sb.ToString();
     }
 
+    /// <summary>A rival's crews, as far as anyone on the street can tell. A man inside knows how the lieutenants feel about their boss.</summary>
+    public static string RivalCrews(World w, Gang gang, bool inside)
+    {
+        var crews = w.CrewsOf(gang.Id).ToList();
+        if (crews.Count == 0) return $"{gang.Name} keeps no standing crews.\n";
+        var sb = new StringBuilder();
+        foreach (var c in crews)
+        {
+            var lt = w.HoodById(c.LieutenantHoodId);
+            var men = c.MemberIds.Select(w.HoodById).Select(h => $"{h.Id} {h.Name}");
+            sb.AppendLine($"  {lt.Id} {lt.Name} (lieutenant, strength {lt.Strength}{(inside ? $", loyalty {lt.Loyalty}" : "")})"
+                + (c.MemberIds.Count > 0 ? $" with {string.Join(", ", men)}" : "") + $"; crew strength {CrewStrength(w, c):0}");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>What a crew brings to a fight when it goes in together: its hardest man in front and the rest behind him.</summary>
+    public static double CrewStrength(World w, Crew c)
+    {
+        var men = c.Everyone.Select(w.HoodById).Where(h => h.IsAvailable).OrderByDescending(h => h.Strength).ToList();
+        return men.Count == 0 ? 0 : Simulation.StormingStrength(men[0], men.Skip(1));
+    }
+
     public static string Wards(World w, int gangId)
     {
         var sb = new StringBuilder();

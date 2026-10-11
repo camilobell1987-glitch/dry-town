@@ -115,6 +115,9 @@ public static partial class AiPlanner
             if (assigned.Contains(hood.Id)) continue;
             // Spare hands, weakest first, who could go along as backup on a hard job.
             var spare = hoods.Where(h => h.Id != hood.Id && !assigned.Contains(h.Id)).Reverse().ToList();
+            // A man in a crew takes his own crew along as backup, strongest first.
+            var crew = w.CrewOfHood(hood.Id);
+            var mates = crew == null ? new List<Hood>() : spare.Where(h => crew.Everyone.Contains(h.Id)).OrderByDescending(h => h.Strength).ThenBy(h => h.Id).ToList();
             Business? best = null;
             List<Hood> bestBackup = new();
             double bestScore = 0, bestWorth = 0;
@@ -136,9 +139,11 @@ public static partial class AiPlanner
                 // Alone, or with up to two men behind him if the gang has hands to spare. Gangs that
                 // already run much of the district are spread too thin to send men in pairs.
                 bool canBackUp = spare.Count >= 4 && turf.Count < w.Businesses.Count * 0.35;
-                for (int extra = 0; extra <= (canBackUp ? 2 : 0); extra++)
+                // A crew goes in together only when the outfit has hands to spare, as any backup does.
+                int most = !canBackUp ? 0 : mates.Count > 0 ? Math.Min(mates.Count, 2) : 2;
+                for (int extra = 0; extra <= most; extra++)
                 {
-                    var backup = spare.Take(extra).ToList();
+                    var backup = (mates.Count > 0 ? mates : spare).Take(extra).ToList();
                     double edge = (Simulation.StormingStrength(hood, backup) - defence) / 10.0;
                     double win = Math.Clamp(0.5 + edge, 0.05, 0.95);
                     double score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost - extra * 150;

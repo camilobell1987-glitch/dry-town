@@ -301,8 +301,10 @@ public sealed partial class Simulation
                         _ => null,
                     };
                     if (what == null) continue;
-                    var who = TeamOf(order).Select(w.HoodById).FirstOrDefault();
-                    w.Log(EventKind.Whisper, me, $"Word from {man.Name}: {host.Name} will {what} this week" + (who != null ? $", sending {who.Name}." : "."));
+                    var team = TeamOf(order).ToList();
+                    string who = team.Count == 0 ? "" : w.CrewOfHood(team[0]) is { } crew && team.Count > 1 && team.All(crew.Everyone.Contains)
+                        ? $", sending {w.HoodById(crew.LieutenantHoodId).Name}'s crew" : $", sending {w.HoodById(team[0]).Name}";
+                    w.Log(EventKind.Whisper, me, $"Word from {man.Name}: {host.Name} will {what} this week{who}.");
                 }
             }
         }
