@@ -36,6 +36,7 @@ int Soak()
     var politics = new List<string>();
     var crimes = new Dictionary<EventKind, int>();
     var rackets = new Dictionary<RacketKind, int>();
+    var ratCounts = new Dictionary<string, int>();
     long gearBought = 0, armedAtEnd = 0, menAtEnd = 0;
     long frontsBought = 0, taxCases = 0, cleanAtEnd = 0, cashAtEnd = 0;
     long trials = 0, acquittals = 0, judgesPaid = 0, juries = 0, lawyered = 0, gangsAtEnd = 0;
@@ -91,6 +92,8 @@ int Soak()
         foreach (var e in ev.Where(e => e.Kind == EventKind.RacketOpened && e.Text.Contains(" opened a ")))
             foreach (var info in Content.Rackets.Values.Where(r => e.Text.Contains($" opened a {r.Label} ")))
                 rackets[info.Kind] = rackets.GetValueOrDefault(info.Kind) + 1;
+        foreach (var (label, phrase) in RatLines)
+            ratCounts[label] = ratCounts.GetValueOrDefault(label) + ev.Count(e => e.Kind is EventKind.Rat or EventKind.Whisper && e.Text.Contains(phrase));
         var samples = sim.Metrics.Samples;
         if (samples[Math.Min(samples.Count, 3 * Content.WeeksPerYear) - 1].PlayerAlive) aliveAt3++;
         if (samples[^1].PlayerAlive) aliveAtEnd++;
@@ -106,6 +109,7 @@ int Soak()
     Console.WriteLine($"Life sentences for a fourth conviction per city-year: {lifers / cy:0.00}; men with a conviction at the end: {convictedAtEnd * 100 / Math.Max(1, menAtEnd)}%, with two or more: {repeat * 100 / Math.Max(1, menAtEnd)}%.");
     Console.WriteLine($"Elections per city-year: men run for alderman {running / cy:0.00}, own men elected {ownMenWon / cy:0.00}, weeks worked at the polls {pollsWorked / cy:0.0} with {pollsCaught * 100 / Math.Max(1, pollsWorked + pollsCaught)}% caught; reform DAs elected {reformDAs / cy:0.00}; seats held by an outfit's own man at the end: {ownSeatsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Random city events per city-year: {cityEvents / cy:0.0}.");
+    Console.WriteLine($"Rats per city-year: {string.Join(", ", RatLines.Select(r => $"{r.Label} {ratCounts.GetValueOrDefault(r.Label) / cy:0.00}"))}.");
     Console.WriteLine($"Rackets opened: {string.Join(", ", rackets.OrderBy(c => c.Key).Select(c => $"{Content.Rackets[c.Key].Label} {c.Value}"))}.");
     Console.WriteLine($"Your gang on autopilot ({difficulty}): alive after 3 years in {aliveAt3}/{seeds}, after {years} years in {aliveAtEnd}/{seeds}.");
     return stalled == 0 ? 0 : 1;
@@ -124,4 +128,24 @@ int Play()
         if (output == null) return 0;
         Console.Write(output);
     }
+}
+
+partial class Program
+{
+    /// <summary>What the soak counts about rats, by a phrase from the log line.</summary>
+    static readonly (string Label, string Phrase)[] RatLines =
+    {
+        ("DA visits", "has had visits from the DA's office"),
+        ("turned", "turned state's evidence against"),
+        ("talked out of it", "sent the DA's men away"),
+        ("families paid", "'s family while he's inside"),
+        ("silenced in a cell", "hanged in his cell"),
+        ("guards caught the knife", "with a knife meant for"),
+        ("informer cases", "Somebody is talking."),
+        ("informers found", "has been talking to the police"),
+        ("plants", "has signed on with"),
+        ("plants found", "is ours. He'll have to get out"),
+        ("plants killed", "had found out he was ours"),
+        ("tip-offs", "this week"),
+    };
 }

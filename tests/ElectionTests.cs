@@ -82,7 +82,7 @@ public class ElectionTests
     [Fact]
     public void OnlyACleanBrightManCanRun()
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 4 });
+        var sim = Simulation.New(new WorldSettings { Seed = 5 });
         var w = sim.World;
         var man = Candidate(w);
         Assert.Contains("campaign is on", Politics.CannotStand(w, w.Player, man, w.Wards[0]));
@@ -120,7 +120,7 @@ public class ElectionTests
     [Fact]
     public void MenAtThePollsTurnOutVotesOrGetCharged()
     {
-        var (sim, w) = ToCampaign();
+        var (sim, w) = ToCampaign(6);
         var ward = w.Wards[0];
         var shell = new CommandShell(sim);
         while (Politics.PollsOpen(w) == null) sim.AdvanceWeek();

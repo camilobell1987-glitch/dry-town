@@ -39,6 +39,8 @@ public sealed class CommandShell
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
         "sheet <hood> (any man's rap sheet) | news (what's going on in the city)\n" +
+        "rats (who's talking, and your men inside) | care <hood> (look after a jailed man's family) | seeto <hood> <rat>\n" +
+        "hunt <hood> (look for a rat) | plant <hood> <gang> (sign him on with a rival) | recall <hood> (bring him home)\n" +
         "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
@@ -102,6 +104,12 @@ public sealed class CommandShell
                     return $"You now keep {Content.Lawyers[W.Player.Lawyer].Label}" + (W.Player.Lawyer == Lawyer.None ? ".\n" : $", ${Content.Lawyers[W.Player.Lawyer].Weekly} a week.\n");
                 case "judge": return PayJudge(int.Parse(p[1]));
                 case "jury": return Queue(new JuryOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "rats": return Reports.Rats(W, Me);
+                case "hunt": return Queue(new HuntOrder(Me, int.Parse(p[1])));
+                case "seeto": return Queue(new SeenToOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "plant": return Queue(new PlantOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "care": return Care(int.Parse(p[1]));
+                case "recall": return Recall(int.Parse(p[1]));
                 case "arm": return Buy(int.Parse(p[1]), gun: Enum.Parse<Weapon>(p[2], true));
                 case "drive": return Buy(int.Parse(p[1]), car: Enum.Parse<Car>(p[2], true));
                 case "hand": return Hand(int.Parse(p[1]), int.Parse(p[2]), p[3].ToLowerInvariant() == "car");
@@ -152,6 +160,23 @@ public sealed class CommandShell
     {
         var g = W.Gangs.FirstOrDefault(x => x.Id == int.Parse(id) && x.Alive && !x.IsPlayer);
         return g == null ? "No such gang. Type 'relations'.\n" : deal(g) + "\n";
+    }
+
+    private string Care(int hoodId)
+    {
+        var man = W.Hoods.FirstOrDefault(h => h.Id == hoodId);
+        if (man == null) return "No such man. Type 'rats'.\n";
+        if (W.CannotLookAfter(W.Player, man) is string no) return no + "\n";
+        int price = W.LookAfter(W.Player, man);
+        return $"${price:N0} went to {man.Name}'s family. His loyalty is {man.Loyalty} now.\n";
+    }
+
+    private string Recall(int hoodId)
+    {
+        var man = W.Hoods.FirstOrDefault(h => h.Id == hoodId && h.GangId == Me && h.State == HoodState.Inside);
+        if (man == null) return "He isn't inside anyone. Type 'rats'.\n";
+        W.Recall(W.Player, man);
+        return $"{man.Name} is home.\n";
     }
 
     private string PayJudge(int hoodId)

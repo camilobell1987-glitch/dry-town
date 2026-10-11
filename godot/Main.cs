@@ -81,6 +81,9 @@ public partial class Main : Control
         _replayWeek = W.Week;
         _ticker.Clear();
         _shell.StartWeek();
+        // Monday morning: what your men inside other outfits say is coming.
+        foreach (var e in W.Events.Where(e => e.Week == _replayWeek && e.Kind == EventKind.Whisper && e.GangId == Me && e.Text.StartsWith("Word from ")))
+            AppendTicker(e.Tick, e.GangId, e.Text);
         SetLive(true);
         _map.BeginReplay(snapshot, _shell.Sim);
         _playing = true;
@@ -95,7 +98,7 @@ public partial class Main : Control
         SetLive(false);
         // Raids were already shown as the police reached them.
         var shown = W.Script.Where(a => a.Kind == ActionKind.Raid).Select(a => a.Text).ToHashSet();
-        foreach (var e in W.Events.Where(e => e.Week == _replayWeek && e.Tick >= Content.ReckoningTick && Reports.IsHeadline(e) && !shown.Contains(e.Text)))
+        foreach (var e in W.Events.Where(e => e.Week == _replayWeek && e.Tick >= Content.ReckoningTick && (Reports.IsHeadline(e) || e.Kind == EventKind.Whisper && e.GangId == Me) && !shown.Contains(e.Text)))
             AppendTicker(e.Tick, e.GangId, e.Text);
         _news.Text = WeekReport(_replayWeek);
         _tabs.CurrentTab = TabIndex("Report");
@@ -218,7 +221,7 @@ public partial class Main : Control
 
         sb.Append(InThePapers());
         sb.Append($"[color={C(Palette.InkQuiet)}]HEADLINES[/color]\n");
-        foreach (var e in W.Events.Where(e => e.Week == week && Reports.IsHeadline(e)).OrderBy(e => e.Tick))
+        foreach (var e in W.Events.Where(e => e.Week == week && (Reports.IsHeadline(e) || e.Kind == EventKind.Whisper && e.GangId == p.Id)).OrderBy(e => e.Tick))
         {
             bool mine = e.GangId == p.Id;
             string swatch = e.GangId >= 0 ? $"[color={C(Palette.Gang(W, e.GangId))}]■[/color] " : "";
@@ -562,6 +565,9 @@ public partial class Main : Control
     {
         Clear(_crewsPanel);
         SuccessionSection();
+        RatsSection();
+        _crewsPanel.AddChild(new HSeparator());
+        AddLabel(_crewsPanel, "Crews", Palette.Player, 17);
         AddLabel(_crewsPanel, "A crew is a lieutenant and up to three men. Send a crew and they go as one team: they lean harder and fight better, but every man is tied up for the week. A crew takes its mood from its lieutenant, and an ambitious lieutenant who breaks away takes his crew with him.", Palette.InkQuiet, wrap: true);
         if (!W.Player.Alive) return;
         var loose = W.HoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId && W.CrewOfHood(h.Id) == null).OrderByDescending(h => h.Brains + h.Strength).ToList();
@@ -1118,6 +1124,21 @@ public partial class Main : Control
             _map.Select(shop: shop.Id);
             _shopFor = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderByDescending(h => h.Strength).Skip(int.Parse(Arg("--for") ?? "0")).First().Id;
         }
+        if (Flag("--rats"))
+        {
+            // A man in a cell talking to the DA, an informer found out, and a man inside a rival.
+            var men = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderBy(h => h.Strength).ToList();
+            _shell.Sim.Jail(men[0], 60, "with attempted arson");
+            men[0].Loyalty = 14;
+            men[0].Talking = 2;
+            men[1].Informer = true;
+            men[1].Loyalty = 18;
+            men[1].ExposedWeek = W.Week;
+            var host = W.LivingGangs.First(g => !g.IsPlayer);
+            men[2].State = HoodState.Inside;
+            men[2].InsideGangId = host.Id;
+            men[2].InsideSinceWeek = W.Week;
+        }
         if (Arg("--exec") is string commands)
             foreach (var c in commands.Split(';')) GD.Print(_shell.Execute(c.Trim()));
         RefreshAll();
@@ -1162,6 +1183,11 @@ public partial class Main : Control
             if (Flag("--ballot") && _wardHeader != null && _hallPanel.GetParent()?.GetParent() is ScrollContainer hallScroll)
             {
                 hallScroll.ScrollVertical = (int)_wardHeader.Position.Y;
+                for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
+            if (Arg("--scroll-men") is string down && _crewsPanel.GetParent()?.GetParent() is ScrollContainer menScroll)
+            {
+                menScroll.ScrollVertical = int.Parse(down);
                 for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
             if (Arg("--focus") is string focus)

@@ -28,6 +28,11 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(JudgeOrder), "judge")]
 [JsonDerivedType(typeof(StandOrder), "stand")]
 [JsonDerivedType(typeof(PollsOrder), "polls")]
+[JsonDerivedType(typeof(HuntOrder), "hunt")]
+[JsonDerivedType(typeof(SeenToOrder), "seento")]
+[JsonDerivedType(typeof(PlantOrder), "plant")]
+[JsonDerivedType(typeof(RecallOrder), "recall")]
+[JsonDerivedType(typeof(FamilyOrder), "family")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -119,3 +124,18 @@ public sealed record LawyerOrder(int GangId, Lawyer Lawyer) : Order(GangId);
 
 /// <summary>Pay off the judge in the case against one of the gang's men.</summary>
 public sealed record JudgeOrder(int GangId, int DefendantId) : Order(GangId);
+
+/// <summary>Send a man to ask around the outfit for whoever is talking to the police, or working for someone else.</summary>
+public sealed record HuntOrder(int GangId, int HoodId) : Order(GangId);
+
+/// <summary>Have a rat taken care of: a man in a cell who is talking to the DA, or one found out on the street.</summary>
+public sealed record SeenToOrder(int GangId, int HoodId, int TargetHoodId) : Order(GangId);
+
+/// <summary>Send a man to sign on with a rival outfit and report back what it's planning.</summary>
+public sealed record PlantOrder(int GangId, int HoodId, int TargetGangId) : Order(GangId);
+
+/// <summary>Bring a planted man home.</summary>
+public sealed record RecallOrder(int GangId, int HoodId) : Order(GangId);
+
+/// <summary>Look after the family of a man in jail, so he has less reason to take the DA's deal.</summary>
+public sealed record FamilyOrder(int GangId, int HoodId) : Order(GangId);

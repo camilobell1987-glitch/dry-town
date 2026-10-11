@@ -101,6 +101,7 @@ public static partial class AiPlanner
             }
         }
 
+        cash -= PlanRats(w, g, hoods, cash, orders);
         PlanPolls(w, g, turf, hoods, orders);
         PlanCrimes(w, g, turf, hoods, cash, orders);
 

@@ -54,6 +54,9 @@ public sealed partial class Simulation
     private void Trial(Hood hood)
     {
         var w = World;
+        // A man talking to the DA signs before the jury sits.
+        if (hood.Talking > 0 && hood.Loyalty < Content.RatLine(hood)) { Turn(hood); return; }
+        hood.Talking = 0;
         var c = hood.Case!;
         var gang = w.GangById(hood.GangId);
         double odds = ConvictionChance(w, hood);
@@ -79,14 +82,6 @@ public sealed partial class Simulation
         hood.JailWeeks = Math.Max(1, c.Sentence - Content.WeeksToTrial);
         Book(hood, RapKind.Convicted, $"Convicted {c.Charge}. Sent away for {c.Sentence} weeks.");
         w.Log(EventKind.Trial, gang.Id, $"{hood.Name} of {gang.Name} was convicted {c.Charge} and sent away for {c.Sentence} weeks.");
-        // A man going away for a long time who owes his outfit nothing may make a deal.
-        if (hood.Loyalty < 30 && c.Sentence >= 26 && w.Rng.Chance(0.3))
-        {
-            gang.Heat = Math.Min(100, gang.Heat + 15);
-            hood.Loyalty = 0;
-            Book(hood, RapKind.Turned, $"Turned state's evidence against {gang.Name}.");
-            w.Log(EventKind.Squeal, gang.Id, $"{hood.Name} turned state's evidence against {gang.Name} for a shorter stretch.");
-        }
     }
 
     /// <summary>Chance a man can get to the jurors in a case and change their minds without being caught.</summary>

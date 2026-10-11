@@ -1,6 +1,7 @@
 namespace DryTown.Core;
 
-public enum HoodState { Free, Jailed, Dead, Gone }
+/// <summary>Inside means he has been planted in another outfit and is working there under false colours.</summary>
+public enum HoodState { Free, Jailed, Dead, Gone, Inside }
 
 public enum BusinessKind { Grocer, Diner, Barber, Tailor, Garage, Laundry, Hotel, Pharmacy, PoolHall, Warehouse }
 
@@ -52,6 +53,24 @@ public sealed class Hood
 
     /// <summary>What he has done for the outfit on the street.</summary>
     public Deeds Deeds { get; set; } = new();
+
+    /// <summary>Weeks until he signs the district attorney's deal, or 0 if he isn't talking to him.</summary>
+    public int Talking { get; set; }
+
+    /// <summary>He tells the police what his outfit is up to. Nobody knows until someone finds him out.</summary>
+    public bool Informer { get; set; }
+
+    /// <summary>The week the outfit he's betraying found him out, or -1. He runs if he's left alone.</summary>
+    public int ExposedWeek { get; set; } = -1;
+
+    /// <summary>The outfit he has been planted in, while he's <see cref="HoodState.Inside"/>.</summary>
+    public int InsideGangId { get; set; } = -1;
+    public int InsideSinceWeek { get; set; }
+
+    /// <summary>His family has been looked after while he's inside, so he has less reason to listen to the DA.</summary>
+    public bool LookedAfter { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore] public bool Exposed => ExposedWeek >= 0;
 
     /// <summary>Times a jury has convicted him. Each one makes the next sentence longer.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public int Convictions => Record.Count(r => r.Kind == RapKind.Convicted);
@@ -137,6 +156,9 @@ public sealed class Gang
 
     /// <summary>The week the gang last went back on its word. Nobody signs with it for a year afterwards.</summary>
     public int BrokeWordWeek { get; set; } = -1000;
+
+    /// <summary>The week the gang last had reason to think someone in it was talking.</summary>
+    public int TalkWeek { get; set; } = -1000;
 }
 
 public enum PactKind { Truce, Alliance }
@@ -287,7 +309,9 @@ public enum EventKind
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
     Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
-    Arson, Hit, Robbery, Hijack, Street, Gear, Front, Trial, Diplomacy, News,
+    Arson, Hit, Robbery, Hijack, Street, Gear, Front, Trial, Diplomacy, News, Rat,
+    /// <summary>Something only the gang itself knows: what its men inside hear, who it suspects, what it paid to keep a man quiet.</summary>
+    Whisper,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

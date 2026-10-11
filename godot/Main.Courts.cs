@@ -38,6 +38,7 @@ public partial class Main
         AddLabel(_hallPanel, $"Charged {c.Charge}{(c.Federal ? " in federal court" : "")}. Trial in {man.JailWeeks} week{(man.JailWeeks == 1 ? "" : "s")}; he faces " +
             (c.Life ? $"life: he has {man.Convictions} convictions behind him already." : $"{c.Sentence} weeks" + (man.Convictions > 0 ? $", longer for the {man.Convictions} conviction{(man.Convictions == 1 ? "" : "s")} on his record." : ".")),
             c.Life ? Palette.Bad : Palette.InkQuiet, wrap: true);
+        if (man.Talking > 0) AddLabel(_hallPanel, "He's talking to the DA, and will sign before his trial. See the Men tab.", Palette.Bad, wrap: true);
         var odds = Simulation.ConvictionChance(W, man);
         string help = string.Join(", ", new[] { c.JudgePaid ? "the judge is paid" : null, c.JuryFixed ? "the jury has been leaned on" : null }.Where(x => x != null));
         AddLabel(_hallPanel, $"{odds * 100:0}% likely the jury convicts" + (help.Length > 0 ? $" ({help})." : "."), odds > 0.5 ? Palette.Bad : Palette.Good);
