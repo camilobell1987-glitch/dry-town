@@ -71,6 +71,7 @@ public sealed partial class Simulation
             string lost = biz.Racket != RacketKind.None ? $" and its {Content.Rackets[biz.Racket].Label}" : "";
             biz.ShutWeeks = 8;
             biz.BurnedWeek = w.Week;
+            hood.Deeds.Fires++;
             biz.Racket = RacketKind.None;
             biz.Resentment = Math.Min(100, biz.Resentment + 10);
             gang.Heat = Math.Min(100, gang.Heat + 8);
@@ -130,6 +131,7 @@ public sealed partial class Simulation
         {
             bool boss = rival.BossHoodId == target.Id;
             Kill(target, boss ? $"in a hit ordered by {gang.Name}" : $"on the street, in a hit ordered by {gang.Name}");
+            hood.Deeds.Kills++;
             gang.Heat = Math.Min(100, gang.Heat + 10 + GunHeat(backup.Prepend(hood)));
             string text = boss
                 ? $"{hood.Name} gunned down {target.Name}, boss of {rival.Name}."
@@ -171,6 +173,7 @@ public sealed partial class Simulation
         {
             int take = bank.Vault * w.Rng.Range(50, 90) / 100;
             bank.Vault -= take;
+            hood.Deeds.Heists++;
             gang.Cash += take;
             w.Ledger(gang.Id).Rackets += take;
             gang.Heat = Math.Min(100, gang.Heat + 20 + GunHeat(backup.Prepend(hood)));
@@ -219,6 +222,7 @@ public sealed partial class Simulation
         if (w.Rng.Chance(chance))
         {
             int load = info.WeeklyIncome * 2;
+            hood.Deeds.Heists++;
             long lost = Math.Min(rival.Cash, info.WeeklyIncome);
             rival.Cash -= lost;
             w.Ledger(rival.Id).Fines += lost;

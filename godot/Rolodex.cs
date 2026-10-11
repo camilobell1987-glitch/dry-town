@@ -28,7 +28,13 @@ public partial class Rolodex : Control
     private Hood? _leaving;
 
     private readonly List<(Rect2 Rect, int Index)> _tabs = new();
-    private Rect2 _front, _up, _down;
+    private Rect2 _front, _up, _down, _turn;
+
+    /// <summary>The cards are turned over to show the men's rap sheets.</summary>
+    private bool _back;
+
+    /// <summary>Show the front of the cards, or the rap sheets on the back.</summary>
+    public bool ShowSheets { get => _back; set { _back = value; QueueRedraw(); } }
 
     private static readonly Color Paper = new("efe6cf");
     private static readonly Color PaperEdge = new("cfc3a5");
@@ -107,10 +113,12 @@ public partial class Rolodex : Control
         {
             if (mb.ButtonIndex == MouseButton.WheelDown) { FlipTo(_index + 1); AcceptEvent(); }
             else if (mb.ButtonIndex == MouseButton.WheelUp) { FlipTo(_index - 1); AcceptEvent(); }
+            else if (mb.ButtonIndex == MouseButton.Right && _front.HasPoint(mb.Position)) { ShowSheets = !_back; AcceptEvent(); }
             else if (mb.ButtonIndex == MouseButton.Left)
             {
                 var p = mb.Position;
-                if (_up.HasPoint(p)) FlipTo(_index - 1);
+                if (_turn.HasPoint(p)) ShowSheets = !_back;
+                else if (_up.HasPoint(p)) FlipTo(_index - 1);
                 else if (_down.HasPoint(p)) FlipTo(_index + 1);
                 else if (_front.HasPoint(p) && _shownId >= 0) HoodPicked?.Invoke(_shownId);
                 else foreach (var (rect, i) in _tabs) if (rect.HasPoint(p)) { FlipTo(i); break; }
@@ -122,7 +130,8 @@ public partial class Rolodex : Control
     public override string _GetTooltip(Vector2 at)
     {
         foreach (var (rect, i) in _tabs) if (rect.HasPoint(at)) return _cards[i].Name;
-        if (_front.HasPoint(at)) return "Click to find him on the map. Roll the wheel to flip cards.";
+        if (_turn.HasPoint(at)) return _back ? "Turn the cards back over." : "Turn the cards over to read the men's rap sheets.";
+        if (_front.HasPoint(at)) return "Click to find him on the map. Roll the wheel to flip cards. Right-click to turn the cards over.";
         return "";
     }
 
@@ -170,6 +179,7 @@ public partial class Rolodex : Control
         if (_leaving != null && t > 0.5f) DrawFolded(font, cardRect, _leaving, (t - 0.5f) * 2, _flip > 0);
         else DrawFolded(font, cardRect, _cards[_index], 1 - t * 2, _flip < 0);
         _front = cardRect;
+        _turn = new Rect2(cardRect.End.X - 92, cardRect.End.Y - 26, 86, 16);
 
         DrawBase(font, new Rect2(6, baseTop, w - 12, 40));
     }
@@ -181,7 +191,9 @@ public partial class Rolodex : Control
         // Squash towards the rail at the bottom, the way a card falls over on a rolodex.
         float pivot = r.End.Y;
         DrawSetTransformMatrix(new Transform2D(new Vector2(1, 0), new Vector2(0, scale), new Vector2(0, pivot * (1 - scale))));
-        DrawCard(font, r, h);
+        if (_back) DrawBack(font, r, h);
+        else DrawCard(font, r, h);
+        TurnLink(font, r);
         if (scale < 1) DrawRect(r, new Color(0, 0, 0, (1 - scale) * (fromTop ? 0.35f : 0.5f)));
         DrawSetTransformMatrix(Transform2D.Identity);
     }
@@ -280,9 +292,51 @@ public partial class Rolodex : Control
             : JobOf(h.Id) is { } job ? job
             : h.Id == gang.BossHoodId ? "Running the outfit."
             : "Free for work.";
-        sy = Paragraph(font, new Vector2(x + 10, sy), cw - 20, now, Type, r.End.Y - 10);
+        sy = Paragraph(font, new Vector2(x + 10, sy), cw - 20, now, Type, r.End.Y - 30);
         if (h.Loyalty < 30 && h.Ambition > 60 && h.Id != gang.BossHoodId)
-            Paragraph(font, new Vector2(x + 10, sy + 2), cw - 20, "Restless. Might break away.", Palette.Bad.Darkened(0.2f), r.End.Y - 10);
+            Paragraph(font, new Vector2(x + 10, sy + 2), cw - 20, "Restless. Might break away.", Palette.Bad.Darkened(0.2f), r.End.Y - 30);
+    }
+
+    /// <summary>The back of the card: the police record, typed up, newest first.</summary>
+    private void DrawBack(Font font, Rect2 r, Hood h)
+    {
+        var w = World!;
+        var x = r.Position.X;
+        var y = r.Position.Y;
+        float cw = r.Size.X;
+        DrawRect(new Rect2(r.Position + new Vector2(2, 3), r.Size), new Color(0, 0, 0, 0.35f));
+        DrawRect(r, Paper.Darkened(0.04f));
+        DrawLine(new Vector2(x, y + 26), new Vector2(x + cw, y + 26), RedRule, 1.5f);
+        for (float ly = y + 44; ly < r.End.Y - 6; ly += 14) DrawLine(new Vector2(x + 4, ly), new Vector2(x + cw - 4, ly), Rule with { A = 0.35f }, 1);
+        foreach (float sx in new[] { x + cw * 0.3f, x + cw * 0.7f })
+            DrawRect(new Rect2(sx - 7, r.End.Y - 7, 14, 7), MetalDark);
+
+        DrawString(font, new Vector2(x + 8, y + 18), "RAP SHEET", HorizontalAlignment.Left, -1, 13, RedRule.Darkened(0.15f));
+        DrawString(font, new Vector2(x + 8, y + 18), $"{Surname(h.Name)}, {h.Name.Split(' ')[0]}", HorizontalAlignment.Right, cw - 16, 12, Type);
+
+        float bottom = r.End.Y - 30, tw = cw - 20;
+        float sy = Paragraph(font, new Vector2(x + 10, y + 32), tw, Reports.Known(h), Type, bottom);
+        sy = Paragraph(font, new Vector2(x + 10, sy + 2), tw, Reports.Priors(h), h.Convictions >= Content.HabitualOffender ? Palette.Bad.Darkened(0.2f) : TypeQuiet, bottom);
+        if (h.Convictions >= Content.HabitualOffender)
+            Stamp(font, new Vector2(x + cw - 100, y + 30), "3 STRIKES", Palette.Bad.Darkened(0.25f));
+        int shown = 0;
+        foreach (var e in Enumerable.Reverse(h.Record))
+        {
+            if (sy > bottom - 14) break;
+            var colour = e.Kind switch { RapKind.Convicted => RedRule.Darkened(0.25f), RapKind.Acquitted => Palette.Good.Darkened(0.4f), RapKind.Turned => Palette.Bad, _ => Type };
+            DrawString(font, new Vector2(x + 10, sy + 13), $"{Content.StartYear + e.Week / Content.WeeksPerYear}", HorizontalAlignment.Left, 34, 11, TypeQuiet);
+            sy = Paragraph(font, new Vector2(x + 44, sy + 2), tw - 34, e.Text, colour, bottom);
+            shown++;
+        }
+        if (shown < h.Record.Count && sy <= bottom + 4)
+            DrawString(font, new Vector2(x + 10, sy + 11), $"…and {h.Record.Count - shown} older", HorizontalAlignment.Left, tw, 11, TypeQuiet);
+    }
+
+    /// <summary>The little link in the corner that turns the cards over.</summary>
+    private void TurnLink(Font font, Rect2 r)
+    {
+        string text = _back ? "‹ the card" : "rap sheet ›";
+        DrawString(font, new Vector2(r.End.X - 92, r.End.Y - 13), text, HorizontalAlignment.Right, 84, 12, RedRule.Darkened(0.15f));
     }
 
     private static string Capital(string s) => char.ToUpper(s[0]) + s[1..];

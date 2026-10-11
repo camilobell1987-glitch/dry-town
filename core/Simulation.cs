@@ -334,6 +334,7 @@ public sealed partial class Simulation
                 biz.ProtectionRate = Content.DefaultRatePercent;
                 biz.Resentment = Math.Min(100, biz.Resentment + 10);
                 gang.Heat = Math.Min(100, gang.Heat + 1);
+                hood.Deeds.Shakedowns++;
                 string text = $"{hood.Name} of {gang.Name} now protects {biz.Name}.";
                 w.Log(EventKind.Extorted, gang.Id, text);
                 w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Extort, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Success, text)));
@@ -375,12 +376,13 @@ public sealed partial class Simulation
                 ? $"{gang.Name} seized {biz.Name} and its {Content.Rackets[biz.Racket].Label} from {rival.Name}."
                 : $"{gang.Name} muscled {rival.Name} out of {biz.Name}.";
             w.Log(EventKind.Takeover, gang.Id, text);
+            hood.Deeds.Takeovers++;
             int casualty = -1;
             // A Thompson gun on the job leaves fewer men standing.
             if (w.Rng.Chance(backup.Prepend(hood).Any(h => h.Weapon == Weapon.TommyGun) ? 0.45 : 0.3))
             {
                 var victim = defender ?? PickVictim(rival);
-                if (victim != null) { Kill(victim, $"in a fight over {biz.Name}"); casualty = victim.Id; }
+                if (victim != null) { Kill(victim, $"in a fight over {biz.Name}"); casualty = victim.Id; hood.Deeds.Kills++; }
             }
             w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Takeover, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Won, text,
                 rival.Id, defender?.Id ?? -1, casualty)));
@@ -396,6 +398,9 @@ public sealed partial class Simulation
                 var fallen = backup.Count > 0 && w.Rng.Chance(0.5) ? w.Rng.Pick(backup) : hood;
                 Kill(fallen, $"trying to take {biz.Name}");
                 casualty = fallen.Id;
+                // Whoever answered the door gets the credit.
+                if (guarded) guard.Hood!.Deeds.Kills++;
+                else if (defender != null) defender.Deeds.Kills++;
             }
             w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Takeover, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Lost, text,
                 rival.Id, defender?.Id ?? -1, casualty)));

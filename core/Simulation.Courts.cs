@@ -5,25 +5,36 @@ public sealed partial class Simulation
 {
     /// <summary>
     /// Lock a man up. A petty charge is settled on the spot; anything longer holds him for trial,
-    /// where his gang's lawyer, a paid judge or a frightened jury can still get him off.
+    /// where his gang's lawyer, a paid judge or a frightened jury can still get him off. Every
+    /// conviction already on his record makes the sentence longer, and a man with three faces life.
     /// </summary>
     public void Jail(Hood hood, int weeks, string why, bool federal = false, double? strength = null)
     {
+        var w = World;
         hood.State = HoodState.Jailed;
         if (weeks <= Content.PettySentence)
         {
             hood.JailWeeks = weeks;
-            World.Log(EventKind.HoodJailed, hood.GangId, $"{hood.Name} got {weeks} weeks {why}.");
+            Book(hood, RapKind.Petty, $"Got {weeks} weeks {why}.");
+            w.Log(EventKind.HoodJailed, hood.GangId, $"{hood.Name} got {weeks} weeks {why}.");
             return;
         }
+        int priors = hood.Convictions;
+        bool life = priors >= Content.HabitualOffender;
+        weeks = Content.Sentence(weeks, priors);
         hood.JailWeeks = Content.WeeksToTrial;
         hood.Case = new Case
         {
             Charge = why, Sentence = weeks, Federal = federal, Strength = strength ?? (federal ? Content.FederalCase : Content.CityCase),
-            Prepared = World.GangById(hood.GangId).Lawyer != Lawyer.None,
+            Prepared = w.GangById(hood.GangId).Lawyer != Lawyer.None, Life = life,
         };
-        World.Log(EventKind.HoodJailed, hood.GangId, $"{hood.Name} was charged {why} and is held for trial. He faces {weeks} weeks.");
+        string faces = life ? "life, with three convictions behind him" : $"{weeks} weeks" + (priors > 0 ? $", more with {priors} conviction{(priors == 1 ? "" : "s")} behind him" : "");
+        Book(hood, RapKind.Charged, $"Charged {why}{(federal ? " in federal court" : "")}. Faced {faces}.");
+        w.Log(EventKind.HoodJailed, hood.GangId, $"{hood.Name} was charged {why} and is held for trial. He faces {faces}.");
     }
+
+    /// <summary>Put a line on a man's record.</summary>
+    private void Book(Hood hood, RapKind kind, string text) => hood.Record.Add(new RapEntry { Week = World.Week, Kind = kind, Text = text });
 
     /// <summary>How likely the jury is to convict him as things stand.</summary>
     public static double ConvictionChance(World w, Hood hood)
@@ -48,17 +59,29 @@ public sealed partial class Simulation
         {
             hood.State = HoodState.Free;
             hood.Loyalty = Math.Min(100, hood.Loyalty + 5);
+            Book(hood, RapKind.Acquitted, $"Acquitted {c.Charge}.");
             w.Log(EventKind.Trial, gang.Id, $"A jury acquitted {hood.Name} of {gang.Name}, charged {c.Charge}. He walked out of court a free man.");
+            return;
+        }
+        if (c.Life)
+        {
+            Book(hood, RapKind.Convicted, $"Convicted {c.Charge}. Sent away for life as a habitual offender.");
+            hood.State = HoodState.Gone;
+            hood.Case = null;
+            w.LeaveCrew(hood.Id);
+            w.Log(EventKind.Trial, gang.Id, $"{hood.Name} of {gang.Name} was convicted {c.Charge}. It was his fourth conviction, and under the habitual offender law he goes away for life.");
             return;
         }
         // The weeks he was held for trial count against the sentence.
         hood.JailWeeks = Math.Max(1, c.Sentence - Content.WeeksToTrial);
+        Book(hood, RapKind.Convicted, $"Convicted {c.Charge}. Sent away for {c.Sentence} weeks.");
         w.Log(EventKind.Trial, gang.Id, $"{hood.Name} of {gang.Name} was convicted {c.Charge} and sent away for {c.Sentence} weeks.");
         // A man going away for a long time who owes his outfit nothing may make a deal.
         if (hood.Loyalty < 30 && c.Sentence >= 26 && w.Rng.Chance(0.3))
         {
             gang.Heat = Math.Min(100, gang.Heat + 15);
             hood.Loyalty = 0;
+            Book(hood, RapKind.Turned, $"Turned state's evidence against {gang.Name}.");
             w.Log(EventKind.Squeal, gang.Id, $"{hood.Name} turned state's evidence against {gang.Name} for a shorter stretch.");
         }
     }

@@ -37,6 +37,7 @@ public sealed class CommandShell
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
+        "sheet <hood> (any man's rap sheet)\n" +
         "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
@@ -80,6 +81,9 @@ public sealed class CommandShell
                 case "buy": return BuyFront(int.Parse(p[1]));
                 case "cases": return Reports.Cases(W, Me);
                 case "relations": return Reports.Relations(W, Me);
+                case "sheet":
+                    if (W.Hoods.FirstOrDefault(h => h.Id == int.Parse(p[1]) && h.IsActive) is not { } man) return "No such man. Type 'hoods'.\n";
+                    return Reports.Sheet(W, man);
                 case "truce": return Talk(p[1], g => W.Propose(W.Player, g, PactKind.Truce, p.Length > 2 ? int.Parse(p[2]) : 0));
                 case "ally": return Talk(p[1], g => W.Propose(W.Player, g, PactKind.Alliance));
                 case "demand": return Talk(p[1], g => W.Demand(W.Player, g, int.Parse(p[2])));
