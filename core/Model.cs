@@ -11,7 +11,7 @@ public enum Weapon { None, Pistol, Shotgun, TommyGun }
 /// <summary>What a man drives. A car gets him there faster and away when it goes wrong.</summary>
 public enum Car { None, ModelT, Packard, Cadillac }
 
-public enum RacketKind { None, Speakeasy, Numbers, LoanShark, Still, Bookie, GamblingDen, Counterfeit }
+public enum RacketKind { None, Speakeasy, Numbers, LoanShark, Still, Bookie, GamblingDen, Counterfeit, Slots, Casino }
 
 public sealed class Hood
 {
@@ -307,10 +307,13 @@ public sealed class WeekLedger
     /// <summary>Skimmed from the union locals the gang runs, and the longshoremen's cut of other outfits' boats.</summary>
     public long Dues { get; set; }
 
+    /// <summary>The other outfits' bookies' fees, for the outfit that runs the racing wire.</summary>
+    public long Wire { get; set; }
+
     /// <summary>Dirty money that went through the books this week. Not income: it was already in the safe.</summary>
     public long Laundered { get; set; }
 
-    public long Net => Protection + Rackets + Legit + TributeIn + Dues - Wages - Spending - Fines - LaunderFee - TributePaid;
+    public long Net => Protection + Rackets + Legit + TributeIn + Dues + Wire - Wages - Spending - Fines - LaunderFee - TributePaid;
 }
 
 public enum EventKind
@@ -325,6 +328,8 @@ public enum EventKind
     Whisper,
     /// <summary>Union locals taken over, strikes, and the docks.</summary>
     Union,
+    /// <summary>After repeal: the racing wire changing hands, the Bureau's public enemy, and the G-men's arrests.</summary>
+    Gmen,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

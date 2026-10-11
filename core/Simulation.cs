@@ -249,6 +249,7 @@ public sealed partial class Simulation
         // After the city's temper has cooled for the week, so the war's share of it stays.
         Wars();
         Feds();
+        Gmen();
         CityNews();
         Loyalty();
         Aging();
@@ -267,6 +268,7 @@ public sealed partial class Simulation
         {
             w.Log(EventKind.Era, -1, "Prohibition is repealed. Liquor is legal again and bootleg margins collapse.");
             CloseLines();
+            Repealed();
         }
     }
 
@@ -476,6 +478,8 @@ public sealed partial class Simulation
         double front = Math.Max(handler?.Strength ?? 0, avg * 0.5);
         // A man posted on the door all week, expecting trouble, fights harder than one called in.
         if (guard != null) front = Math.Max(front, guard.Strength + 3 + guardBackup);
+        // A casino keeps its own men on the door.
+        if (biz.Racket == RacketKind.Casino && World.Working(biz)) front += Content.CasinoDoor;
         int turf = world.TurfOf(rival.Id).Count();
         double coverage = Math.Min(1.0, available.Count * (double)BusinessesPerHandler / Math.Max(1, turf * 2));
         return front + 3 * coverage;
@@ -485,11 +489,8 @@ public sealed partial class Simulation
     {
         var w = World;
         var biz = w.Businesses.FirstOrDefault(b => b.Id == o.BusinessId);
-        if (biz == null || biz.ProtectorGangId != gang.Id || biz.Racket != RacketKind.None || !biz.IsOpen) return;
-        if (!Content.Rackets.TryGetValue(o.Racket, out var info)) return;
-        if (!Content.RacketsFor(biz.Kind).Contains(o.Racket)) return;
-        if (info.NeedsProhibition && !w.Prohibition) return;
-        if (gang.Cash < info.SetupCost) return;
+        if (biz == null || w.CannotOpenRacket(gang, biz, o.Racket) != null) return;
+        var info = Content.Rackets[o.Racket];
         if (!TryUseHood(gang, o.HoodId, out var hood)) return;
 
         gang.Cash -= info.SetupCost;
@@ -572,6 +573,13 @@ public sealed partial class Simulation
 
             biz.Resentment = own ? 0 : Math.Clamp(biz.Resentment + (biz.ProtectionRate - 12) / 2 - 1, 0, 100);
 
+            // A casino is its owners' own business. Whoever takes the hotel from them gets the rooms, not the tables.
+            if (biz.Racket == RacketKind.Casino && !World.Working(biz))
+            {
+                biz.Racket = RacketKind.None;
+                w.Log(EventKind.Lapsed, gang.Id, $"With {(biz.OwnerGangId >= 0 ? w.GangById(biz.OwnerGangId).Name : "its owners")} gone from it, the casino at {biz.Name} shut its doors.");
+            }
+
             if (biz.Racket != RacketKind.None)
             {
                 var info = Content.Rackets[biz.Racket];
@@ -579,8 +587,16 @@ public sealed partial class Simulation
                 if (!supplied.TryGetValue(gang.Id, out var real)) supplied[gang.Id] = real = w.Supplied(gang.Id);
                 int income = (int)((legalNow ? info.WeeklyIncome * 3 / 10 : info.WeeklyIncome) * w.RacketFactor(biz.Racket) * w.BoozeFactor(biz, gang, real));
                 int heat = legalNow ? 0 : info.WeeklyHeat * w.RacketHeatFactor(biz.Racket);
+                if (biz.Racket == RacketKind.Bookie) income = Wire(gang, income);
                 gang.Cash += income;
-                ledger.Rackets += income;
+                if (biz.Racket == RacketKind.Casino)
+                {
+                    // A casino keeps books like any hotel. Its money comes in clean, but the ward has to look the other way.
+                    gang.CleanCash += income;
+                    ledger.Legit += income;
+                    if (!Politics.Covered(w, gang, biz)) heat = Content.CasinoHeatUncovered;
+                }
+                else ledger.Rackets += income;
                 gang.Heat = Math.Min(100, gang.Heat + heat);
                 if (biz.Racket == RacketKind.LoanShark) biz.Resentment = Math.Min(100, biz.Resentment + 1);
             }

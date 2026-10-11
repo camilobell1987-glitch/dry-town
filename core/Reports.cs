@@ -3,7 +3,7 @@ using System.Text;
 namespace DryTown.Core;
 
 /// <summary>Plain-text reports shared by the console runner and the Godot screen.</summary>
-public static class Reports
+public static partial class Reports
 {
     public static string Date(World w) => $"Week {w.WeekOfYear}, {w.Year}";
 

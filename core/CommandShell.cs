@@ -27,7 +27,7 @@ public sealed class CommandShell
 
     public static readonly string Help =
         "gangs | hoods | turf | targets | log\n" +
-        "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit>\n" +
+        "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit|slots|casino>\n" +
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "crews [gang] (yours, or a rival's) | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
@@ -46,6 +46,7 @@ public sealed class CommandShell
         "hunt <hood> (look for a rat) | plant <hood> <gang> (sign him on with a rival) | recall <hood> (bring him home)\n" +
         "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
         "war <gang> (go to the mattresses against them) | calloff (end a war you started)\n" +
+        "wire (who runs the racing wire, after repeal) | gmen (the Bureau's Public Enemy Number One)\n" +
         "goal (the scenario's goal and how you stand)\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
@@ -98,6 +99,8 @@ public sealed class CommandShell
                     W.SetCut(W.Player, Enum.Parse<Cut>(p[1], true));
                     return $"Your liquor is {Content.Label(W.Player.Cut)} now.\n";
                 case "unions": return Reports.Unions(W, Me);
+                case "wire": return Reports.Wire(W, Me);
+                case "gmen": return Reports.Gmen(W, Me);
                 case "goal": return W.Settings.Scenario == ScenarioKind.None ? "This is the open city: no goal but the one you set yourself.\n" : Scenarios.Summary(W) + "\n";
                 case "local": return Queue(new UnionOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "strike": return Strike(int.Parse(p[1]), p[2]);
@@ -339,7 +342,7 @@ public sealed class CommandShell
             ExtortOrder e => e.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null) ?? CheckBiz(e.BusinessId),
             RacketOrder r => CheckHood(r.HoodId) ?? CheckBiz(r.BusinessId)
                 ?? (W.BusinessById(r.BusinessId).ProtectorGangId != Me ? "You can only open a racket on your own turf." : null)
-                ?? (!Content.RacketsFor(W.BusinessById(r.BusinessId).Kind).Contains(r.Racket) ? "That business can't hide that racket." : null),
+                ?? W.CannotOpenRacket(W.Player, W.BusinessById(r.BusinessId), r.Racket),
             SetRateOrder s => CheckBiz(s.BusinessId),
             RecruitOrder { Family: true } => Pending.Any(o => o is RecruitOrder { Family: true }) ? "Family is already coming this week."
                 : !Simulation.CanBringInFamily(W, W.Player) ? $"You can bring family in once a year, for ${Content.FamilyCost}." : null,

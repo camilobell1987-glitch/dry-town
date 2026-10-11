@@ -217,6 +217,7 @@ public partial class Main : Control
             Line("Tribute received", l.TributeIn, false);
             Line("Tribute paid", l.TributePaid, true);
             Line("Union dues", l.Dues, false);
+            Line("The racing wire", l.Wire, false);
             var net = l.Net >= 0 ? Palette.Good : Palette.Bad;
             sb.Append($"[b]Net [color={C(net)}]{(l.Net >= 0 ? "+" : "-")}${Math.Abs(l.Net):N0}[/color][/b]   Cash ${p.Cash:N0} (${p.Clean:N0} clean) · Heat {p.Heat}\n");
             if (l.Laundered > 0) sb.Append($"[color={C(Palette.InkQuiet)}]Washed ${l.Laundered:N0} through your fronts.[/color]\n");
@@ -225,6 +226,7 @@ public partial class Main : Control
         else if (!p.Alive) sb.Append($"[color={C(Palette.Bad)}]Your outfit is finished. The city goes on without you.[/color]\n\n");
 
         sb.Append(InThePapers());
+        sb.Append(PublicEnemySection());
         sb.Append($"[color={C(Palette.InkQuiet)}]HEADLINES[/color]\n");
         foreach (var e in W.Events.Where(e => e.Week == week && (Reports.IsHeadline(e) || e.Kind == EventKind.Whisper && e.GangId == p.Id)).OrderBy(e => e.Tick))
         {
@@ -348,8 +350,9 @@ public partial class Main : Control
         else AddLabel(_businessPanel, "Pays nobody.", Palette.InkQuiet);
         if (!b.IsFront || b.OwnerGangId != b.ProtectorGangId) AddLabel(_businessPanel, $"Resentment {b.Resentment}/100" + (b.Resentment > 60 ? " · may talk to the police" : ""), b.Resentment > 60 ? Palette.Bad : Palette.InkQuiet);
         FrontLines(b);
-        if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {Content.Rackets[b.Racket].Label}", Palette.Bad);
+        if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {RacketLabel(b)}", Palette.Bad);
         BoozeLine(b);
+        RepealLine(b);
         UnionLine(b);
         if (!b.IsOpen) AddLabel(_businessPanel, W.Week - b.BurnedWeek <= 8 ? $"Burned out. Rebuilding for {b.ShutWeeks} more weeks." : $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
 
@@ -451,17 +454,19 @@ public partial class Main : Control
 
         if (hoods.Count == 0 && crews.Count == 0) { AddLabel(_businessPanel, "All your men have jobs this week. Cancel one on the Orders tab to free him.", Palette.InkQuiet, wrap: true); return; }
 
+        // Rackets the back room could take, short of the money for them.
         var rackets = Content.RacketsFor(b.Kind)
+            .Where(k => W.CannotOpenRacket(W.Player, b, k) is not { } why || why.StartsWith("That costs"))
             .Select(k => Content.Rackets[k])
-            .Where(r => !r.NeedsProhibition || W.Prohibition)
             .ToList();
-        if (b.Racket == RacketKind.None && rackets.Count > 0 && hoods.Count > 0)
+        if (rackets.Count > 0 && hoods.Count > 0)
         {
             _businessPanel.AddChild(new HSeparator());
-            AddLabel(_businessPanel, "Open a racket in the back room", Palette.Ink);
+            AddLabel(_businessPanel, b.Racket == RacketKind.None ? "Open a racket in the back room" : $"Put the back room to better use than a {RacketLabel(b)}", Palette.Ink);
             var racketPick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
             foreach (var r in rackets)
-                racketPick.AddItem($"{r.Label} · costs ${r.SetupCost}, pays ~${r.WeeklyIncome}/week, +{r.WeeklyHeat} heat" + (r.Kind == RacketKind.Counterfeit ? ", Treasury risk" : ""), (int)r.Kind);
+                racketPick.AddItem($"{r.Label} · costs ${r.SetupCost}, pays ~${r.WeeklyIncome}/week{(r.Kind == RacketKind.Casino ? " clean" : "")}, +{r.WeeklyHeat} heat" +
+                    (r.Kind == RacketKind.Counterfeit ? ", Treasury risk" : r.Kind == RacketKind.Casino && !Politics.Covered(W, W.Player, b) ? $" (+{Content.CasinoHeatUncovered} without the ward's alderman)" : ""), (int)r.Kind);
             _businessPanel.AddChild(racketPick);
             var who = HoodPicker(hoods, h => $"brains {h.Brains}");
             AddButton(_businessPanel, "Open it", () => Queue(new RacketOrder(Me, who.GetSelectedId(), b.Id, (RacketKind)racketPick.GetSelectedId())));
@@ -1036,7 +1041,9 @@ public partial class Main : Control
         if (Arg("--seed") is string seed) NewGame(ulong.Parse(seed));
         if (Arg("--load") is string slot) GD.Print(LoadGame(int.Parse(slot)) ? $"Loaded {SlotPath(int.Parse(slot))}" : "Load failed");
         int weeks = int.Parse(Arg("--weeks") ?? "0");
+        if (weeks > 0 && IsInstanceValid(_briefing)) _briefing!.Hide();
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
+        if (Arg("--repeal") is string repeal) SetUpRepeal(repeal);
         if (Arg("--fronts") is string fronts)
         {
             // Buy the richest places on your turf as fronts, then let a few weeks wash money through them.

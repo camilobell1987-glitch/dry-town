@@ -496,6 +496,7 @@ public sealed partial class World
         Pacts = Pacts,
         Wars = Wars,
         Goal = Goal,
+        Repeal = Repeal,
         Grudges = Grudges,
         Offers = Offers,
         CityEvents = CityEvents,
@@ -520,6 +521,7 @@ public sealed partial class World
         w.Pacts.AddRange(d.Pacts);
         w.Wars.AddRange(d.Wars);
         if (d.Goal != null) w.Goal = d.Goal;
+        if (d.Repeal != null) w.Repeal = d.Repeal;
         w.Grudges.AddRange(d.Grudges);
         w.Offers.AddRange(d.Offers);
         w.CityEvents.AddRange(d.CityEvents);
