@@ -1053,6 +1053,15 @@ public partial class Main : Control
             _talkTo = rivals[0].Id;
             W.AddGrudge(rivals[0].Id, Me, 30 - W.GrudgeOf(rivals[0].Id, Me));
         }
+        if (Flag("--war"))
+        {
+            // At war with the biggest rival for a few weeks, talking to them.
+            W.Pacts.RemoveAll(p => p.Involves(Me));
+            var enemy = W.LivingGangs.Where(g => !g.IsPlayer && W.WarOf(g.Id) == null).OrderByDescending(W.Power).First();
+            W.Declare(W.Player, enemy);
+            W.Wars.Single(x => x.Involves(Me)).StartWeek = W.Week - 5;
+            _talkTo = enemy.Id;
+        }
         if (Flag("--gang-crews"))
         {
             // Talk to the outfit with the most crews, with a man of yours inside it.

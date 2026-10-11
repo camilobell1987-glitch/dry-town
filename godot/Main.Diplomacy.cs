@@ -55,7 +55,7 @@ public partial class Main
             for (int i = 0; i < cols.Length; i++) { it.SetText(i, cols[i]); it.SetTooltipText(i, tip); }
             it.SetMetadata(0, g.Id);
             it.SetCustomColor(0, Palette.Gang(W, g.Id));
-            if (!g.IsPlayer) it.SetCustomColor(4, W.AtPeace(Me, g.Id) ? Palette.Good : W.GrudgeOf(g.Id, Me) > Content.GrudgeTooDeep ? Palette.Bad : Palette.InkQuiet);
+            if (!g.IsPlayer) it.SetCustomColor(4, W.AtPeace(Me, g.Id) ? Palette.Good : W.AtWar(Me, g.Id) || W.GrudgeOf(g.Id, Me) > Content.GrudgeTooDeep ? Palette.Bad : Palette.InkQuiet);
             if (g.Id == _talkTo) it.Select(0);
         }
         RefreshDiplomacy();
@@ -64,8 +64,9 @@ public partial class Main
     /// <summary>Where you stand with a gang, in a word for the list.</summary>
     private string Short(Gang g)
     {
+        if (W.AtWar(Me, g.Id)) return "war";
         var p = W.PactBetween(Me, g.Id);
-        if (p == null) return W.GrudgeOf(g.Id, Me) > Content.GrudgeTooDeep ? "war" : W.GrudgeOf(g.Id, Me) > 20 ? "sore" : "";
+        if (p == null) return W.GrudgeOf(g.Id, Me) > Content.GrudgeTooDeep ? "hate you" : W.GrudgeOf(g.Id, Me) > 20 ? "sore" : "";
         return p.Kind == PactKind.Alliance ? "ally" : p.PayerId == Me ? "you pay" : p.PayerId >= 0 ? "pays you" : "truce";
     }
 
@@ -94,6 +95,7 @@ public partial class Main
             AddLabel(_talkPanel, "Pick a gang above to talk terms with them.", Palette.InkQuiet, wrap: true);
             AddLabel(_talkPanel, $"A truce keeps both sides off each other's turf for {Content.TruceWeeks} weeks. An outfit much stronger than you wants paying for one, and one much weaker might pay you. Allies take up each other's quarrels. Break your word and nobody signs with you for a year.", Palette.InkQuiet, 13, wrap: true);
             if (W.Untrusted(me)) AddLabel(_talkPanel, "You broke your word this year. Nobody will sign with you until it's forgotten.", Palette.Bad, 13, wrap: true);
+            WarStatus();
             return;
         }
 
@@ -102,8 +104,9 @@ public partial class Main
         int hate = W.GrudgeOf(them.Id, Me), mine = W.GrudgeOf(Me, them.Id);
         AddLabel(_talkPanel, (hate > Content.GrudgeTooDeep ? $"They hate you ({hate}): it will cost you to make peace." : hate > 0 ? $"They hold a grudge against you ({hate})." : "They have nothing against you.")
             + (mine > 0 ? $" Your men have their own score to settle with them ({mine})." : ""), hate > Content.GrudgeTooDeep ? Palette.Bad : Palette.InkQuiet, 13, wrap: true);
-        AddLabel(_talkPanel, Capital(Reports.Standing(W, me, them)) + ".", W.AtPeace(Me, them.Id) ? Palette.Good : Palette.InkQuiet);
+        AddLabel(_talkPanel, Capital(Reports.Standing(W, me, them)) + ".", W.AtPeace(Me, them.Id) ? Palette.Good : W.AtWar(Me, them.Id) ? Palette.Bad : Palette.InkQuiet);
         CrewsOf(them);
+        WarActions(them);
 
         if (W.PactBetween(Me, them.Id) is { } pact)
         {
@@ -116,6 +119,8 @@ public partial class Main
             int ask = Content.TributeAsk(W.Income(me));
             if (W.WantsPaying(me, them))
                 AddButton(_talkPanel, $"Offer ${ask} a week for a truce", () => Say(W.Propose(me, them, PactKind.Truce, ask)));
+            // In the middle of a war, a truce is the only thing worth talking about.
+            if (W.AtWar(Me, them.Id)) { if (_answer.Length > 0) AddLabel(_talkPanel, _answer, Palette.Player, wrap: true); return; }
             AddButton(_talkPanel, "Propose an alliance", () => Say(W.Propose(me, them, PactKind.Alliance)));
             int demand = Content.TributeAsk(W.Income(them));
             AddButton(_talkPanel, $"Demand ${demand} a week to leave them alone", () => Say(W.Demand(me, them, demand)));
@@ -138,6 +143,32 @@ public partial class Main
             AddLabel(_talkPanel, $"{lt.Name}'s crew · {men} · strength {Reports.CrewStrength(W, c):0} together.{mood}",
                 mood.Length > 0 ? Palette.Bad : Palette.InkQuiet, 13, wrap: true);
         }
+    }
+
+    /// <summary>Your war, if you have one: what it costs and how it ends.</summary>
+    private void WarStatus()
+    {
+        if (W.WarOf(Me) is not { } war) return;
+        var enemy = W.GangById(war.Other(Me));
+        int weeks = W.Week - war.StartWeek;
+        _talkPanel.AddChild(new HSeparator());
+        AddLabel(_talkPanel, $"At war with {enemy.Name}", Palette.Bad, 15);
+        AddLabel(_talkPanel, $"Your men are on the mattresses, ${Simulation.MattressBill(W, W.Player)} a week for the safehouses. Hits on {enemy.Name} are {Content.WarHit:P0} likelier and draw half the heat, and both bosses are hard to reach. Each week you draw {Content.WarHeat(weeks)} heat and the city's outrage climbs by {Content.WarOutrage(weeks)}, more the longer it goes on.",
+            Palette.InkQuiet, 13, wrap: true);
+        if (war.A == Me) AddButton(_talkPanel, "Come off the mattresses", () => Say(W.CallOff(W.Player)));
+        else AddLabel(_talkPanel, $"{enemy.Name} started it. Only they can call it off; a truce ends it from your side.", Palette.InkQuiet, 13, wrap: true);
+    }
+
+    /// <summary>Going to war with the gang you're talking to, or the war you're already in.</summary>
+    private void WarActions(Gang them)
+    {
+        if (W.AtWar(Me, them.Id)) { WarStatus(); return; }
+        _talkPanel.AddChild(new HSeparator());
+        AddLabel(_talkPanel, $"Go to the mattresses: open war with {them.Name}. Both outfits' men sleep in safehouses (${Content.MattressCost} a man a week), hits between you are {Content.WarHit:P0} likelier and draw half the heat, and both bosses hole up. The heat and the city's outrage climb every week it lasts. You can call it off whenever you like.",
+            Palette.InkQuiet, 13, wrap: true);
+        var problem = W.CannotDeclare(W.Player, them);
+        var go = AddButton(_talkPanel, problem ?? $"Go to the mattresses against {them.Name}", () => Say(W.Declare(W.Player, them)));
+        go.Disabled = problem != null;
     }
 
     private void Say(string answer)

@@ -21,7 +21,7 @@ There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). To play the game, install the **.NET edition** of Godot 4.7, open `godot/project.godot` and press Play. If your editor is a different 4.x version, it updates the version in `DryTown.csproj` when it opens the project.
 
 ```sh
-dotnet test tests                                                    # 152 tests
+dotnet test tests                                                    # 162 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
@@ -184,6 +184,21 @@ The console has `relations`, `truce <gang> [tribute]`, `ally <gang>`, `demand <g
 
 ![Talking terms on the Gangs tab](docs/screenshots/diplomacy.png)
 
+### Going to the mattresses
+
+When a grudge runs too deep for raids and fires, an outfit can declare open war. Pick a gang on the **Gangs** tab and press **Go to the mattresses**, or type `war <gang>`. Until it ends:
+
+- Both outfits' men sleep in safehouses. That costs $15 a man every Sunday, on top of wages.
+- Hits between the two are 15 points likelier, and a successful one draws half the usual heat: the police write it off as gangland business.
+- Both bosses hole up, so they're as hard to reach as a boss with soldiers round him, however few men the outfit has.
+- Both sides draw heat every week, and the city's outrage climbs, both by more the longer the war lasts. Outrage feeds the reformers at the next election.
+
+An outfit can only fight one war at a time, and a pact has to be broken before its partner can be attacked. Only the side that started a war can call it off (**Come off the mattresses**, or `calloff`). The other side can end it by getting a truce, paid for if it has to be. A war also ends when either outfit is finished.
+
+Rival outfits go to war too. An aggressive outfit with a deep grudge against one no stronger than itself goes to the mattresses, if it has the money to keep its men there for a couple of months. While at war it sends men after the enemy's best man, or its boss if the odds are good, every other week. It calls the war off once its anger cools, the fight turns against it, or the money runs short. **Plan for me** never starts a war, but it calls off one you started on the same terms.
+
+![At war with a rival, on the Gangs tab](docs/screenshots/mattresses.png)
+
 ## City Hall
 
 The city is split into wards, and each ward has an alderman. Open the **City Hall** tab and the map shows the wards, each washed in the colour of the outfit that owns its alderman. Click a ward on the map or in the list to see who runs it.
@@ -296,7 +311,7 @@ Scroll to zoom, and drag with the right or middle mouse button to pan. Trackpad 
 ![Sending a man mid-week](docs/screenshots/mid-week.png)
 ![Saturday night](docs/screenshots/night.png)
 
-The **Console** tab and `sim play` take the same text orders: `extort <hood> <business>`, `racket <hood> <business> <kind>`, `guard <hood> <business>`, `recruit`, `bribe <dollars>`, `rate <business> <percent>`, `crews [gang]`, `crew new <hood>`, `crew add <crew> <hood>`, `send <crew> <business>`, `post <crew> <business>`, `wards`, `payoff <ward>`, `campaign <ward|mayor> <dollars>`, `street`, `hire <person>`, `paycop <person>`, `buystory <person>`, `silence <hood> <person>`, `torch <hood> <business>`, `hit <hood> <target> [backup…]`, `banks`, `rob <hood> <bank> [backup…]`, `hijack <hood> <business> [backup…]`, `shops`, `arm <hood> <pistol|shotgun|tommygun>`, `drive <hood> <modelt|packard|cadillac>`, `hand <from> <to> <gun|car>`, `fronts`, `buy <business>`, `booze`, `buyline <line>`, `waylay <hood> <line> [backup…]`, `cut <straight|watered|hard>`, `cases`, `lawyer <none|storefront|mouthpiece>`, `judge <hood>`, `jury <hood> <defendant>`, `sheet <hood>`, `relations`, `truce <gang> [tribute]`, `ally <gang>`, `demand <gang> <dollars>`, `break <gang>`, `accept <offer>`, `decline <offer>`, `auto`, `end`. `arm`, `drive`, `buy`, `buyline`, `cut`, `lawyer`, `judge` and the talks with other gangs act on the spot.
+The **Console** tab and `sim play` take the same text orders: `extort <hood> <business>`, `racket <hood> <business> <kind>`, `guard <hood> <business>`, `recruit`, `bribe <dollars>`, `rate <business> <percent>`, `crews [gang]`, `crew new <hood>`, `crew add <crew> <hood>`, `send <crew> <business>`, `post <crew> <business>`, `wards`, `payoff <ward>`, `campaign <ward|mayor> <dollars>`, `street`, `hire <person>`, `paycop <person>`, `buystory <person>`, `silence <hood> <person>`, `torch <hood> <business>`, `hit <hood> <target> [backup…]`, `banks`, `rob <hood> <bank> [backup…]`, `hijack <hood> <business> [backup…]`, `shops`, `arm <hood> <pistol|shotgun|tommygun>`, `drive <hood> <modelt|packard|cadillac>`, `hand <from> <to> <gun|car>`, `fronts`, `buy <business>`, `booze`, `buyline <line>`, `waylay <hood> <line> [backup…]`, `cut <straight|watered|hard>`, `cases`, `lawyer <none|storefront|mouthpiece>`, `judge <hood>`, `jury <hood> <defendant>`, `sheet <hood>`, `relations`, `truce <gang> [tribute]`, `ally <gang>`, `demand <gang> <dollars>`, `break <gang>`, `accept <offer>`, `decline <offer>`, `war <gang>`, `calloff`, `auto`, `end`. `arm`, `drive`, `buy`, `buyline`, `cut`, `lawyer`, `judge` and the talks with other gangs, wars included, act on the spot.
 
 ## Systems
 
@@ -306,7 +321,7 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 - **Turf wars and guards.** A hood sent at a rival's business fights whoever answers the door. That is the guard posted there, otherwise the business's handler. A guard fights harder than a handler who gets called in. The rest of the rival gang only backs him up if it isn't spread thin. Losers can die.
 - **Heat.** Rackets, violence and sheer size draw police attention. High heat brings raids, fines, closed rackets and arrests. Bribes cool it, and so do aldermen on the payroll and a mayor who owes you.
 - **Trials.** Serious charges go to a jury after three weeks. Lawyers, paid judges and frightened jurors lower the odds of a conviction. Each conviction on a man's rap sheet lengthens his next sentence, and a fourth is life (see above).
-- **Diplomacy.** Grudges, truces, tribute and alliances between outfits (see above).
+- **Diplomacy.** Grudges, truces, tribute and alliances between outfits, and open wars (see above).
 - **Feds.** Treasury tax cases hit gangs holding large amounts of dirty money. They can't be bribed, they seize money, and they can send the boss away. Money washed through a front is out of their reach (see above). Treasury agents also find counterfeiting presses.
 - **The street.** Drifters, beat cops, reporters and witnesses (see above). Violent crimes may leave a witness, and a gang that runs hot gets a reporter on its tail.
 - **Guns and cars.** A gun adds to a man's strength and his menace; a car gets a job there sooner and gets the men away when it goes wrong (see above).
@@ -322,20 +337,23 @@ All gangs, including the player's, were run by the AI planner. A city counts as 
 | --- | --- | --- | --- | --- | --- |
 | 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 | 80/80 | 20/20 (seeds 100–119) |
 | 50-year cities contested (Phase 6, before the street) | 10/10 | | 10/10 | 8/8 | |
-| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 71/80 / 53/80 | 68/80 / 42/80 | 59/80 / 45/80 | 61/80 / 60/80 | 16/20 / 15/20 (seeds 100–119) |
-| Arson / hits / bank jobs / hijacks per city per year | 1.4 / 0.1 / 0.1 / 2.2 | 1.9 / 0.1 / 0.2 / 2.8 | 2.3 / 0.1 / 0.3 / 3.3 | 1.2 / 0.2 / 0.5 / 1.7 | 0.8 / 0.1 / 0.5 / 1.0 |
-| Guns and cars bought per city per year; men carrying a gun after 10 years | 49; 48% | 46; 34% | 43; 26% | 53; 21% | 102; 30% |
-| Fronts bought and tax cases per city per year; gangs' cash that is clean after 10 years | 1.4, 0.83; 58% | 1.6, 0.96; 57% | 1.5, 1.16; 70% | 1.8, 1.43; 80% | 4.8, 1.11; 89% |
-| Trials per city per year; acquitted | 29; 24% | 36; 21% | 38; 19% | 40; 18% | 49; 17% |
-| Life sentences for a fourth conviction per city per year; men with a conviction / two or more after 10 years | 0.39; 53% / 19% | 0.30; 47% / 14% | 0.30; 42% / 13% | 0.16; 31% / 8% | 0.14; 25% / 5% |
-| Truces / tribute deals / alliances / broken pacts per city per year; pacts standing after 10 years | 2.7 / 13 / 2.0 / 1.0; 6.0 | 2.0 / 16 / 2.9 / 1.3; 6.7 | 1.6 / 16 / 3.6 / 1.4; 5.7 | 1.0 / 14 / 3.4 / 1.1; 4.7 | 0.9 / 15 / 2.8 / 0.8; 4.5 |
-| Men run for alderman / own men elected / weeks worked at the polls per city per year; seats held by an outfit's own man after 10 years | 0.69 / 0.20 / 1.3; 0.4 | 0.92 / 0.33 / 2.2; 0.8 | 0.91 / 0.42 / 2.6; 1.2 | 0.89 / 0.46 / 2.9; 1.4 | 1.07 / 0.56 / 3.3; 1.8 |
-| Random city events per city per year | 2.5 | 2.5 | 2.6 | 2.6 | 2.6 |
-| Men talking to the DA / men who turned / informers' cases / men planted in a rival, per city per year | 2.0 / 0.33 / 0.17 / 0.01 | 2.2 / 0.39 / 0.17 / 0.16 | 2.1 / 0.44 / 0.27 / 0.25 | 2.4 / 0.53 / 0.30 / 0.53 | 2.2 / 0.57 / 0.51 / 0.71 |
-| Rival crews after 10 years; rival men in one | 6.0; 68% | 9.7; 73% | 10.2; 67% | 10.6; 48% | 12.4; 33% |
-| Supply lines bought / shipments stopped / lines changing hands after one / bad batches, per city per year | 1.33 / 0.97 / 0.22 / 0.38 | 1.46 / 1.44 / 0.29 / 0.35 | 1.30 / 1.76 / 0.31 / 0.33 | 1.20 / 0.92 / 0.17 / 0.22 | 0.93 / 0.48 / 0.13 / 0.18 |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 70/80 / 54/80 | 72/80 / 42/80 | 64/80 / 55/80 | 65/80 / 61/80 | 17/20 / 17/20 (seeds 100–119) |
+| Arson / hits / bank jobs / hijacks per city per year | 1.2 / 2.1 / 0.1 / 2.3 | 1.8 / 3.3 / 0.2 / 2.9 | 2.1 / 2.9 / 0.3 / 3.1 | 1.3 / 3.1 / 0.5 / 2.0 | 0.8 / 2.6 / 0.6 / 1.3 |
+| Guns and cars bought per city per year; men carrying a gun after 10 years | 47; 47% | 43; 33% | 41; 24% | 52; 19% | 90; 28% |
+| Fronts bought and tax cases per city per year; gangs' cash that is clean after 10 years | 1.4, 0.79; 57% | 1.5, 0.94; 56% | 1.4, 1.18; 69% | 2.0, 1.38; 83% | 5.0, 1.10; 92% |
+| Trials per city per year; acquitted | 30; 24% | 36; 21% | 37; 19% | 41; 18% | 48; 17% |
+| Life sentences for a fourth conviction per city per year; men with a conviction / two or more after 10 years | 0.32; 54% / 18% | 0.32; 46% / 15% | 0.30; 40% / 13% | 0.18; 31% / 8% | 0.13; 26% / 5% |
+| Truces / tribute deals / alliances / broken pacts per city per year; pacts standing after 10 years | 2.9 / 13 / 1.8 / 0.8; 5.8 | 2.0 / 15 / 3.0 / 1.2; 6.0 | 1.5 / 15 / 3.6 / 1.2; 5.8 | 1.0 / 14 / 3.8 / 1.1; 4.2 | 0.9 / 15 / 2.8 / 0.7; 7.0 |
+| Men run for alderman / own men elected / weeks worked at the polls per city per year; seats held by an outfit's own man after 10 years | 0.69 / 0.18 / 1.2; 0.4 | 0.90 / 0.31 / 2.1; 0.8 | 0.90 / 0.43 / 2.5; 1.3 | 0.91 / 0.47 / 2.9; 1.5 | 1.03 / 0.53 / 3.2; 1.5 |
+| Random city events per city per year | 2.7 | 2.5 | 2.7 | 2.5 | 2.7 |
+| Men talking to the DA / men who turned / informers' cases / men planted in a rival, per city per year | 2.0 / 0.33 / 0.19 / 0.01 | 2.1 / 0.41 / 0.20 / 0.13 | 2.0 / 0.37 / 0.22 / 0.24 | 2.3 / 0.52 / 0.32 / 0.51 | 1.9 / 0.44 / 0.45 / 0.68 |
+| Rival crews after 10 years; rival men in one | 5.9; 68% | 9.5; 73% | 9.4; 66% | 10.1; 46% | 13.3; 36% |
+| Supply lines bought / shipments stopped / lines changing hands after one / bad batches, per city per year | 1.38 / 0.95 / 0.19 / 0.41 | 1.48 / 1.46 / 0.29 / 0.33 | 1.30 / 1.64 / 0.34 / 0.31 | 1.21 / 1.10 / 0.22 / 0.24 | 1.05 / 0.66 / 0.11 / 0.29 |
+| Wars declared (on the player's gang) / called off / ended in a pact / ended with one side finished, per city per year | 1.22 (0.14) / 0.21 / 0.84 / 0.15 | 1.41 (0.08) / 0.30 / 0.74 / 0.35 | 1.13 (0.03) / 0.25 / 0.51 / 0.35 | 0.96 (0.01) / 0.21 / 0.34 / 0.40 | 1.07 (0.03) / 0.20 / 0.44 / 0.42 |
 
-These runs include rum-running. Stopped shipments count with the hijacks, which is why there are more of them: a shipment is worth more than one speakeasy's beer, so a rival goes after a line first when the odds are as good. A city sees a bad batch about once every three years. The player's gang lasts as long as before in small, medium and large cities: over 160 three-year runs each, it was alive in 143 small cities against 136 on main, 130 medium ones against 128 and 124 large ones against 123. Huge cities came out worse on the first seeds and level on the next: on seeds 1–160 the player's gang lasted three years in 126 against 140 on main, and on seeds 161–240 in 64 against 64. That gap looks like noise rather than rum-running: with every part of it switched off (no lines bought, no shipments stopped, no watering and no bad batches), seeds 1–80 gave 58, against 61 with it on. Before rum-running, with rival crews, the player's gang was alive after 3 / 10 years in 66/51 small, 64/36 medium, 60/41 large, 69/59 huge and 14/13 metropolis runs.
+These runs include wars. Rivals go to the mattresses about once a year in any city, almost always against each other: a rival declares on the player's gang about once every seven years in a small city and hardly ever in a big one. Most wars end in a truce, a few are called off when the money runs short, and the rest end when one side is finished. Hits went from one every five to ten years in a city to two or three a year, now that outfits at war hunt each other's men. The player's gang lasts as long as before: over 160 three-year runs each, it was alive in 142 small cities against 143 on main, 130 medium ones against 130, 125 large ones against 124 and 130 huge ones against 126. Before wars, with rum-running, the player's gang was alive after 3 / 10 years in 71/53 small, 68/42 medium, 59/45 large, 61/60 huge and 16/15 metropolis runs.
+
+Rum-running came in the change before. Stopped shipments count with the hijacks, which is why there are more of them: a shipment is worth more than one speakeasy's beer, so a rival goes after a line first when the odds are as good. A city sees a bad batch about once every three years. The player's gang lasts as long as before in small, medium and large cities: over 160 three-year runs each, it was alive in 143 small cities against 136 on main, 130 medium ones against 128 and 124 large ones against 123. Huge cities came out worse on the first seeds and level on the next: on seeds 1–160 the player's gang lasted three years in 126 against 140 on main, and on seeds 161–240 in 64 against 64. That gap looks like noise rather than rum-running: with every part of it switched off (no lines bought, no shipments stopped, no watering and no bad batches), seeds 1–80 gave 58, against 61 with it on. Before rum-running, with rival crews, the player's gang was alive after 3 / 10 years in 66/51 small, 64/36 medium, 60/41 large, 69/59 huge and 14/13 metropolis runs.
 
 Rival crews came in the change before. Most rival men in a small or medium city end up in one, and fewer in the big cities, where outfits hit the cap of four crews. The first version sent a rival crew in together whenever there was a fight, every man of it, even for an outfit spread thin, and the player's gang lasted three years in only 115 of 160 small cities against 136 on main, and 105 of 160 medium ones against 128. Crews now go in together only when ordinary backup would, and with at most two of the crew behind the man in front. Over 320 cities each, the player's gang lasts three years in 274 small cities and 264 medium ones on the first seeds, against 272 and 261 on main. Large cities came out a little worse on some seeds and better on others: over 800 large cities, the player's gang lasted three years in 642 against 658 on main. Before rival crews, with rats, the player's gang was alive after 3 / 10 years in 68/55 small, 67/36 medium, 65/48 large, 62/58 huge and 13/13 metropolis runs.
 

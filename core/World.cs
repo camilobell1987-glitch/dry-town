@@ -480,6 +480,7 @@ public sealed partial class World
         Events = Events,
         LastLedger = LastLedger,
         Pacts = Pacts,
+        Wars = Wars,
         Grudges = Grudges,
         Offers = Offers,
         CityEvents = CityEvents,
@@ -502,6 +503,7 @@ public sealed partial class World
         w.People.AddRange(d.People);
         w.Banks.AddRange(d.Banks);
         w.Pacts.AddRange(d.Pacts);
+        w.Wars.AddRange(d.Wars);
         w.Grudges.AddRange(d.Grudges);
         w.Offers.AddRange(d.Offers);
         w.CityEvents.AddRange(d.CityEvents);

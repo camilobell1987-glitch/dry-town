@@ -459,3 +459,18 @@ public sealed class SupplyLine
     /// <summary>Weeks its owner has had no speakeasy to take a delivery.</summary>
     public int IdleWeeks { get; set; }
 }
+
+/// <summary>
+/// Two outfits gone to the mattresses: both sides' men sleep in safehouses and the shooting starts
+/// in earnest, until one side calls it off, the two sign a pact, or one of them is finished.
+/// </summary>
+public sealed class War
+{
+    /// <summary>The outfit that declared it, and the one it declared on.</summary>
+    public int A { get; set; }
+    public int B { get; set; }
+    public int StartWeek { get; set; }
+
+    public bool Involves(int gangId) => A == gangId || B == gangId;
+    public int Other(int gangId) => A == gangId ? B : A;
+}

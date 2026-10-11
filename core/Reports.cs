@@ -214,6 +214,10 @@ public static class Reports
         foreach (var g in w.LivingGangs.Where(g => g.Id != gangId).OrderByDescending(w.Power))
             sb.AppendLine($"{g.Id,3} {Trim(g.Name, 28),-28} {w.Power(g),5:0} {w.GrudgeOf(g.Id, gangId),8} {w.GrudgeOf(gangId, g.Id),8}  {Standing(w, me, g)}");
         sb.AppendLine($"Your power: {w.Power(me):0}." + (w.Untrusted(me) ? " You broke your word this year: nobody will sign with you." : ""));
+        foreach (var war in w.Wars.Where(x => !x.Involves(gangId)))
+            sb.AppendLine($"  {w.GangById(war.A).Name} has been at war with {w.GangById(war.B).Name} for {w.Week - war.StartWeek} weeks.");
+        if (w.WarOf(gangId) is { } mine)
+            sb.AppendLine($"Your men are on the mattresses: ${Simulation.MattressBill(w, me)} a week for the safehouses, hits on {w.GangById(mine.Other(gangId)).Name} {Content.WarHit:+0%} likelier and drawing half the heat." + (mine.A == gangId ? " Type 'calloff' to end it." : " They started it: only a truce ends it from your side."));
         foreach (var o in w.Offers)
             sb.AppendLine($"  Offer {o.Id}: {w.Describe(o)} Answer by week {o.ExpiresWeek % Content.WeeksPerYear + 1} with 'accept {o.Id}' or 'decline {o.Id}'.");
         return sb.ToString();
@@ -222,8 +226,10 @@ public static class Reports
     /// <summary>A gang's pact with another, in a few words.</summary>
     public static string Standing(World w, Gang me, Gang other)
     {
+        if (w.Wars.FirstOrDefault(x => x.Involves(me.Id) && x.Involves(other.Id)) is { } war)
+            return $"at war for {w.Week - war.StartWeek} weeks, since {(war.A == me.Id ? "you" : "they")} went to the mattresses";
         var p = w.PactBetween(me.Id, other.Id);
-        if (p == null) return w.GrudgeOf(other.Id, me.Id) > Content.GrudgeTooDeep ? "at war" : "no pact";
+        if (p == null) return w.GrudgeOf(other.Id, me.Id) > Content.GrudgeTooDeep ? "bad blood" : "no pact";
         int left = p.UntilWeek - w.Week;
         string tribute = p.PayerId == me.Id ? $", you pay ${p.Tribute}/week" : p.PayerId >= 0 ? $", they pay ${p.Tribute}/week" : "";
         return $"{World.Name(p.Kind)}{tribute}, {left} weeks left";

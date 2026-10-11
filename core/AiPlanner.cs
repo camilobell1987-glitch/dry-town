@@ -292,6 +292,8 @@ public static partial class AiPlanner
             orders.Add(new SilenceOrder(g.Id, man!.Id, witness.Id));
         }
 
+        if (PlanWarHit(w, g, hoods, orders)) return;
+
         // A gang only tries one big job a week, and only every so often.
         int beat = (w.Week + g.Id * 7) % 4;
 
