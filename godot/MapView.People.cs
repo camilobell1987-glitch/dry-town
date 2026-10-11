@@ -20,12 +20,13 @@ public partial class MapView
     public int SelectedBank { get; private set; } = -1;
 
     /// <summary>Select one thing on the map, and nothing else.</summary>
-    public void Select(int business = -1, int person = -1, int hood = -1, int bank = -1)
+    public void Select(int business = -1, int person = -1, int hood = -1, int bank = -1, int shop = -1)
     {
         SelectedBusiness = business;
         SelectedPerson = person;
         SelectedHood = hood;
         SelectedBank = bank;
+        SelectedShop = shop;
     }
 
     private enum Pickable { Person, Hood }

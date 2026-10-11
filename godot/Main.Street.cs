@@ -13,6 +13,7 @@ public partial class Main
         if (_map.SelectedPerson >= 0) { PersonPanel(W.PersonById(_map.SelectedPerson)); return true; }
         if (_map.SelectedHood >= 0) { HoodPanel(W.HoodById(_map.SelectedHood)); return true; }
         if (_map.SelectedBank >= 0 && W.BankById(_map.SelectedBank) is { } bank) { BankPanel(bank); return true; }
+        if (_map.SelectedShop >= 0) { ShopPanel(W.Map.LotAt(_map.SelectedShop)); return true; }
         return false;
     }
 
@@ -141,7 +142,13 @@ public partial class Main
         AddLabel(panel, $"Intimidation {target.Intimidation} · Muscle {target.Muscle} · Brains {target.Brains} · Stealth {target.Stealth}", Palette.Ink);
         int handles = W.Businesses.Count(b => b.HandlerHoodId == target.Id && b.ProtectorGangId == gang.Id);
         if (handles > 0) AddLabel(panel, $"Collects from {handles} business{(handles == 1 ? "" : "es")}.", Palette.InkQuiet);
-        if (target.GangId == Me) { AddLabel(panel, "One of yours. Give him work from a business, a bank or the Men tab.", Palette.InkQuiet, wrap: true); return; }
+        if (target.GangId == Me)
+        {
+            AddLabel(panel, "One of yours. Give him work from a business, a bank or someone on the street.", Palette.InkQuiet, wrap: true);
+            OwnManGear(panel, target);
+            return;
+        }
+        if (target.Weapon != Weapon.None || target.Car != Car.None) AddLabel(panel, GearLine(target), Palette.InkQuiet, wrap: true);
         if (!target.IsAvailable) { AddLabel(panel, "He's out of reach.", Palette.InkQuiet); return; }
         if (boss && Simulation.IsGuardedBoss(W, target)) AddLabel(panel, "A boss keeps soldiers round him. He's much harder to get to.", Palette.InkQuiet, wrap: true);
         ShowQueued(panel, o => o is HitOrder h && h.TargetHoodId == target.Id);

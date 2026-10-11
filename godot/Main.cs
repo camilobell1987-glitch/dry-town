@@ -373,7 +373,7 @@ public partial class Main : Control
         {
             if (!rival) return $"{Simulation.ExtortChance(W, W.Player, h, b, backup.Count):P0} chance";
             double defence = Simulation.DefenceStrength(W, W.GangById(b.ProtectorGangId), b);
-            return $"{Simulation.TakeoverChance(h.Strength + Simulation.BackupStrength(backup), defence):P0} to win if unguarded";
+            return $"{Simulation.TakeoverChance(Simulation.StormingStrength(h, backup), defence):P0} to win if unguarded";
         }
 
         AddLabel(_businessPanel, rival ? $"Take it from {W.GangById(b.ProtectorGangId).Name}. Expect a fight; men can die." : "Lean on the owner for protection money.", Palette.Ink, wrap: true);
@@ -487,7 +487,7 @@ public partial class Main : Control
             string crewText = crew == null ? "" : crew.LieutenantHoodId == h.Id ? "Lt" : World.Surname(W.HoodById(crew.LieutenantHoodId).Name);
             string[] cols = { h.Name, $"{h.Age(W.Week)}", $"{h.Intimidation}", $"{h.Muscle}", $"{h.Brains}", $"{h.Stealth}", $"{h.Loyalty}", crewText, state };
             for (int i = 0; i < cols.Length; i++) it.SetText(i, cols[i]);
-            string tip = $"{h.Name}, {h.Age(W.Week)}" + (h.Family ? ", family" : "") + $"\nIntimidation {h.Intimidation}, Muscle {h.Muscle}, Brains {h.Brains}, Stealth {h.Stealth}\nLoyalty {h.Loyalty}/100, ambition {h.Ambition}/100, wage ${h.Wage}/week" + (job != null ? $"\nThis week: {job}" : "");
+            string tip = $"{h.Name}, {h.Age(W.Week)}" + (h.Family ? ", family" : "") + $"\nIntimidation {h.Intimidation}, Muscle {h.Muscle}, Brains {h.Brains}, Stealth {h.Stealth}\nLoyalty {h.Loyalty}/100, ambition {h.Ambition}/100, wage ${h.Wage}/week\n{GearLine(h)}" + (job != null ? $"\nThis week: {job}" : "");
             for (int i = 0; i < cols.Length; i++) it.SetTooltipText(i, tip);
             if (h.Loyalty < 30) it.SetCustomColor(6, Palette.Bad);
             if (h.Age(W.Week) >= 65) it.SetCustomColor(1, Palette.Bad);
@@ -813,6 +813,7 @@ public partial class Main : Control
         _map.PersonClicked += _ => OnMapSelection();
         _map.HoodClicked += _ => OnMapSelection();
         _map.BankClicked += _ => OnMapSelection();
+        _map.ShopClicked += _ => OnMapSelection();
         _map.ActionHappened += OnAction;
         left.AddChild(_map);
 
@@ -1040,6 +1041,22 @@ public partial class Main : Control
             if (men.Count >= 4) _shell.Pending.Add(new ArsonOrder(Me, men[3].Id, mark.Id));
             if (Flag("--sure")) { foreach (var h in men) h.Brains = h.Muscle = h.Stealth = 10; }
         }
+        if (Flag("--arm"))
+        {
+            // Kit the gang out: guns all round, cars for two of them, and armour for the boss.
+            W.Player.Cash += 20_000;
+            var men = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderByDescending(h => h.Strength).ToList();
+            for (int i = 0; i < men.Count; i++) W.Arm(W.Player, men[i], i == 0 ? Weapon.TommyGun : i < 3 ? Weapon.Shotgun : Weapon.Pistol);
+            foreach (var h in men.Take(2)) W.Drive(W.Player, h, h == men[0] ? Car.Packard : Car.ModelT);
+            W.Drive(W.Player, W.HoodById(W.Player.BossHoodId), Car.Cadillac);
+        }
+        if (Arg("--select-shop") is string shopKind)
+        {
+            var shopUse = shopKind == "car" ? LotUse.CarDealer : LotUse.GunShop;
+            var shop = W.Shops(shopUse).OrderBy(l => W.Map.Distance(W.HqOf(W.Player), l)).First();
+            _map.Select(shop: shop.Id);
+            _shopFor = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderByDescending(h => h.Strength).Skip(int.Parse(Arg("--for") ?? "0")).First().Id;
+        }
         if (Arg("--exec") is string commands)
             foreach (var c in commands.Split(';')) GD.Print(_shell.Execute(c.Trim()));
         RefreshAll();
@@ -1090,6 +1107,9 @@ public partial class Main : Control
                     "bank" => W.Map.LotAt(W.Banks.OrderBy(b => W.Map.Distance(hq, W.Map.LotAt(b.LotId))).First().LotId),
                     "fire" => W.Businesses.Where(b => b.BurnedWeek >= W.Week - 1).Select(W.LotOf).FirstOrDefault() ?? hq,
                     "person" => W.PersonById(_map.SelectedPerson) is { } p ? W.Map.LotAt(p.LotId) : hq,
+                    "shop" => _map.SelectedShop >= 0 ? W.Map.LotAt(_map.SelectedShop) : hq,
+                    "job" => _shell.Sim.Upcoming.FirstOrDefault(j => j.GangId == Me && Simulation.TeamOf(j.Order).Any()) is { } job
+                        ? W.Map.LotAt(Simulation.TargetLot(W, job.Order)) : hq,
                     _ => hq,
                 };
                 _map.ResetView(lot, float.Parse(Arg("--zoom") ?? "4"));

@@ -39,7 +39,7 @@ public partial class Rolodex : Control
     private static readonly Color Metal = new("6e6a66");
     private static readonly Color MetalDark = new("3b3836");
 
-    private const float CardHeight = 330;
+    private const float CardHeight = 368;
     private const float TabHeight = 22;
 
     public Rolodex()
@@ -266,6 +266,14 @@ public partial class Rolodex : Control
         Gauge(font, new Vector2(x + 10, sy), cw - 20, "Ambition", h.Ambition, h.Ambition > 70 ? Palette.Player.Darkened(0.3f) : TypeQuiet);
         sy += 22;
 
+        // What he carries and drives, each with a little stamp of it.
+        GunGlyph(new Vector2(x + 18, sy + 7), h.Weapon);
+        DrawString(font, new Vector2(x + 34, sy + 11), h.Weapon == Weapon.None ? "Unarmed" : Capital(Content.Guns[h.Weapon].Label), HorizontalAlignment.Left, cw - 44, 12, h.Weapon == Weapon.None ? TypeQuiet : Type);
+        sy += 16;
+        CarGlyph(new Vector2(x + 18, sy + 7), h.Car);
+        DrawString(font, new Vector2(x + 34, sy + 11), h.Car == Car.None ? "On foot" : Capital(Content.Cars[h.Car].Label), HorizontalAlignment.Left, cw - 44, 12, h.Car == Car.None ? TypeQuiet : Type);
+        sy += 20;
+
         // What he's up to, and a note when he is trouble.
         string now = h.State == HoodState.Jailed ? $"In jail, {h.JailWeeks} more week{(h.JailWeeks == 1 ? "" : "s")}."
             : JobOf(h.Id) is { } job ? job
@@ -274,6 +282,33 @@ public partial class Rolodex : Control
         sy = Paragraph(font, new Vector2(x + 10, sy), cw - 20, now, Type, r.End.Y - 10);
         if (h.Loyalty < 30 && h.Ambition > 60 && h.Id != gang.BossHoodId)
             Paragraph(font, new Vector2(x + 10, sy + 2), cw - 20, "Restless. Might break away.", Palette.Bad.Darkened(0.2f), r.End.Y - 10);
+    }
+
+    private static string Capital(string s) => char.ToUpper(s[0]) + s[1..];
+
+    /// <summary>A pistol, a shotgun or a Thompson, drawn small; an empty outline when he has none.</summary>
+    private void GunGlyph(Vector2 c, Weapon gun)
+    {
+        var ink = gun == Weapon.None ? Type with { A = 0.3f } : Type;
+        float barrel = gun switch { Weapon.Shotgun => 12, Weapon.TommyGun => 11, _ => 7 };
+        DrawRect(new Rect2(c.X - 6, c.Y - 3, barrel + 2, 3), ink);
+        DrawColoredPolygon(new[] { c + new Vector2(-6, 0), c + new Vector2(-1, 0), c + new Vector2(-3, 6), c + new Vector2(-7, 6) }, ink);
+        if (gun == Weapon.TommyGun)
+        {
+            DrawCircle(c + new Vector2(2, 3), 2.6f, ink);
+            DrawRect(new Rect2(c.X - 10, c.Y - 2, 4, 3), ink);
+        }
+        if (gun == Weapon.Shotgun) DrawRect(new Rect2(c.X - 11, c.Y - 2, 5, 4), RedRule.Darkened(0.4f));
+    }
+
+    private void CarGlyph(Vector2 c, Car car)
+    {
+        var ink = car == Car.None ? Type with { A = 0.3f } : car == Car.Cadillac ? new Color("3a3632") : Type;
+        float len = car == Car.ModelT ? 7 : 9;
+        DrawRect(new Rect2(c.X - len, c.Y - 1, len * 2, 4), ink);
+        DrawColoredPolygon(new[] { c + new Vector2(-len * 0.55f, -1), c + new Vector2(-len * 0.35f, -5), c + new Vector2(len * 0.35f, -5), c + new Vector2(len * 0.55f, -1) }, ink);
+        DrawCircle(c + new Vector2(-len * 0.55f, 4), 2.2f, ink);
+        DrawCircle(c + new Vector2(len * 0.55f, 4), 2.2f, ink);
     }
 
     private void Gauge(Font font, Vector2 at, float width, string label, int value, Color fill)

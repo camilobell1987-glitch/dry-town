@@ -45,6 +45,7 @@ public sealed partial class World
         if (hood.State == HoodState.Jailed) return "He's in jail.";
         if (gun == hood.Weapon) return "He already carries one.";
         if (gun == Weapon.None) return null;
+        if (Content.Guns[gun].Price < Content.Guns[hood.Weapon].Price) return "He carries something heavier.";
         int cost = Content.Guns[gun].Price - Content.TradeIn(Content.Guns[hood.Weapon].Price);
         return gang.Cash < cost ? $"That costs ${cost}." : null;
     }
@@ -54,6 +55,7 @@ public sealed partial class World
         if (hood.GangId != gang.Id || !hood.IsActive) return "He isn't one of yours.";
         if (car == hood.Car) return "He already drives one.";
         if (car == Car.None) return null;
+        if (Content.Cars[car].Price < Content.Cars[hood.Car].Price) return "He drives something better.";
         int cost = Content.Cars[car].Price - Content.TradeIn(Content.Cars[hood.Car].Price);
         return gang.Cash < cost ? $"That costs ${cost}." : null;
     }

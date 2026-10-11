@@ -165,20 +165,22 @@ public static class AiPlanner
         int Cost(Weapon from, Weapon to) => Content.Guns[to].Price - Content.TradeIn(Content.Guns[from].Price);
         int CarCost(Car from, Car to) => Content.Cars[to].Price - Content.TradeIn(Content.Cars[from].Price);
 
+        // An outfit that already runs a third of the city spends on holding it: no more iron, and a few cars.
+        bool topDog = w.Businesses.Count(b => b.ProtectorGangId == g.Id) * 3 > w.Businesses.Count;
         // Half the men armed is plenty; the rest are collectors and lookouts.
         int armed = men.Count(h => h.Weapon != Weapon.None);
-        if (armed * 2 < men.Count && men.FirstOrDefault(h => h.Weapon == Weapon.None) is { } bare && Buy(Cost(bare.Weapon, Weapon.Pistol)))
+        if (!topDog && armed * 2 < men.Count && men.FirstOrDefault(h => h.Weapon == Weapon.None) is { } bare && Buy(Cost(bare.Weapon, Weapon.Pistol)))
             orders.Add(new ArmOrder(g.Id, bare.Id, Weapon.Pistol));
         int cars = w.HoodsOf(g.Id).Count(h => h.Car != Car.None);
         var driver = men.FirstOrDefault(h => h.Car == Car.None && h.Id != g.BossHoodId);
-        if (driver != null && cars < 1 + men.Count / 6)
+        if (driver != null && cars < (topDog ? 3 : 1 + men.Count / 6))
         {
             var car = cash > 9000 ? Car.Packard : Car.ModelT;
             if (Buy(CarCost(Car.None, car))) orders.Add(new CarOrder(g.Id, driver.Id, car));
         }
-        if (cash > 8000 && men.FirstOrDefault(h => h.Weapon == Weapon.Pistol) is { } hard && Buy(Cost(hard.Weapon, Weapon.Shotgun)))
+        if (!topDog && cash > 8000 && men.FirstOrDefault(h => h.Weapon == Weapon.Pistol) is { } hard && Buy(Cost(hard.Weapon, Weapon.Shotgun)))
             orders.Add(new ArmOrder(g.Id, hard.Id, Weapon.Shotgun));
-        if (cash > 15000 && g.Heat < 60 && men.FirstOrDefault(h => h.Weapon == Weapon.Shotgun) is { } heavy && Buy(Cost(heavy.Weapon, Weapon.TommyGun)))
+        if (!topDog && cash > 15000 && g.Heat < 60 && men.FirstOrDefault(h => h.Weapon == Weapon.Shotgun) is { } heavy && Buy(Cost(heavy.Weapon, Weapon.TommyGun)))
             orders.Add(new ArmOrder(g.Id, heavy.Id, Weapon.TommyGun));
         var boss = w.HoodById(g.BossHoodId);
         if (cash > 25000 && boss.Car != Car.Cadillac && Buy(CarCost(boss.Car, Car.Cadillac)))
