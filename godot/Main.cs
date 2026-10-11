@@ -206,6 +206,8 @@ public partial class Main : Control
             Line("Fines and seizures", l.Fines, true);
             Line("Fronts' own profit", l.Legit, false);
             Line("Bookkeeper", l.LaunderFee, true);
+            Line("Tribute received", l.TributeIn, false);
+            Line("Tribute paid", l.TributePaid, true);
             var net = l.Net >= 0 ? Palette.Good : Palette.Bad;
             sb.Append($"[b]Net [color={C(net)}]{(l.Net >= 0 ? "+" : "-")}${Math.Abs(l.Net):N0}[/color][/b]   Cash ${p.Cash:N0} (${p.Clean:N0} clean) · Heat {p.Heat}\n");
             if (l.Laundered > 0) sb.Append($"[color={C(Palette.InkQuiet)}]Washed ${l.Laundered:N0} through your fronts.[/color]\n");
@@ -376,6 +378,8 @@ public partial class Main : Control
         if (hoods.Count == 0 && crews.Count == 0) { AddLabel(_businessPanel, _map.Live ? "All your men are busy this week." : "All your men have jobs this week. Cancel one on the Orders tab to free him.", Palette.InkQuiet, wrap: true); return; }
 
         bool rival = b.IsProtected;
+        if (rival && W.PactBetween(Me, b.ProtectorGangId) is { } pact)
+            AddLabel(_businessPanel, $"You have {(pact.Kind == PactKind.Truce ? "a truce" : "an alliance")} with {W.GangById(b.ProtectorGangId).Name}. Moving on their turf breaks it, and nobody will take your word for a year.", Palette.Bad, 13, wrap: true);
         string Odds(Hood h, IReadOnlyList<Hood> backup)
         {
             if (!rival) return $"{Simulation.ExtortChance(W, W.Player, h, b, backup.Count):P0} chance";
@@ -640,23 +644,6 @@ public partial class Main : Control
         }
     }
 
-    private void RefreshGangs()
-    {
-        _gangsTree.Clear();
-        var root = _gangsTree.CreateItem();
-        foreach (var g in W.LivingGangs.OrderByDescending(g => W.TurfOf(g.Id).Count()))
-        {
-            var it = _gangsTree.CreateItem(root);
-            var boss = W.HoodById(g.BossHoodId);
-            int wards = W.Wards.Count(x => x.OwnerGangId == g.Id);
-            string[] cols = { g.IsPlayer ? $"{g.Name} (you)" : g.Name, $"{W.TurfOf(g.Id).Count()}", $"{W.HoodsOf(g.Id).Count()}", $"{wards}", $"${g.Cash:N0}", $"{g.Heat}" };
-            string tip = $"{g.Name}, run by {boss.Name}" + (wards > 0 ? $"\nAldermen on the payroll: {string.Join(", ", W.Wards.Where(x => x.OwnerGangId == g.Id).Select(x => x.Name))}" : "")
-                + (W.Hall.FriendGangId == g.Id ? $"\nMayor {W.Hall.Mayor} owes them" : "");
-            for (int i = 0; i < cols.Length; i++) { it.SetText(i, cols[i]); it.SetTooltipText(i, tip); }
-            it.SetCustomColor(0, Palette.Gang(W, g.Id));
-        }
-    }
-
     // ---- Saving ---------------------------------------------------------------
 
     public override void _Notification(int what)
@@ -874,7 +861,7 @@ public partial class Main : Control
         menTab.AddChild(crewsScroll);
         _ordersPanel = ScrollTab("Orders");
         _hallPanel = ScrollTab("City Hall");
-        _gangsTree = TreeTab("Gangs", "Gang", "Turf", "Men", "Wards", "Cash", "Heat");
+        BuildGangsTab();
         _news = new RichTextLabel { Name = "Report", SelectionEnabled = true, BbcodeEnabled = true };
         _tabs.AddChild(_news);
         _tabs.AddChild(BuildConsole());
@@ -922,7 +909,7 @@ public partial class Main : Control
         {
             tree.SetColumnTitle(i, columns[i]);
             tree.SetColumnExpand(i, i == 0);
-            if (i > 0) tree.SetColumnCustomMinimumWidth(i, columns[i] is "Cash" ? 80 : columns[i] is "Now" ? 50 : columns[i] is "Crew" or "Wards" ? 50 : 34);
+            if (i > 0) tree.SetColumnCustomMinimumWidth(i, columns[i] is "Cash" ? 80 : columns[i] is "Now" ? 50 : columns[i] is "Crew" or "Wards" ? 50 : columns[i] is "You" ? 74 : 34);
             if (i > 0) tree.SetColumnTitleAlignment(i, HorizontalAlignment.Center);
         }
         _tabs.AddChild(tree);
@@ -1045,6 +1032,17 @@ public partial class Main : Control
             _shell.Sim.Jail(men[1], 20, "with attempted arson");
             W.Retain(W.Player, Lawyer.Storefront);
             W.PayJudge(W.Player, men[0]);
+        }
+        if (Flag("--talk"))
+        {
+            // A truce with the smallest outfit, a paid truce offered by the second biggest, and the biggest picked to talk to.
+            W.Pacts.RemoveAll(p => p.Involves(Me));
+            W.Offers.Clear();
+            var rivals = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(W.Power).ToList();
+            W.Sign(W.Player, rivals[^1], PactKind.Truce);
+            W.Put(rivals[1], OfferKind.Truce, Content.TributeAsk(W.Income(rivals[1])));
+            _talkTo = rivals[0].Id;
+            W.AddGrudge(rivals[0].Id, Me, 30 - W.GrudgeOf(rivals[0].Id, Me));
         }
         if (Flag("--plan")) _shell.Execute("auto");
         if (Arg("--select-front") is string which)

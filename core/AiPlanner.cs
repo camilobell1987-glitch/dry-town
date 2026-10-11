@@ -4,7 +4,7 @@ namespace DryTown.Core;
 /// Heuristic planner used by rival gangs, and by the player's gang on autopilot
 /// (soak tests, or "plan my week for me").
 /// </summary>
-public static class AiPlanner
+public static partial class AiPlanner
 {
     public static List<Order> Plan(World w, Gang g)
     {
@@ -115,7 +115,7 @@ public static class AiPlanner
             var spare = hoods.Where(h => h.Id != hood.Id && !assigned.Contains(h.Id)).Reverse().ToList();
             Business? best = null;
             List<Hood> bestBackup = new();
-            double bestScore = 0;
+            double bestScore = 0, bestWorth = 0;
             foreach (var biz in w.Businesses)
             {
                 if (!biz.IsOpen || biz.ProtectorGangId == g.Id || taken.Contains(biz.Id)) continue;
@@ -123,11 +123,13 @@ public static class AiPlanner
                 if (!biz.IsProtected)
                 {
                     double score = value * Simulation.ExtortChance(w, g, hood, biz);
-                    if (score > bestScore) { bestScore = score; best = biz; bestBackup = new(); }
+                    if (score > bestScore) { bestScore = bestWorth = score; best = biz; bestBackup = new(); }
                     continue;
                 }
-                if (hood.Id == g.BossHoodId) continue;
+                if (hood.Id == g.BossHoodId || w.AtPeace(g.Id, biz.ProtectorGangId)) continue;
                 var rival = w.GangById(biz.ProtectorGangId);
+                // An old score to settle decides which fight to pick, though not whether to pick one.
+                double spite = 1 + w.GrudgeOf(g.Id, rival.Id) / 100.0;
                 double defence = Simulation.DefenceStrength(w, rival, biz);
                 // Alone, or with up to two men behind him if the gang has hands to spare. Gangs that
                 // already run much of the district are spread too thin to send men in pairs.
@@ -140,10 +142,11 @@ public static class AiPlanner
                     double score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost - extra * 150;
                     if (g.Heat > 60) score *= 0.3;
                     if (rival.IsPlayer && !g.IsPlayer) score *= w.Settings.RivalWariness(w.Week / Content.WeeksPerYear);
-                    if (score > bestScore) { bestScore = score; best = biz; bestBackup = backup; }
+                    double spited = score > 0 ? score * spite : score;
+                    if (spited > bestScore) { bestScore = spited; bestWorth = score; best = biz; bestBackup = backup; }
                 }
             }
-            if (best == null || bestScore < 80) continue;
+            if (best == null || bestWorth < 80) continue;
             taken.Add(best.Id);
             assigned.Add(hood.Id);
             foreach (var b in bestBackup) assigned.Add(b.Id);
@@ -158,7 +161,7 @@ public static class AiPlanner
     /// Arm the men, best first, out of money the gang can spare: revolvers all round, then a car
     /// to get away in, then heavier guns for the hard men, and armour for a rich boss.
     /// </summary>
-    private static bool TopDog(World w, Gang g) => w.Businesses.Count(b => b.ProtectorGangId == g.Id) * 3 > w.Businesses.Count;
+    private static bool TopDog(World w, Gang g) => w.TopDog(g);
 
     /// <summary>
     /// Once the safe holds more dirty money than is comfortable, buy the best place on the books
@@ -297,7 +300,8 @@ public static class AiPlanner
         }
 
         bool Near(Business b) => w.BlocksFromHq(g, b) <= 4;
-        bool Wary(Business b) => w.GangById(b.ProtectorGangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1;
+        bool Wary(Business b) => w.AtPeace(g.Id, b.ProtectorGangId)
+            || w.GangById(b.ProtectorGangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1;
 
         if (beat == 1 && w.Prohibition && g.Heat < 40 && hoods.Count >= 3)
         {
@@ -332,7 +336,7 @@ public static class AiPlanner
             // The rival's best man who works close to home.
             var lead = hoods[0];
             var backup = hoods.Skip(1).Take(1).ToList();
-            var target = w.Hoods.Where(h => h.IsAvailable && h.GangId != g.Id && w.GangById(h.GangId).Alive && w.GangById(h.GangId).BossHoodId != h.Id
+            var target = w.Hoods.Where(h => h.IsAvailable && h.GangId != g.Id && w.GangById(h.GangId).Alive && w.GangById(h.GangId).BossHoodId != h.Id && !w.AtPeace(g.Id, h.GangId)
                     && !(w.GangById(h.GangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1))
                 .Where(h => w.Map.Distance(w.HqOf(g), w.Map.LotAt(Simulation.HauntOf(w, h))) <= CityMap.StrideX * 4)
                 .OrderByDescending(h => w.Businesses.Count(b => b.HandlerHoodId == h.Id)).ThenByDescending(h => h.Strength).ThenBy(h => h.Id)

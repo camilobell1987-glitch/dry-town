@@ -5,8 +5,8 @@ namespace DryTown.Core;
 /// <summary>Everything needed to carry on a city exactly where it was left: the world, the dice, and the orders on the desk.</summary>
 public sealed class SaveData
 {
-    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers.</summary>
-    public const int CurrentVersion = 7;
+    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals.</summary>
+    public const int CurrentVersion = 8;
 
     public int Version { get; set; } = CurrentVersion;
     public DateTime SavedAt { get; set; }
@@ -37,6 +37,9 @@ public sealed class SaveData
     public List<Bank> Banks { get; set; } = new();
     public List<GameEvent> Events { get; set; } = new();
     public Dictionary<int, WeekLedger> LastLedger { get; set; } = new();
+    public List<Pact> Pacts { get; set; } = new();
+    public List<Grudge> Grudges { get; set; } = new();
+    public List<Offer> Offers { get; set; } = new();
 
     public int DirectorDominantWeeks { get; set; }
     public int DirectorQuietWeeks { get; set; }

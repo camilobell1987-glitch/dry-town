@@ -474,6 +474,9 @@ public sealed partial class World
         Crews = Crews,
         Events = Events,
         LastLedger = LastLedger,
+        Pacts = Pacts,
+        Grudges = Grudges,
+        Offers = Offers,
     };
 
     public static World FromSave(SaveData d)
@@ -491,6 +494,9 @@ public sealed partial class World
         foreach (var (id, ledger) in d.LastLedger) w.LastLedger[id] = ledger;
         w.People.AddRange(d.People);
         w.Banks.AddRange(d.Banks);
+        w.Pacts.AddRange(d.Pacts);
+        w.Grudges.AddRange(d.Grudges);
+        w.Offers.AddRange(d.Offers);
         // Cities saved before there were banks get them now.
         w.PlaceBanks();
         w.PlaceShops();

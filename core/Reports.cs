@@ -18,6 +18,7 @@ public static class Reports
             sb.AppendLine($"Protection ${l.Protection}  Rackets ${l.Rackets}  Wages -${l.Wages}  Spending -${l.Spending}  Fines -${l.Fines}" +
                 (l.Legit + l.LaunderFee > 0 ? $"  Fronts ${l.Legit}  Bookkeeper -${l.LaunderFee}" : "") + $"  Net ${l.Net}");
             if (l.Laundered > 0) sb.AppendLine($"Washed ${l.Laundered} through the fronts.");
+            if (l.TributePaid + l.TributeIn > 0) sb.AppendLine($"Tribute: paid ${l.TributePaid}, received ${l.TributeIn}.");
             sb.AppendLine($"Cash ${player.Cash} (${player.Clean} clean)  Heat {player.Heat}  Turf {w.TurfOf(player.Id).Count()}/{w.Businesses.Count}  Men {w.HoodsOf(player.Id).Count()}");
         }
         else if (!player.Alive)
@@ -119,6 +120,30 @@ public static class Reports
         foreach (var b in w.Banks)
             sb.AppendLine($"{b.Id,3} {Trim(b.Name, 40),-40} vault ${b.Vault,-6} guards {b.Guards}" + (w.Week - b.RobbedWeek < 12 ? ", on its guard after a hold-up" : ""));
         return sb.Length == 0 ? "No banks in this city.\n" : sb.ToString();
+    }
+
+    /// <summary>Where the player stands with every other outfit, and what they've put to him.</summary>
+    public static string Relations(World w, int gangId)
+    {
+        var me = w.GangById(gangId);
+        var sb = new StringBuilder();
+        sb.AppendLine($"{"Id",3} {"Gang",-28} {"Power",5} {"Hate you",8} {"You hate",8}  Standing");
+        foreach (var g in w.LivingGangs.Where(g => g.Id != gangId).OrderByDescending(w.Power))
+            sb.AppendLine($"{g.Id,3} {Trim(g.Name, 28),-28} {w.Power(g),5:0} {w.GrudgeOf(g.Id, gangId),8} {w.GrudgeOf(gangId, g.Id),8}  {Standing(w, me, g)}");
+        sb.AppendLine($"Your power: {w.Power(me):0}." + (w.Untrusted(me) ? " You broke your word this year: nobody will sign with you." : ""));
+        foreach (var o in w.Offers)
+            sb.AppendLine($"  Offer {o.Id}: {w.Describe(o)} Answer by week {o.ExpiresWeek % Content.WeeksPerYear + 1} with 'accept {o.Id}' or 'decline {o.Id}'.");
+        return sb.ToString();
+    }
+
+    /// <summary>A gang's pact with another, in a few words.</summary>
+    public static string Standing(World w, Gang me, Gang other)
+    {
+        var p = w.PactBetween(me.Id, other.Id);
+        if (p == null) return w.GrudgeOf(other.Id, me.Id) > Content.GrudgeTooDeep ? "at war" : "no pact";
+        int left = p.UntilWeek - w.Week;
+        string tribute = p.PayerId == me.Id ? $", you pay ${p.Tribute}/week" : p.PayerId >= 0 ? $", they pay ${p.Tribute}/week" : "";
+        return $"{World.Name(p.Kind)}{tribute}, {left} weeks left";
     }
 
     public static string Gangs(World w)

@@ -125,6 +125,53 @@ public sealed class Gang
 
     /// <summary>The lawyer the gang keeps on retainer for its men's trials.</summary>
     public Lawyer Lawyer { get; set; }
+
+    /// <summary>The week the gang last went back on its word. Nobody signs with it for a year afterwards.</summary>
+    public int BrokeWordWeek { get; set; } = -1000;
+}
+
+public enum PactKind { Truce, Alliance }
+
+/// <summary>
+/// An agreement between two gangs: neither moves on the other. A truce can come with tribute, paid
+/// every Sunday by one side to the other. Allies also take up each other's quarrels.
+/// </summary>
+public sealed class Pact
+{
+    public PactKind Kind { get; set; }
+    public int A { get; set; }
+    public int B { get; set; }
+    public int SignedWeek { get; set; }
+    public int UntilWeek { get; set; }
+
+    /// <summary>The side that pays the tribute, or -1, and what it pays each week.</summary>
+    public int PayerId { get; set; } = -1;
+    public int Tribute { get; set; }
+
+    public bool Involves(int gangId) => A == gangId || B == gangId;
+    public int Other(int gangId) => A == gangId ? B : A;
+}
+
+/// <summary>How much one gang hates another, 0 to 100. It builds with every hostile act and fades with time.</summary>
+public sealed class Grudge
+{
+    public int From { get; set; }
+    public int To { get; set; }
+    public int Amount { get; set; }
+}
+
+public enum OfferKind { Truce, Alliance, Demand }
+
+/// <summary>A proposal a rival has put to the player, waiting on an answer.</summary>
+public sealed class Offer
+{
+    public int Id { get; set; }
+    public OfferKind Kind { get; set; }
+    public int FromGangId { get; set; }
+
+    /// <summary>For a truce, what they offer to pay each week; for a demand, what they want from you.</summary>
+    public int Tribute { get; set; }
+    public int ExpiresWeek { get; set; }
 }
 
 public enum Lawyer { None, Storefront, Mouthpiece }
@@ -183,10 +230,14 @@ public sealed class WeekLedger
     /// <summary>The bookkeeper's cut for running dirty money through the fronts.</summary>
     public long LaunderFee { get; set; }
 
+    /// <summary>Tribute paid to, and received from, other gangs under a truce.</summary>
+    public long TributePaid { get; set; }
+    public long TributeIn { get; set; }
+
     /// <summary>Dirty money that went through the books this week. Not income: it was already in the safe.</summary>
     public long Laundered { get; set; }
 
-    public long Net => Protection + Rackets + Legit - Wages - Spending - Fines - LaunderFee;
+    public long Net => Protection + Rackets + Legit + TributeIn - Wages - Spending - Fines - LaunderFee - TributePaid;
 }
 
 public enum EventKind
@@ -194,7 +245,7 @@ public enum EventKind
     Extorted, ExtortFailed, Takeover, TakeoverRepelled, HoodKilled, HoodJailed, HoodReleased,
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
     Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
-    Arson, Hit, Robbery, Hijack, Street, Gear, Front, Trial,
+    Arson, Hit, Robbery, Hijack, Street, Gear, Front, Trial, Diplomacy,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

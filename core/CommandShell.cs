@@ -37,6 +37,7 @@ public sealed class CommandShell
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
+        "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -78,6 +79,15 @@ public sealed class CommandShell
                 case "fronts": return Reports.Fronts(W, Me);
                 case "buy": return BuyFront(int.Parse(p[1]));
                 case "cases": return Reports.Cases(W, Me);
+                case "relations": return Reports.Relations(W, Me);
+                case "truce": return Talk(p[1], g => W.Propose(W.Player, g, PactKind.Truce, p.Length > 2 ? int.Parse(p[2]) : 0));
+                case "ally": return Talk(p[1], g => W.Propose(W.Player, g, PactKind.Alliance));
+                case "demand": return Talk(p[1], g => W.Demand(W.Player, g, int.Parse(p[2])));
+                case "break": return Talk(p[1], g => W.Break(W.Player, g));
+                case "accept":
+                case "decline":
+                    if (W.Offers.FirstOrDefault(o => o.Id == int.Parse(p[1])) is not { } offer) return "No such offer. Type 'relations'.\n";
+                    return W.Answer(offer, p[0].ToLowerInvariant() == "accept") + "\n";
                 case "lawyer":
                     W.Retain(W.Player, Enum.Parse<Lawyer>(p[1], true));
                     return $"You now keep {Content.Lawyers[W.Player.Lawyer].Label}" + (W.Player.Lawyer == Lawyer.None ? ".\n" : $", ${Content.Lawyers[W.Player.Lawyer].Weekly} a week.\n");
@@ -92,8 +102,9 @@ public sealed class CommandShell
                 case "send": return CrewOrder(int.Parse(p[1]), int.Parse(p[2]), guard: false);
                 case "post": return CrewOrder(int.Parse(p[1]), int.Parse(p[2]), guard: true);
                 case "auto":
+                    var answers = AiPlanner.TalkForPlayer(W);
                     Pending = AiPlanner.Plan(W, W.Player);
-                    return $"Planned {Pending.Count} orders. Type 'orders' to review or 'end' to run the week.\n";
+                    return string.Concat(answers.Select(a => a + "\n")) + $"Planned {Pending.Count} orders. Type 'orders' to review or 'end' to run the week.\n";
                 case "orders":
                     var sb = new StringBuilder();
                     foreach (var o in Pending) sb.AppendLine($"  {Describe(o)}");
@@ -125,6 +136,13 @@ public sealed class CommandShell
         if (W.CannotDrive(W.Player, hood, c) is string no2) return no2 + "\n";
         int paid = W.Drive(W.Player, hood, c);
         return $"{hood.Name} now drives a {Content.Cars[c].Label}. That cost ${paid}.\n";
+    }
+
+    /// <summary>Deal with another gang, picked by its id.</summary>
+    private string Talk(string id, Func<Gang, string> deal)
+    {
+        var g = W.Gangs.FirstOrDefault(x => x.Id == int.Parse(id) && x.Alive && !x.IsPlayer);
+        return g == null ? "No such gang. Type 'relations'.\n" : deal(g) + "\n";
     }
 
     private string PayJudge(int hoodId)
@@ -256,7 +274,21 @@ public sealed class CommandShell
         };
         if (problem != null) return problem + "\n";
         Pending.Add(order);
-        return $"Queued: {Describe(order)}\n";
+        return $"Queued: {Describe(order)}\n" + (Breaks(order) is { } partner ? $"That breaks your {World.Name(W.PactBetween(Me, partner.Id)!.Kind)} with {partner.Name}.\n" : "");
+    }
+
+    /// <summary>The gang this order moves on, if the player has a pact with it.</summary>
+    public Gang? Breaks(Order order)
+    {
+        int target = order switch
+        {
+            ExtortOrder e when e.BusinessId >= 0 && e.BusinessId < W.Businesses.Count => W.Businesses[e.BusinessId].ProtectorGangId,
+            ArsonOrder a when a.BusinessId >= 0 && a.BusinessId < W.Businesses.Count => W.Businesses[a.BusinessId].ProtectorGangId,
+            HijackOrder h when h.BusinessId >= 0 && h.BusinessId < W.Businesses.Count => W.Businesses[h.BusinessId].ProtectorGangId,
+            HitOrder h when W.Hoods.FirstOrDefault(x => x.Id == h.TargetHoodId) is { } t => t.GangId,
+            _ => -1,
+        };
+        return target >= 0 && W.AtPeace(Me, target) ? W.GangById(target) : null;
     }
 
     public string Describe(Order o) => o switch

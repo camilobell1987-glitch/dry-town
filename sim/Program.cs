@@ -39,6 +39,7 @@ int Soak()
     long gearBought = 0, armedAtEnd = 0, menAtEnd = 0;
     long frontsBought = 0, taxCases = 0, cleanAtEnd = 0, cashAtEnd = 0;
     long trials = 0, acquittals = 0, judgesPaid = 0, juries = 0, lawyered = 0, gangsAtEnd = 0;
+    long truces = 0, alliances = 0, tributes = 0, broken = 0, pactsAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
     {
         var sim = Simulation.New(new WorldSettings { Seed = s, Difficulty = difficulty, Size = size, PoliticsEnabled = !args.Contains("--no-politics") });
@@ -69,6 +70,11 @@ int Soak()
         juries += ev.Count(e => e.Kind == EventKind.Trial && e.Text.Contains("paid visits to the jurors"));
         lawyered += sim.World.LivingGangs.Count(g => g.Lawyer != Lawyer.None);
         gangsAtEnd += sim.World.LivingGangs.Count();
+        truces += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.EndsWith("agreed a truce."));
+        alliances += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" are allies now"));
+        tributes += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" a week to be left alone"));
+        broken += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" broke the "));
+        pactsAtEnd += sim.World.Pacts.Count;
         foreach (var e in ev.Where(e => e.Kind == EventKind.RacketOpened && e.Text.Contains(" opened a ")))
             foreach (var info in Content.Rackets.Values.Where(r => e.Text.Contains($" opened a {r.Label} ")))
                 rackets[info.Kind] = rackets.GetValueOrDefault(info.Kind) + 1;
@@ -82,6 +88,8 @@ int Soak()
     Console.WriteLine($"Guns and cars bought per city-year: {gearBought / (double)(seeds * years):0.0}; men carrying a gun at the end: {armedAtEnd * 100 / Math.Max(1, menAtEnd)}%.");
     Console.WriteLine($"Fronts bought per city-year: {frontsBought / (double)(seeds * years):0.0}; tax cases per city-year: {taxCases / (double)(seeds * years):0.00}; gangs' cash clean at the end: {cleanAtEnd * 100 / Math.Max(1, cashAtEnd)}%.");
     Console.WriteLine($"Trials per city-year: {trials / (double)(seeds * years):0.0}, {acquittals * 100 / Math.Max(1, trials)}% acquitted; judges paid {judgesPaid / (double)(seeds * years):0.0}, juries leaned on {juries / (double)(seeds * years):0.00} per city-year; gangs with a lawyer at the end: {lawyered * 100 / Math.Max(1, gangsAtEnd)}%.");
+    double cy = seeds * years;
+    Console.WriteLine($"Pacts per city-year: truces {truces / cy:0.0}, tribute deals {tributes / cy:0.0}, alliances {alliances / cy:0.0}, broken {broken / cy:0.0}; pacts standing at the end: {pactsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Rackets opened: {string.Join(", ", rackets.OrderBy(c => c.Key).Select(c => $"{Content.Rackets[c.Key].Label} {c.Value}"))}.");
     Console.WriteLine($"Your gang on autopilot ({difficulty}): alive after 3 years in {aliveAt3}/{seeds}, after {years} years in {aliveAtEnd}/{seeds}.");
     return stalled == 0 ? 0 : 1;
