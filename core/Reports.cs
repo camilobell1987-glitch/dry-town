@@ -257,6 +257,8 @@ public static class Reports
         var hall = w.Hall;
         string friend = hall.FriendGangId >= 0 ? $", a friend of {w.GangById(hall.FriendGangId).Name}" : "";
         sb.AppendLine($"Mayor {hall.Mayor} ({(hall.Reform ? "reform" : "machine")}{friend}). Outrage {hall.Outrage}.");
+        string daFriend = hall.DAFriendGangId >= 0 ? $", a friend of {w.GangById(hall.DAFriendGangId).Name}" : "";
+        sb.AppendLine($"District Attorney {hall.DA} ({(hall.DAReform ? "reform" : "machine")}{daFriend}).");
         var due = Politics.Campaigning(w);
         if (due is { } d) sb.AppendLine($"Election in {d.Week - w.Week + 1} weeks: {(d.Kind == ElectionKind.Mayor ? "mayor" : "aldermen")}.");
         else sb.AppendLine($"Next elections: aldermen week {Politics.NextElection(w, ElectionKind.Alderman) % Content.WeeksPerYear + 1} of {Content.StartYear + Politics.NextElection(w, ElectionKind.Alderman) / Content.WeeksPerYear}, " +
@@ -265,9 +267,23 @@ public static class Reports
         foreach (var ward in w.Wards)
         {
             var biz = Politics.BusinessesIn(w, ward).ToList();
-            string owner = ward.Reformer ? "nobody (reformer)" : ward.OwnerGangId >= 0 ? w.GangById(ward.OwnerGangId).Name : "the party";
-            string price = ward.Reformer || ward.OwnerGangId == gangId ? "" : Politics.PayoffCost(w, ward, w.GangById(gangId)).ToString();
+            string owner = ward.Reformer ? "nobody (reformer)" : ward.OwnerGangId >= 0 ? w.GangById(ward.OwnerGangId).Name + (ward.OwnMan ? " (own man)" : "") : "the party";
+            string price = ward.Reformer || ward.OwnMan || ward.OwnerGangId == gangId ? "" : Politics.PayoffCost(w, ward, w.GangById(gangId)).ToString();
             sb.AppendLine($"{ward.Id,3} {Trim(ward.Name, 16),-16} {Trim(ward.Alderman, 30),-30} {Trim(owner, 24),-24} {biz.Count(b => b.ProtectorGangId == gangId),2}/{biz.Count,-2} {price,6}");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The last count in every race: each candidate, his ticket and his votes.</summary>
+    public static string Results(World w)
+    {
+        if (w.Hall.Results.Count == 0) return "No votes have been counted yet.\n";
+        var sb = new StringBuilder();
+        foreach (var race in w.Hall.Results)
+        {
+            sb.AppendLine($"{race.Race}, {Date(w, race.Week)}:");
+            foreach (var t in race.Field.OrderByDescending(t => t.Votes))
+                sb.AppendLine($"  {(t.Won ? "*" : " ")} {Trim(t.Name, 30),-30} {Trim(t.Ticket, 28),-28} {t.Votes,6:N0} {race.Share(t),3}%");
         }
         return sb.ToString();
     }

@@ -23,9 +23,12 @@ public sealed partial class Simulation
         bool life = priors >= Content.HabitualOffender;
         weeks = Content.Sentence(weeks, priors);
         hood.JailWeeks = Content.WeeksToTrial;
+        double odds = strength ?? (federal ? Content.FederalCase : Content.CityCase);
+        // The city's cases are the district attorney's to push or let slide.
+        if (!federal) odds += (w.Hall.DAReform ? Content.DaReformCase : 0) - (w.Hall.DAFriendGangId == hood.GangId ? Content.DaFriendCase : 0);
         hood.Case = new Case
         {
-            Charge = why, Sentence = weeks, Federal = federal, Strength = strength ?? (federal ? Content.FederalCase : Content.CityCase),
+            Charge = why, Sentence = weeks, Federal = federal, Strength = odds,
             Prepared = w.GangById(hood.GangId).Lawyer != Lawyer.None, Life = life,
         };
         string faces = life ? "life, with three convictions behind him" : $"{weeks} weeks" + (priors > 0 ? $", more with {priors} conviction{(priors == 1 ? "" : "s")} behind him" : "");

@@ -5,8 +5,8 @@ namespace DryTown.Core;
 /// <summary>Everything needed to carry on a city exactly where it was left: the world, the dice, and the orders on the desk.</summary>
 public sealed class SaveData
 {
-    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals. 9 added rap sheets.</summary>
-    public const int CurrentVersion = 9;
+    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals. 9 added rap sheets. 10 added vote counts, candidates and the district attorney.</summary>
+    public const int CurrentVersion = 10;
 
     public int Version { get; set; } = CurrentVersion;
     public DateTime SavedAt { get; set; }
@@ -69,6 +69,7 @@ public static class SaveGame
         if (data.Version > SaveData.CurrentVersion) throw new InvalidDataException("This save is from a newer version of the game.");
         if (data.Version < 2) GiveAges(data);
         if (data.Version < 3) GiveWards(data);
+        if (data.Hall is { DA: "" } hall) hall.DA = Politics.NewPolitician(new Rng(data.Settings.Seed ^ 0xDA), false);
         data.Version = SaveData.CurrentVersion;
         return data;
     }

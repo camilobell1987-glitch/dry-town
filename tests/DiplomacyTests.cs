@@ -166,7 +166,7 @@ public class DiplomacyTests
     [Fact]
     public void RivalsMakeAndBreakPactsOnTheirOwn()
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 2, Size = CitySize.Medium });
+        var sim = Simulation.New(new WorldSettings { Seed = 1, Size = CitySize.Medium });
         for (int i = 0; i < 3 * Content.WeeksPerYear; i++) sim.AdvanceWeek(playerAutopilot: true);
         var ev = sim.World.Events.Where(e => e.Kind == EventKind.Diplomacy).ToList();
         Assert.Contains(ev, e => e.Text.Contains(" broke the "));

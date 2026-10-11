@@ -48,6 +48,33 @@ public static class Content
     /// <summary>Weeks of campaigning before an election, when money can be put behind a candidate.</summary>
     public const int CampaignWeeks = 8;
 
+    /// <summary>The last weeks of a campaign, when men can be sent to work the polls.</summary>
+    public const int PollsWeeks = 2;
+
+    /// <summary>The votes a man leaning on voters for a week is worth, in the same weight as campaign money.</summary>
+    public static int PollsVotes(Hood man) => 40 * man.Intimidation + 10 * man.Muscle;
+
+    /// <summary>A man needs this much brains to run for alderman, and a clean record.</summary>
+    public const int CandidateBrains = 5;
+
+    /// <summary>What one of the gang's own men on the ballot is worth to it, over and above the money behind him.</summary>
+    public static int CandidateWeight(Hood man) => 150 + man.Brains * 30;
+
+    /// <summary>A sitting alderman who is one of the outfit's own men has a stronger machine than a bought one.</summary>
+    public const int OwnManIncumbency = 400;
+
+    /// <summary>How many turn out to vote in a ward.</summary>
+    public static int WardTurnout(int businesses) => 600 + businesses * 45;
+
+    /// <summary>How lopsided the count runs: closer to 0, the closer the races.</summary>
+    public const double VoteSpread = 0.4;
+
+    /// <summary>The weight a winning mayor's coat-tails lend his side's man for district attorney.</summary>
+    public const int CoatTails = 200;
+
+    /// <summary>A reform DA pushes every city case harder; a machine DA lets his backer's cases go soft.</summary>
+    public const double DaReformCase = 0.05, DaFriendCase = 0.1;
+
     public static bool IsAldermanYear(int year) => year % 2 == 0;
     public static bool IsMayorYear(int year) => year % 4 == 3;
 

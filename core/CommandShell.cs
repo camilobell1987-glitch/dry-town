@@ -32,6 +32,7 @@ public sealed class CommandShell
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
         "heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
         "wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
+        "stand <hood> <ward> (run him for alderman) | polls <hood> <ward> (lean on voters, last " + Content.PollsWeeks + " weeks) | results (the last vote)\n" +
         "street (people about) | hire <person> | paycop <person> | buystory <person> | silence <hood> <person>\n" +
         "torch <hood> <biz> | hit <hood> <target hood> [backup..] | banks | rob <hood> <bank> [backup..] | hijack <hood> <biz> [backup..]\n" +
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
@@ -66,6 +67,9 @@ public sealed class CommandShell
                 case "wards": return Reports.Wards(W, Me);
                 case "payoff": return Queue(new PayoffOrder(Me, int.Parse(p[1])));
                 case "campaign": return Queue(new CampaignOrder(Me, p[1].ToLowerInvariant() == "mayor" ? -1 : int.Parse(p[1]), int.Parse(p[2])));
+                case "stand": return Queue(new StandOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "polls": return Queue(new PollsOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "results": return Reports.Results(W);
                 case "street": return Reports.Street(W, Me);
                 case "banks": return Reports.Banks(W, Me);
                 case "hire": return Queue(new HireOrder(Me, int.Parse(p[1])));
@@ -268,6 +272,11 @@ public sealed class CommandShell
                 ?? (W.BusinessById(g.BusinessId).ProtectorGangId != Me ? "You can only guard your own turf." : null),
             PayoffOrder po => CheckPayoff(po),
             CampaignOrder co => CheckCampaign(co),
+            StandOrder so => CheckHood(so.HoodId) ?? (so.WardId < 0 || so.WardId >= W.Wards.Count ? "There's no such ward. Type 'wards'."
+                : Pending.Any(q => q is StandOrder x && (x.HoodId == so.HoodId || x.WardId == so.WardId)) ? "You're already putting a man up there this week."
+                : Politics.CannotStand(W, W.Player, W.HoodById(so.HoodId), W.Wards[so.WardId])),
+            PollsOrder po => CheckHood(po.HoodId) ?? (po.WardId < 0 || po.WardId >= W.Wards.Count ? "There's no such ward. Type 'wards'."
+                : Politics.PollsOpen(W) == null ? $"The polls only need working in the last {Content.PollsWeeks} weeks of a campaign." : null),
             ArmOrder a => CheckHood(a.HoodId, allowJailed: true) ?? W.CannotArm(W.Player, W.HoodById(a.HoodId), a.Weapon),
             CarOrder c => CheckHood(c.HoodId, allowJailed: true) ?? W.CannotDrive(W.Player, W.HoodById(c.HoodId), c.Car),
             FrontOrder f => CheckBiz(f.BusinessId) ?? W.CannotBuyFront(W.Player, W.BusinessById(f.BusinessId)),
@@ -308,6 +317,8 @@ public sealed class CommandShell
             $"put Alderman {W.Wards[po.WardId].Alderman} of {W.Wards[po.WardId].Name} on the payroll (${Politics.PayoffCost(W, W.Wards[po.WardId], W.Player)})",
         CampaignOrder co => co.WardId < 0 ? $"put ${co.Amount} behind the machine's man for mayor"
             : $"put ${co.Amount} behind your man in {(co.WardId < W.Wards.Count ? W.Wards[co.WardId].Name : "ward " + co.WardId)}",
+        StandOrder so when so.WardId >= 0 && so.WardId < W.Wards.Count => $"{HoodName(so.HoodId)} runs for alderman in {W.Wards[so.WardId].Name}",
+        PollsOrder po when po.WardId >= 0 && po.WardId < W.Wards.Count => $"{HoodName(po.HoodId)} works the polls in {W.Wards[po.WardId].Name}",
         ArsonOrder a => $"{HoodName(a.HoodId)} sets fire to {BizName(a.BusinessId)}",
         HitOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "go" : "goes")} after {HoodName(h.TargetHoodId)}",
         RobberyOrder r => $"{HoodName(r.HoodId)}{With(r.Backup)} {(Sim.WeekRunning ? "hold" : "holds")} up {W.BankById(r.BankId)?.Name ?? "a bank"}",

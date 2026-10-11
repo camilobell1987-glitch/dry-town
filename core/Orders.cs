@@ -26,6 +26,8 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(JuryOrder), "jury")]
 [JsonDerivedType(typeof(LawyerOrder), "lawyer")]
 [JsonDerivedType(typeof(JudgeOrder), "judge")]
+[JsonDerivedType(typeof(StandOrder), "stand")]
+[JsonDerivedType(typeof(PollsOrder), "polls")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -60,6 +62,12 @@ public sealed record PayoffOrder(int GangId, int WardId) : Order(GangId);
 
 /// <summary>Put money behind a candidate while an election is coming. WardId -1 is the mayor's race.</summary>
 public sealed record CampaignOrder(int GangId, int WardId, int Amount) : Order(GangId);
+
+/// <summary>Put one of the gang's men on the ballot for alderman in a ward.</summary>
+public sealed record StandOrder(int GangId, int HoodId, int WardId) : Order(GangId);
+
+/// <summary>Send a man to lean on voters in a ward in the last weeks of a campaign, for whichever race is on.</summary>
+public sealed record PollsOrder(int GangId, int HoodId, int WardId) : Order(GangId);
 
 /// <summary>Burn down a business a rival protects. It stays shut for weeks and its racket is lost.</summary>
 public sealed record ArsonOrder(int GangId, int HoodId, int BusinessId) : Order(GangId);

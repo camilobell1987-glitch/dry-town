@@ -318,6 +318,8 @@ public enum ActionKind
     Silence,
     /// <summary>Someone on the street is hired, paid off or bought.</summary>
     Hire,
+    /// <summary>A hood leans on voters outside a polling place.</summary>
+    Polls,
 }
 
 public enum ActionResult { None, Success, Failed, Won, Lost, BackedOff, Killed, Arrested }

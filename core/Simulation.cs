@@ -109,6 +109,9 @@ public sealed partial class Simulation
                 case SetRateOrder o: SetRate(gang, o); break;
                 case PayoffOrder o when o.WardId >= 0 && o.WardId < w.Wards.Count: Politics.Payoff(w, gang, w.Wards[o.WardId]); break;
                 case CampaignOrder o: Politics.Campaign(w, gang, o.WardId, o.Amount); break;
+                case StandOrder o when o.WardId >= 0 && o.WardId < w.Wards.Count && w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man:
+                    Politics.Stand(w, gang, man, w.Wards[o.WardId]); break;
+                case PollsOrder o: WorkPolls(gang, o); break;
                 case ArsonOrder o: Arson(gang, o); break;
                 case HitOrder o: Hit(gang, o); break;
                 case RobberyOrder o: Robbery(gang, o); break;
@@ -166,6 +169,7 @@ public sealed partial class Simulation
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
             JuryOrder => w.PrecinctNear(w.Map.LotAt(hq)).Id,
+            PollsOrder p when p.WardId >= 0 && p.WardId < w.Wards.Count => Politics.PollingPlace(w, w.Wards[p.WardId], hq),
             _ => hq,
         };
     }
@@ -190,6 +194,7 @@ public sealed partial class Simulation
         HijackOrder h => h.Team,
         SilenceOrder s => new[] { s.HoodId },
         JuryOrder j => new[] { j.HoodId },
+        PollsOrder p => new[] { p.HoodId },
         _ => Array.Empty<int>(),
     };
 
