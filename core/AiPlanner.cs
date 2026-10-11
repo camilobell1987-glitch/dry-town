@@ -59,8 +59,8 @@ public static partial class AiPlanner
         }
 
         var hoods = w.AvailableHoodsOf(g.Id).ToList();
-        // The boss stays home once there are soldiers to send.
-        if (hoods.Count >= 3) hoods.RemoveAll(h => h.Id == g.BossHoodId);
+        // The boss stays home once there are soldiers to send, and a man on the ballot keeps out of trouble.
+        if (hoods.Count >= 3) hoods.RemoveAll(h => h.Id == g.BossHoodId || Politics.StandingIn(w, h) != null);
         hoods = hoods.OrderByDescending(h => h.Strength).ThenBy(h => h.Id).ToList();
 
         if (g.Heat < 50 && hoods.Count > 0)
@@ -101,6 +101,7 @@ public static partial class AiPlanner
             }
         }
 
+        PlanPolls(w, g, turf, hoods, orders);
         PlanCrimes(w, g, turf, hoods, cash, orders);
 
         // Score each target as about ten weeks of income, less the expected cost of losing the man.
@@ -351,6 +352,24 @@ public static partial class AiPlanner
     }
 
     /// <summary>
+    /// In the last weeks of a campaign, send the most frightening spare man to the polls where the gang
+    /// has the most riding: its own man's ward, its alderman's, or for the mayor's race its home ward.
+    /// </summary>
+    private static void PlanPolls(World w, Gang g, List<Business> turf, List<Hood> hoods, List<Order> orders)
+    {
+        if (w.Wards.Count == 0 || !w.Settings.PoliticsEnabled || turf.Count < 4 || hoods.Count < 4) return;
+        if (Politics.PollsOpen(w) is not { } race) return;
+        Ward? ward = race.Kind == ElectionKind.Alderman
+            ? w.Wards.FirstOrDefault(x => x.Candidates.ContainsKey(g.Id)) ?? w.Wards.FirstOrDefault(x => x.OwnerGangId == g.Id && x.Campaign.ContainsKey(g.Id))
+            : w.Hall.Campaign.ContainsKey(g.Id) ? w.Wards[turf.GroupBy(b => w.LotOf(b).WardId).OrderByDescending(x => x.Count()).ThenBy(x => x.Key).First().Key] : null;
+        if (ward == null) return;
+        var man = hoods.Where(h => h.Id != g.BossHoodId && Politics.StandingIn(w, h) == null).OrderByDescending(h => h.Intimidation).ThenBy(h => h.Id).FirstOrDefault();
+        if (man == null) return;
+        orders.Add(new PollsOrder(g.Id, man.Id, ward.Id));
+        hoods.Remove(man);
+    }
+
+    /// <summary>
     /// Buy the alderman where the gang does most of its business, and put money into elections
     /// once it can afford to. Returns what it plans to spend.
     /// </summary>
@@ -371,8 +390,21 @@ public static partial class AiPlanner
         }
         if (due is { Kind: ElectionKind.Alderman } && cash > 4000)
         {
-            // Defend a bought alderman first, then try for the home ward.
-            var target = home.FirstOrDefault(x => x.Ward.OwnerGangId == g.Id && x.Count >= 3).Ward ?? home[0].Ward;
+            // Back the gang's own man on the ballot first, then defend a bought alderman, then try for the home ward.
+            var target = w.Wards.FirstOrDefault(x => x.Candidates.ContainsKey(g.Id))
+                ?? home.FirstOrDefault(x => x.Ward.OwnerGangId == g.Id && x.Count >= 3).Ward ?? home[0].Ward;
+            // A big outfit with a man to spare puts him up where it runs the most shops, unless it already holds the seat for good.
+            if (!w.Wards.Any(x => x.Candidates.ContainsKey(g.Id)) && home[0].Count >= 5 && w.HoodsOf(g.Id).Count() >= 7
+                && !(home[0].Ward.OwnMan && home[0].Ward.OwnerGangId == g.Id))
+            {
+                var man = w.AvailableHoodsOf(g.Id).Where(h => h.Brains >= Content.CandidateBrains + 1 && Politics.CannotStand(w, g, h, home[0].Ward) == null)
+                    .OrderByDescending(h => h.Brains).ThenBy(h => h.Strength).ThenBy(h => h.Id).FirstOrDefault();
+                if (man != null)
+                {
+                    orders.Add(new StandOrder(g.Id, man.Id, home[0].Ward.Id));
+                    target = home[0].Ward;
+                }
+            }
             if (target.Campaign.GetValueOrDefault(g.Id) < 1500)
             {
                 int amount = (int)Math.Min(750, cash / 12);

@@ -41,6 +41,7 @@ int Soak()
     long trials = 0, acquittals = 0, judgesPaid = 0, juries = 0, lawyered = 0, gangsAtEnd = 0;
     long truces = 0, alliances = 0, tributes = 0, broken = 0, pactsAtEnd = 0;
     long lifers = 0, repeat = 0, convictedAtEnd = 0;
+    long running = 0, ownMenWon = 0, pollsWorked = 0, pollsCaught = 0, reformDAs = 0, ownSeatsAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
     {
         var sim = Simulation.New(new WorldSettings { Seed = s, Difficulty = difficulty, Size = size, PoliticsEnabled = !args.Contains("--no-politics") });
@@ -77,6 +78,12 @@ int Soak()
         broken += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" broke the "));
         pactsAtEnd += sim.World.Pacts.Count;
         lifers += ev.Count(e => e.Text.Contains("habitual offender law"));
+        running += ev.Count(e => e.Text.Contains(" is running for alderman in "));
+        ownMenWon += ev.Count(e => e.Text.Contains("leaves the street for a seat on the council"));
+        pollsWorked += ev.Count(e => e.Text.Contains(" worked the polls in "));
+        pollsCaught += ev.Count(e => e.Text.Contains("charged with intimidating voters"));
+        reformDAs += ev.Count(e => e.Text.Contains("every case in the city courts will be pushed harder"));
+        ownSeatsAtEnd += sim.World.Wards.Count(x => x.OwnMan);
         repeat += sim.World.Hoods.Count(h => h.IsActive && h.Convictions >= 2);
         convictedAtEnd += sim.World.Hoods.Count(h => h.IsActive && h.Convictions >= 1);
         foreach (var e in ev.Where(e => e.Kind == EventKind.RacketOpened && e.Text.Contains(" opened a ")))
@@ -95,6 +102,7 @@ int Soak()
     double cy = seeds * years;
     Console.WriteLine($"Pacts per city-year: truces {truces / cy:0.0}, tribute deals {tributes / cy:0.0}, alliances {alliances / cy:0.0}, broken {broken / cy:0.0}; pacts standing at the end: {pactsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Life sentences for a fourth conviction per city-year: {lifers / cy:0.00}; men with a conviction at the end: {convictedAtEnd * 100 / Math.Max(1, menAtEnd)}%, with two or more: {repeat * 100 / Math.Max(1, menAtEnd)}%.");
+    Console.WriteLine($"Elections per city-year: men run for alderman {running / cy:0.00}, own men elected {ownMenWon / cy:0.00}, weeks worked at the polls {pollsWorked / cy:0.0} with {pollsCaught * 100 / Math.Max(1, pollsWorked + pollsCaught)}% caught; reform DAs elected {reformDAs / cy:0.00}; seats held by an outfit's own man at the end: {ownSeatsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Rackets opened: {string.Join(", ", rackets.OrderBy(c => c.Key).Select(c => $"{Content.Rackets[c.Key].Label} {c.Value}"))}.");
     Console.WriteLine($"Your gang on autopilot ({difficulty}): alive after 3 years in {aliveAt3}/{seeds}, after {years} years in {aliveAtEnd}/{seeds}.");
     return stalled == 0 ? 0 : 1;

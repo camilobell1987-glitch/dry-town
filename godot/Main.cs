@@ -1044,6 +1044,16 @@ public partial class Main : Control
             _talkTo = rivals[0].Id;
             W.AddGrudge(rivals[0].Id, Me, 30 - W.GrudgeOf(rivals[0].Id, Me));
         }
+        if (Flag("--ballot"))
+        {
+            // Put your brightest man on the ballot where you run the most shops, and look at that ward.
+            var home = W.TurfOf(Me).GroupBy(b => W.LotOf(b).WardId).OrderByDescending(x => x.Count()).First().Key;
+            var man = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId && h.Id != W.Player.HeirHoodId).OrderByDescending(h => h.Brains).First();
+            man.Brains = Math.Max(man.Brains, Content.CandidateBrains);
+            man.Record.RemoveAll(r => r.Kind == RapKind.Convicted);
+            Politics.Stand(W, W.Player, man, W.Wards[home]);
+            _selectedWard = home;
+        }
         if (Flag("--plan")) _shell.Execute("auto");
         if (Arg("--select-front") is string which)
             _map.SelectedBusiness = (which == "offer"
@@ -1138,6 +1148,11 @@ public partial class Main : Control
         if (Arg("--shot") is string shot)
         {
             for (int i = 0; i < 4; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            if (Flag("--ballot") && _wardHeader != null && _hallPanel.GetParent()?.GetParent() is ScrollContainer hallScroll)
+            {
+                hallScroll.ScrollVertical = (int)_wardHeader.Position.Y;
+                for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
             if (Arg("--focus") is string focus)
             {
                 // Close in on your headquarters, the bank nearest it, or a business burned out this week.
