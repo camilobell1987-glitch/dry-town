@@ -159,7 +159,13 @@ public sealed class Gang
 
     /// <summary>The week the gang last had reason to think someone in it was talking.</summary>
     public int TalkWeek { get; set; } = -1000;
+
+    /// <summary>How far the gang stretches the liquor it sells: more money, and more chance of a bad batch.</summary>
+    public Cut Cut { get; set; }
 }
+
+/// <summary>How the liquor is served: straight, watered, or cut with whatever's to hand.</summary>
+public enum Cut { Straight, Watered, Hard }
 
 public enum PactKind { Truce, Alliance }
 
@@ -310,6 +316,8 @@ public enum EventKind
     Raid, Squeal, RacketOpened, Recruited, Deserted, Breakaway, NewGang, GangDissolved,
     Succession, Bribe, Era, Lapsed, DiedNaturally, Heir, Family, Politics,
     Arson, Hit, Robbery, Hijack, Street, Gear, Front, Trial, Diplomacy, News, Rat,
+    /// <summary>Supply lines bought, lost and changing hands, and bad liquor.</summary>
+    Booze,
     /// <summary>Something only the gang itself knows: what its men inside hear, who it suspects, what it paid to keep a man quiet.</summary>
     Whisper,
 }
@@ -419,4 +427,35 @@ public sealed class Bank
 
     /// <summary>The week it was last held up. A bank stays on its guard for a while afterwards.</summary>
     public int RobbedWeek { get; set; } = -1000;
+}
+
+public enum LineKind { Truck, Boat }
+
+/// <summary>
+/// A run bringing real liquor into the city from outside, by road or by water. An outfit that buys
+/// one serves the good stuff in its speakeasies, and its shipments are worth stopping.
+/// </summary>
+public sealed class SupplyLine
+{
+    public int Id { get; init; }
+    public required string Name { get; init; }
+    public LineKind Kind { get; init; }
+
+    /// <summary>What it carries and where from, as a phrase: "Canadian whisky down from Windsor".</summary>
+    public required string Cargo { get; init; }
+
+    /// <summary>What the suppliers ask to deal with an outfit.</summary>
+    public int Price { get; init; }
+
+    /// <summary>How many speakeasies it keeps in good liquor.</summary>
+    public int Capacity { get; init; }
+
+    /// <summary>The outfit the suppliers deal with, or -1.</summary>
+    public int OwnerGangId { get; set; } = -1;
+
+    /// <summary>The week its last shipment was stopped. Nothing gets through that week.</summary>
+    public int WaylaidWeek { get; set; } = -1000;
+
+    /// <summary>Weeks its owner has had no speakeasy to take a delivery.</summary>
+    public int IdleWeeks { get; set; }
 }

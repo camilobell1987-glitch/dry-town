@@ -216,6 +216,7 @@ public partial class Main
         var hoods = FreeHoods().Where(h => h.Id != W.Player.BossHoodId || W.AvailableHoodsOf(Me).Count() < 3).ToList();
         var rival = W.GangById(b.ProtectorGangId);
 
+        WaylayActions(b, rival, hoods);
         if (Simulation.CanHijack(W, W.Player, b) && !AlreadyGiven(o => o is HijackOrder h && h.BusinessId == b.Id))
         {
             panel.AddChild(new HSeparator());

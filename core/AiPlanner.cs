@@ -41,6 +41,7 @@ public static partial class AiPlanner
         cash -= PlanStreet(w, g, cash, orders);
         cash -= PlanGear(w, g, cash, orders);
         cash -= PlanFronts(w, g, turf, cash, orders);
+        cash -= PlanBooze(w, g, turf, cash, orders);
         cash -= PlanCourts(w, g, turf, cash, orders);
 
         // An aging boss with money to spare brings his family into the business.
@@ -77,7 +78,9 @@ public static partial class AiPlanner
                     // The dearer setups are for outfits with money behind them, and a press only for the well off.
                     .Where(r => cash > (r.SetupCost >= 900 ? r.SetupCost * 2 : r.SetupCost) + 400)
                     .Where(r => r.Kind != RacketKind.Counterfeit || cash > 5000)
-                    .OrderByDescending(r => r.WeeklyIncome - r.WeeklyHeat * 15 - (r.Kind == RacketKind.Counterfeit ? 60 : 0))
+                    .OrderByDescending(r => r.WeeklyIncome - r.WeeklyHeat * 15 - (r.Kind == RacketKind.Counterfeit ? 60 : 0)
+                        // A line with room to spare makes a speakeasy worth more.
+                        + (r.Kind == RacketKind.Speakeasy && w.LinesOf(g.Id).Sum(l => l.Capacity) > w.Supplied(g.Id, thisWeek: false).Count ? (int)(r.WeeklyIncome * Content.LineBonus) : 0))
                     .FirstOrDefault();
                 if (racket != null)
                 {
@@ -307,13 +310,24 @@ public static partial class AiPlanner
         }
 
         bool Near(Business b) => w.BlocksFromHq(g, b) <= 4;
-        bool Wary(Business b) => w.AtPeace(g.Id, b.ProtectorGangId)
-            || w.GangById(b.ProtectorGangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1;
+        bool WaryOf(int gangId) => w.AtPeace(g.Id, gangId)
+            || w.GangById(gangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1;
+        bool Wary(Business b) => WaryOf(b.ProtectorGangId);
 
         if (beat == 1 && w.Prohibition && g.Heat < 40 && hoods.Count >= 3)
         {
             var lead = hoods[0];
             var backup = hoods.Skip(1).Take(1).ToList();
+            // A rival's whole shipment is worth more than one speakeasy's beer, if the odds are as good.
+            var run = w.SupplyLines.Where(l => Simulation.CanWaylay(w, g, l) && !WaryOf(l.OwnerGangId))
+                .OrderByDescending(l => Simulation.WaylayChance(w, lead, backup, l) * Simulation.Load(l)).ThenBy(l => l.Id).FirstOrDefault();
+            if (run != null && Simulation.WaylayChance(w, lead, backup, run) >= 0.55)
+            {
+                hoods.Remove(lead);
+                foreach (var b in backup) hoods.Remove(b);
+                orders.Add(new WaylayOrder(g.Id, lead.Id, run.Id, backup.Select(b => b.Id).ToArray()));
+                return;
+            }
             var truck = w.Businesses.Where(b => Simulation.CanHijack(w, g, b) && Near(b) && !Wary(b))
                 .OrderByDescending(b => Simulation.HijackChance(w, lead, backup, b)).ThenBy(b => b.Id).FirstOrDefault();
             if (truck != null && Simulation.HijackChance(w, lead, backup, truck) >= 0.55)

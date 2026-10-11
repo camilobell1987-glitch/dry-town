@@ -120,7 +120,7 @@ public class ElectionTests
     [Fact]
     public void MenAtThePollsTurnOutVotesOrGetCharged()
     {
-        var (sim, w) = ToCampaign(6);
+        var (sim, w) = ToCampaign(7);
         var ward = w.Wards[0];
         var shell = new CommandShell(sim);
         while (Politics.PollsOpen(w) == null) sim.AdvanceWeek();

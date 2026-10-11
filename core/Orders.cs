@@ -33,6 +33,9 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(PlantOrder), "plant")]
 [JsonDerivedType(typeof(RecallOrder), "recall")]
 [JsonDerivedType(typeof(FamilyOrder), "family")]
+[JsonDerivedType(typeof(WaylayOrder), "waylay")]
+[JsonDerivedType(typeof(LineOrder), "line")]
+[JsonDerivedType(typeof(CutOrder), "cut")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -139,3 +142,15 @@ public sealed record RecallOrder(int GangId, int HoodId) : Order(GangId);
 
 /// <summary>Look after the family of a man in jail, so he has less reason to take the DA's deal.</summary>
 public sealed record FamilyOrder(int GangId, int HoodId) : Order(GangId);
+
+/// <summary>Stop the shipment on a rival's supply line, on the road or at the landing, and sell the load.</summary>
+public sealed record WaylayOrder(int GangId, int HoodId, int LineId, int[]? Backup = null) : Order(GangId)
+{
+    [JsonIgnore] public IEnumerable<int> Team => (Backup ?? Array.Empty<int>()).Prepend(HoodId);
+}
+
+/// <summary>Strike a deal with the suppliers on a line nobody holds.</summary>
+public sealed record LineOrder(int GangId, int LineId) : Order(GangId);
+
+/// <summary>Change how far the gang stretches its liquor.</summary>
+public sealed record CutOrder(int GangId, Cut Cut) : Order(GangId);

@@ -117,6 +117,9 @@ public sealed partial class Simulation
                 case HitOrder o: Hit(gang, o); break;
                 case RobberyOrder o: Robbery(gang, o); break;
                 case HijackOrder o: Hijack(gang, o); break;
+                case WaylayOrder o: Waylay(gang, o); break;
+                case LineOrder o when w.LineById(o.LineId) is { } line: w.BuyLine(gang, line); break;
+                case CutOrder o: w.SetCut(gang, o.Cut); break;
                 case HireOrder o: Hire(gang, o); break;
                 case PayCopOrder o: PayCop(gang, o); break;
                 case BuyStoryOrder o: BuyStory(gang, o); break;
@@ -171,6 +174,7 @@ public sealed partial class Simulation
             RacketOrder r => w.BusinessById(r.BusinessId).LotId,
             ArsonOrder a => w.BusinessById(a.BusinessId).LotId,
             HijackOrder h => w.BusinessById(h.BusinessId).LotId,
+            WaylayOrder l when w.LineById(l.LineId) is { } line && w.DropOf(line) is { } drop => drop.LotId,
             HitOrder h => HauntOf(w, w.HoodById(h.TargetHoodId)),
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
@@ -201,6 +205,7 @@ public sealed partial class Simulation
         HitOrder h => h.Team,
         RobberyOrder r => r.Team,
         HijackOrder h => h.Team,
+        WaylayOrder l => l.Team,
         SilenceOrder s => new[] { s.HoodId },
         JuryOrder j => new[] { j.HoodId },
         PollsOrder p => new[] { p.HoodId },
@@ -221,6 +226,7 @@ public sealed partial class Simulation
 
         w.Tick = Content.CollectionTick;
         Collect();
+        Booze();
         PayWages();
         PayLawyers();
         Launder();
@@ -245,7 +251,10 @@ public sealed partial class Simulation
         int yearBefore = w.Year;
         w.Week++;
         if (w.Year == Content.RepealYear && yearBefore != w.Year)
+        {
             w.Log(EventKind.Era, -1, "Prohibition is repealed. Liquor is legal again and bootleg margins collapse.");
+            CloseLines();
+        }
     }
 
     // ---- Orders -------------------------------------------------------------
@@ -263,14 +272,14 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or RecallOrder or FamilyOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
             RecruitOrder or HireOrder => rng.Range(0, 5) * 24 + rng.Range(10, 17),
             PayCopOrder or BuyStoryOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
             // Fires are set and trucks stopped after dark; banks are robbed while the doors are open.
-            ArsonOrder or HijackOrder => rng.Range(0, 5) * 24 + rng.Range(20, 23),
+            ArsonOrder or HijackOrder or WaylayOrder => rng.Range(0, 5) * 24 + rng.Range(20, 23),
             RobberyOrder => rng.Range(0, 5) * 24 + rng.Range(10, 15),
             _ => rng.Range(0, 5) * 24 + rng.Range(9, 22),
         };
@@ -527,6 +536,7 @@ public sealed partial class Simulation
     private void Collect()
     {
         var w = World;
+        var supplied = new Dictionary<int, HashSet<int>>();
         foreach (var biz in w.Businesses)
         {
             if (biz.ShutWeeks > 0) { biz.ShutWeeks--; continue; }
@@ -553,7 +563,8 @@ public sealed partial class Simulation
             {
                 var info = Content.Rackets[biz.Racket];
                 bool legalNow = info.NeedsProhibition && !w.Prohibition;
-                int income = (int)((legalNow ? info.WeeklyIncome * 3 / 10 : info.WeeklyIncome) * w.RacketFactor(biz.Racket));
+                if (!supplied.TryGetValue(gang.Id, out var real)) supplied[gang.Id] = real = w.Supplied(gang.Id);
+                int income = (int)((legalNow ? info.WeeklyIncome * 3 / 10 : info.WeeklyIncome) * w.RacketFactor(biz.Racket) * w.BoozeFactor(biz, gang, real));
                 int heat = legalNow ? 0 : info.WeeklyHeat * w.RacketHeatFactor(biz.Racket);
                 gang.Cash += income;
                 ledger.Rackets += income;
