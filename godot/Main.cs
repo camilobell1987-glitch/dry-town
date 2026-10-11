@@ -1097,6 +1097,15 @@ public partial class Main : Control
             W.Wars.Single(x => x.Involves(Me)).StartWeek = W.Week - 5;
             _talkTo = enemy.Id;
         }
+        if (Flag("--commission"))
+        {
+            // At the table, talking to the biggest rival there, with nothing between you yet.
+            if (!W.Seated(Me)) W.Commission.Seats.Add(Me);
+            var rival = W.Members.Where(g => !g.IsPlayer && W.WarOf(g.Id) == null).OrderByDescending(W.Power).First();
+            W.Pacts.RemoveAll(p => p.Involves(Me));
+            W.Commission.LastAsked.Remove(Me);
+            _talkTo = rival.Id;
+        }
         if (Flag("--gang-crews"))
         {
             // Talk to the outfit with the most crews, with a man of yours inside it.
@@ -1264,6 +1273,11 @@ public partial class Main : Control
             if (Flag("--ballot") && _wardHeader != null && _hallPanel.GetParent()?.GetParent() is ScrollContainer hallScroll)
             {
                 hallScroll.ScrollVertical = (int)_wardHeader.Position.Y;
+                for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
+            if (Arg("--scroll-talk") is string talkDown && _talkPanel.GetParent()?.GetParent() is ScrollContainer talkScroll)
+            {
+                talkScroll.ScrollVertical = int.Parse(talkDown);
                 for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
             if (Arg("--scroll-men") is string down && _crewsPanel.GetParent()?.GetParent() is ScrollContainer menScroll)

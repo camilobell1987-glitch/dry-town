@@ -330,6 +330,8 @@ public enum EventKind
     Union,
     /// <summary>After repeal: the racing wire changing hands, the Bureau's public enemy, and the G-men's arrests.</summary>
     Gmen,
+    /// <summary>The Commission: seats, votes, and outfits thrown out for breaking its rules.</summary>
+    Commission,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

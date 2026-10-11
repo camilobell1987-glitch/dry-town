@@ -5,8 +5,8 @@ namespace DryTown.Core;
 /// <summary>Everything needed to carry on a city exactly where it was left: the world, the dice, and the orders on the desk.</summary>
 public sealed class SaveData
 {
-    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals. 9 added rap sheets. 10 added vote counts, candidates and the district attorney. 11 added city events. 12 added rats, informers and planted men. 13 added supply lines and cut liquor. 14 added wars. 15 added union locals and strikes. 16 added scenarios. 17 added the racing wire and the Bureau's public enemy.</summary>
-    public const int CurrentVersion = 17;
+    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals. 9 added rap sheets. 10 added vote counts, candidates and the district attorney. 11 added city events. 12 added rats, informers and planted men. 13 added supply lines and cut liquor. 14 added wars. 15 added union locals and strikes. 16 added scenarios. 17 added the racing wire and the Bureau's public enemy. 18 added the Commission.</summary>
+    public const int CurrentVersion = 18;
 
     public int Version { get; set; } = CurrentVersion;
     public DateTime SavedAt { get; set; }
@@ -43,6 +43,7 @@ public sealed class SaveData
     public List<War> Wars { get; set; } = new();
     public ScenarioState? Goal { get; set; }
     public RepealState? Repeal { get; set; }
+    public CommissionState? Commission { get; set; }
     public List<Grudge> Grudges { get; set; } = new();
     public List<Offer> Offers { get; set; } = new();
     public List<CityEvent> CityEvents { get; set; } = new();

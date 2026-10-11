@@ -160,6 +160,7 @@ public partial class Main
         if (!CanGiveOrders(panel) || AlreadyGiven(o => o is HitOrder h && h.TargetHoodId == target.Id)) return;
 
         AddLabel(panel, "Put out a hit. Killing a man in the street brings heat, and someone may see it. If it goes wrong your man may not come back.", Palette.Ink, wrap: true);
+        if (Reports.BreachWarning(W, Me, target) is { } breach) AddLabel(panel, breach + (W.CannotAsk(W.Player, gang) == null ? " Ask the table first, on the Gangs tab." : ""), Palette.Bad, 13, wrap: true);
         var hoods = FreeHoods().Where(h => h.Id != W.Player.BossHoodId).ToList();
         if (hoods.Count > 0)
         {

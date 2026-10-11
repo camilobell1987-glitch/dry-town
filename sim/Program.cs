@@ -49,6 +49,7 @@ int Soak()
     long trials = 0, acquittals = 0, judgesPaid = 0, juries = 0, lawyered = 0, gangsAtEnd = 0;
     long truces = 0, alliances = 0, tributes = 0, broken = 0, pactsAtEnd = 0;
     long lifers = 0, repeat = 0, convictedAtEnd = 0;
+    long asks = 0, asksPassed = 0, breaches = 0, playerBreaches = 0, seatsAtEnd = 0, warsAfter = 0, bossHitsAfter = 0, aliveAtSitdown = 0, aliveAfterSitdown = 0;
     long playerNamed = 0, playerArrests = 0, wireMoves = 0, enemiesNamed = 0, gmenArrests = 0, bossesTaken = 0, casinosAtEnd = 0, slotsAtEnd = 0, wireHeld = 0, aliveAtRepeal = 0, aliveAfterRepeal = 0;
     long cityEvents = 0, running = 0, ownMenWon = 0, pollsWorked = 0, pollsCaught = 0, reformDAs = 0, ownSeatsAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
@@ -137,7 +138,20 @@ int Soak()
         casinosAtEnd += sim.World.Businesses.Count(b => b.Racket == RacketKind.Casino);
         slotsAtEnd += sim.World.Businesses.Count(b => b.Racket == RacketKind.Slots);
         if (sim.World.WireGangId >= 0) wireHeld++;
+        int sitdown = sim.World.CommissionStartWeek;
+        asks += ev.Count(e => e.Kind == EventKind.Commission && e.Text.StartsWith("The Commission voted "));
+        asksPassed += ev.Count(e => e.Kind == EventKind.Commission && e.Text.StartsWith("The Commission voted ") && e.Text.Contains(" to let "));
+        breaches += ev.Count(e => e.Kind == EventKind.Commission && e.Text.Contains(" without the Commission's say-so."));
+        playerBreaches += ev.Count(e => e.Kind == EventKind.Commission && e.GangId == sim.World.Player.Id && e.Text.Contains(" without the Commission's say-so."));
+        seatsAtEnd += sim.World.Members.Count();
+        warsAfter += ev.Count(e => e.Week >= sitdown && e.Text.Contains(" went to the mattresses against "));
+        bossHitsAfter += ev.Count(e => e.Week >= sitdown && e.Kind == EventKind.Hit && e.Text.Contains(", boss of "));
         var samples = sim.Metrics.Samples;
+        if (samples.Count > sitdown && samples[sitdown - 1].PlayerAlive)
+        {
+            aliveAtSitdown++;
+            if (samples[^1].PlayerAlive) aliveAfterSitdown++;
+        }
         int repealWeek = (Content.RepealYear - Content.StartYear) * Content.WeeksPerYear;
         if (samples.Count > repealWeek && samples[repealWeek - 1].PlayerAlive)
         {
@@ -163,6 +177,10 @@ int Soak()
     Console.WriteLine($"Wars per city-year: declared {warsDeclared / cy:0.00} ({warsOnPlayer / cy:0.00} on your gang), called off {warsCalledOff / cy:0.00}, ended in a pact {warsMadePeace / cy:0.00}, ended with one side finished {warsFinished / cy:0.00}; still going at the end: {warsAtEnd}/{seeds}.");
     Console.WriteLine($"Rum-running per city-year: lines bought {linesBought / cy:0.00}, shipments stopped {shipmentsStopped / cy:0.00}, lines changing hands after one {linesSwitched / cy:0.00}, bad batches {badBatches / cy:0.00}; lines held at the end: {linesHeld}/{linesTotal}.");
     Console.WriteLine($"Rats per city-year: {string.Join(", ", RatLines.Select(r => $"{r.Label} {ratCounts.GetValueOrDefault(r.Label) / cy:0.00}"))}.");
+    double sy = seeds * Math.Max(0, years - (Content.CommissionYear - Content.StartYear) - (Content.CommissionWeek - 1) / (double)Content.WeeksPerYear);
+    if (sy > 0)
+        Console.WriteLine($"After the Commission sits, per city-year: questions put to the table {asks / sy:0.00} ({asksPassed / sy:0.00} passed), rules broken {breaches / sy:0.00} ({playerBreaches} times by the player's gang), wars declared {warsAfter / sy:0.00}, bosses gunned down {bossHitsAfter / sy:0.00}; " +
+            $"seats at the end {seatsAtEnd / (double)seeds:0.0} a city; the player's gang, alive when it sat, was still alive at the end in {aliveAfterSitdown}/{aliveAtSitdown}.");
     double ry = seeds * Math.Max(0, years - (Content.RepealYear - Content.StartYear));
     if (ry > 0)
         Console.WriteLine($"After repeal, per city-year: the wire changing hands {wireMoves / ry:0.00}, public enemies named {enemiesNamed / ry:0.00}, G-men arrests {gmenArrests / ry:0.00} ({bossesTaken / ry:0.00} of the boss); the player's gang named {playerNamed} times, with {playerArrests} arrests; " +

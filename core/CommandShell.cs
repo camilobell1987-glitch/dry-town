@@ -46,6 +46,7 @@ public sealed class CommandShell
         "hunt <hood> (look for a rat) | plant <hood> <gang> (sign him on with a rival) | recall <hood> (bring him home)\n" +
         "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
         "war <gang> (go to the mattresses against them) | calloff (end a war you started)\n" +
+        "commission (the table, after 1931) | ask <war|hit> <gang> (put it to a vote) | commission <leave|join>\n" +
         "wire (who runs the racing wire, after repeal) | gmen (the Bureau's Public Enemy Number One)\n" +
         "goal (the scenario's goal and how you stand)\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
@@ -114,6 +115,10 @@ public sealed class CommandShell
                 case "demand": return Talk(p[1], g => W.Demand(W.Player, g, int.Parse(p[2])));
                 case "break": return Talk(p[1], g => W.Break(W.Player, g));
                 case "war": return Talk(p[1], g => W.Declare(W.Player, g));
+                case "commission":
+                    if (p.Length > 1) return W.Walk(W.Player, p[1].ToLowerInvariant() == "leave") + "\n";
+                    return Reports.Commission(W, Me);
+                case "ask": return Talk(p[2], g => W.Ask(W.Player, g, Enum.Parse<SanctionKind>(p[1], true)));
                 case "calloff": return W.CallOff(W.Player) + "\n";
                 case "accept":
                 case "decline":
@@ -365,7 +370,8 @@ public sealed class CommandShell
         };
         if (problem != null) return problem + "\n";
         Pending.Add(order);
-        return $"Queued: {Describe(order)}\n" + (Breaks(order) is { } partner ? $"That breaks your {World.Name(W.PactBetween(Me, partner.Id)!.Kind)} with {partner.Name}.\n" : "");
+        return $"Queued: {Describe(order)}\n" + (Breaks(order) is { } partner ? $"That breaks your {World.Name(W.PactBetween(Me, partner.Id)!.Kind)} with {partner.Name}.\n" : "")
+            + (order is HitOrder hit && Reports.BreachWarning(W, Me, W.HoodById(hit.TargetHoodId)) is { } warning ? warning + "\n" : "");
     }
 
     /// <summary>The gang this order moves on, if the player has a pact with it.</summary>

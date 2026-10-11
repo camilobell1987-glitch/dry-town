@@ -41,10 +41,12 @@ public sealed partial class World
     public string Declare(Gang gang, Gang enemy)
     {
         if (CannotDeclare(gang, enemy) is { } no) return no;
+        bool breach = BreaksRules(gang.Id, enemy.Id, SanctionKind.War);
         Wars.Add(new War { A = gang.Id, B = enemy.Id, StartWeek = Week });
         AddGrudge(enemy.Id, gang.Id, Content.GrudgeWar);
         Offers.RemoveAll(o => o.FromGangId == enemy.Id && gang.IsPlayer || o.FromGangId == gang.Id && enemy.IsPlayer);
         Log(EventKind.Diplomacy, gang.Id, $"{gang.Name} went to the mattresses against {enemy.Name}. Both outfits have their men sleeping in safehouses, and the shooting has started.");
+        if (breach) Breach(gang, enemy, $"went to war with {enemy.Name}");
         return $"Your men are on the mattresses. It's war with {enemy.Name} until one of you calls it off or makes peace.";
     }
 

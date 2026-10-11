@@ -96,6 +96,7 @@ public partial class Main
             AddLabel(_talkPanel, $"A truce keeps both sides off each other's turf for {Content.TruceWeeks} weeks. An outfit much stronger than you wants paying for one, and one much weaker might pay you. Allies take up each other's quarrels. Break your word and nobody signs with you for a year.", Palette.InkQuiet, 13, wrap: true);
             if (W.Untrusted(me)) AddLabel(_talkPanel, "You broke your word this year. Nobody will sign with you until it's forgotten.", Palette.Bad, 13, wrap: true);
             WarStatus();
+            CommissionSection();
             return;
         }
 
@@ -167,7 +168,9 @@ public partial class Main
         AddLabel(_talkPanel, $"Go to the mattresses: open war with {them.Name}. Both outfits' men sleep in safehouses (${Content.MattressCost} a man a week), hits between you are {Content.WarHit:P0} likelier and draw half the heat, and both bosses hole up. The heat and the city's outrage climb every week it lasts. You can call it off whenever you like.",
             Palette.InkQuiet, 13, wrap: true);
         var problem = W.CannotDeclare(W.Player, them);
-        var go = AddButton(_talkPanel, problem ?? $"Go to the mattresses against {them.Name}", () => Say(W.Declare(W.Player, them)));
+        var warning = Reports.WarWarning(W, Me, them);
+        if (problem == null && warning != null) AskTheTable(them, warning);
+        var go = AddButton(_talkPanel, problem ?? (warning != null ? "Go to war without the table's say-so" : $"Go to the mattresses against {them.Name}"), () => Say(W.Declare(W.Player, them)));
         go.Disabled = problem != null;
     }
 
