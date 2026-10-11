@@ -297,6 +297,7 @@ public sealed partial class Simulation
                         ArsonOrder a when w.BusinessById(a.BusinessId).ProtectorGangId == me => $"burn {w.BusinessById(a.BusinessId).Name}",
                         HijackOrder h when w.BusinessById(h.BusinessId).ProtectorGangId == me => $"stop the beer truck to {w.BusinessById(h.BusinessId).Name}",
                         WaylayOrder l when w.LineById(l.LineId) is { } line && line.OwnerGangId == me => $"stop our shipment on {line.Name}",
+                        UnionOrder u when w.LocalById(u.LocalId) is { } local && local.OwnerGangId == me => $"push us out of {local.Name}",
                         HitOrder h when w.HoodById(h.TargetHoodId).GangId == me => $"go after {w.HoodById(h.TargetHoodId).Name}",
                         PlantOrder p when p.TargetGangId == me => $"plant {w.HoodById(p.HoodId).Name} on us",
                         _ => null,

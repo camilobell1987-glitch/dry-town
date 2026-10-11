@@ -193,6 +193,7 @@ public sealed partial class World
         }
         world.PlaceShops();
         world.PlaceLines();
+        world.PlaceLocals();
         return world;
     }
 
@@ -464,6 +465,7 @@ public sealed partial class World
         People = People,
         Banks = Banks,
         SupplyLines = SupplyLines,
+        Locals = Locals,
         StreetNames = Map.StreetNames,
         AvenueNames = Map.AvenueNames,
         BlocksX = Map.BlocksX,
@@ -510,9 +512,11 @@ public sealed partial class World
         foreach (var (kind, week) in d.CityEventLast) w.CityEventLast[kind] = week;
         // Cities saved before there were banks get them now.
         w.SupplyLines.AddRange(d.SupplyLines);
+        w.Locals.AddRange(d.Locals);
         w.PlaceBanks();
         w.PlaceShops();
         w.PlaceLines();
+        w.PlaceLocals();
         return w;
     }
 

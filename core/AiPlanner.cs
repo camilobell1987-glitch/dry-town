@@ -106,6 +106,7 @@ public static partial class AiPlanner
 
         cash -= PlanRats(w, g, hoods, cash, orders);
         PlanPolls(w, g, turf, hoods, orders);
+        PlanUnions(w, g, hoods, orders);
         PlanCrimes(w, g, turf, hoods, cash, orders);
 
         // Score each target as about ten weeks of income, less the expected cost of losing the man.

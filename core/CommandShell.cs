@@ -38,6 +38,7 @@ public sealed class CommandShell
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
         "booze (supply lines and your pour) | buyline <line> | waylay <hood> <line> [backup..] | cut <straight|watered|hard>\n" +
+        "unions (the locals and the docks) | local <hood> <local> [backup..] (take it over) | strike <local> <biz|off>\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
         "sheet <hood> (any man's rap sheet) | news (what's going on in the city)\n" +
         "rats (who's talking, and your men inside) | care <hood> (look after a jailed man's family) | seeto <hood> <rat>\n" +
@@ -94,6 +95,9 @@ public sealed class CommandShell
                 case "cut":
                     W.SetCut(W.Player, Enum.Parse<Cut>(p[1], true));
                     return $"Your liquor is {Content.Label(W.Player.Cut)} now.\n";
+                case "unions": return Reports.Unions(W, Me);
+                case "local": return Queue(new UnionOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
+                case "strike": return Strike(int.Parse(p[1]), p[2]);
                 case "cases": return Reports.Cases(W, Me);
                 case "relations": return Reports.Relations(W, Me);
                 case "sheet":
@@ -205,6 +209,22 @@ public sealed class CommandShell
         if (W.CannotBuyFront(W.Player, b) is string no) return no + "\n";
         int price = W.BuyFront(W.Player, b);
         return $"{b.Name} is yours, for ${price:N0}. It can wash ${Content.LaunderCapacity(b)} a week.\n";
+    }
+
+    private string Strike(int localId, string what)
+    {
+        if (W.LocalById(localId) is not { } local) return "There's no such local. Type 'unions'.\n";
+        if (what == "off")
+        {
+            if (local.OwnerGangId != Me) return $"You don't run {local.Name}.\n";
+            if (!local.OnStrike) return "The local isn't out anywhere.\n";
+            W.EndStrike(local, $"{W.Player.Name} sent the pickets of {local.Name} back to work at {W.BusinessById(local.StrikeBusinessId).Name}.");
+            return "The pickets are going back to work.\n";
+        }
+        int bizId = int.Parse(what);
+        if (CheckBiz(bizId) is string bad) return bad + "\n";
+        var b = W.BusinessById(bizId);
+        return W.CallStrike(W.Player, local, b) is string no ? no + "\n" : $"{World.Capital(local.Name)} is out at {b.Name}. The pickets stay until the owner pays you, or for {Content.StrikeWeeks} weeks.\n";
     }
 
     private string BuyLine(int lineId)
@@ -351,6 +371,7 @@ public sealed class CommandShell
             ArsonOrder a when a.BusinessId >= 0 && a.BusinessId < W.Businesses.Count => W.Businesses[a.BusinessId].ProtectorGangId,
             HijackOrder h when h.BusinessId >= 0 && h.BusinessId < W.Businesses.Count => W.Businesses[h.BusinessId].ProtectorGangId,
             WaylayOrder l when W.LineById(l.LineId) is { } line => line.OwnerGangId,
+            UnionOrder u when W.LocalById(u.LocalId) is { } local => local.OwnerGangId,
             HitOrder h when W.Hoods.FirstOrDefault(x => x.Id == h.TargetHoodId) is { } t => t.GangId,
             _ => -1,
         };
@@ -379,6 +400,8 @@ public sealed class CommandShell
         WaylayOrder l => $"{HoodName(l.HoodId)}{With(l.Backup)} {(Sim.WeekRunning ? "stop" : "stops")} the shipment on {W.LineById(l.LineId)?.Name ?? "a supply line"}",
         LineOrder l => $"take over {W.LineById(l.LineId)?.Name ?? "a supply line"}",
         CutOrder c => $"serve the liquor {Content.Label(c.Cut)}",
+        UnionOrder u => $"{HoodName(u.HoodId)}{With(u.Backup)} {(Sim.WeekRunning ? "go" : "goes")} down to the hall of {W.LocalById(u.LocalId)?.Name ?? "a union local"}",
+        StrikeOrder s => $"call {W.LocalById(s.LocalId)?.Name ?? "a local"} out of {BizName(s.BusinessId)}",
         HireOrder h => $"sign on {PersonName(h.PersonId)} (${W.PersonById(h.PersonId)?.Fee ?? 0})",
         PayCopOrder c => $"pay {PersonName(c.PersonId)} ${Content.CopPrice} to look away",
         BuyStoryOrder b => $"buy {PersonName(b.PersonId)}'s story (${Content.StoryPrice(W.Player.Heat)})",
@@ -463,6 +486,13 @@ public sealed class CommandShell
                 if (!Simulation.CanWaylay(W, W.Player, line)) return line.OwnerGangId < 0 ? "Nobody holds that line, so nothing's coming in on it." : $"{W.GangById(line.OwnerGangId).Name} has no speakeasy for it to supply.";
                 if (Already(o => o is WaylayOrder q && q.LineId == l.LineId)) return "You're already sending men after it.";
                 return l.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
+            }
+            case UnionOrder u:
+            {
+                if (W.LocalById(u.LocalId) is not { } local) return "There's no such local. Type 'unions'.";
+                if (local.OwnerGangId == Me) return "You run it already.";
+                if (Already(o => o is UnionOrder q && q.LocalId == u.LocalId)) return "You're already sending men to that hall.";
+                return u.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
             }
             default:
                 return null;

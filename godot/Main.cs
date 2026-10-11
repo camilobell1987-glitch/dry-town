@@ -176,6 +176,7 @@ public partial class Main : Control
             case ActionKind.Raid: audio.Play("whistle", v * 0.6f); break;
             case ActionKind.Hit: audio.Play(a.Result == ActionResult.Won ? "gunshots" : "gunshot", v * 0.9f); break;
             case ActionKind.Robbery: audio.Play(a.Result == ActionResult.Success ? "cash" : "whistle", v * 0.8f); break;
+            case ActionKind.Union: audio.Play(a.CasualtyHoodId >= 0 ? "gunshots" : a.Result is ActionResult.Success or ActionResult.Won ? "bell" : "door", v * 0.7f); break;
             case ActionKind.Hijack: audio.Play(a.CasualtyHoodId >= 0 ? "gunshots" : "horn", v * 0.6f); break;
             case ActionKind.Arson when a.Result == ActionResult.Success: audio.Play("door", v * 0.8f); break;
             case ActionKind.Hire when a.GangId == Me: audio.Play("cash", 0.5f); break;
@@ -212,6 +213,7 @@ public partial class Main : Control
             Line("Bookkeeper", l.LaunderFee, true);
             Line("Tribute received", l.TributeIn, false);
             Line("Tribute paid", l.TributePaid, true);
+            Line("Union dues", l.Dues, false);
             var net = l.Net >= 0 ? Palette.Good : Palette.Bad;
             sb.Append($"[b]Net [color={C(net)}]{(l.Net >= 0 ? "+" : "-")}${Math.Abs(l.Net):N0}[/color][/b]   Cash ${p.Cash:N0} (${p.Clean:N0} clean) · Heat {p.Heat}\n");
             if (l.Laundered > 0) sb.Append($"[color={C(Palette.InkQuiet)}]Washed ${l.Laundered:N0} through your fronts.[/color]\n");
@@ -335,6 +337,7 @@ public partial class Main : Control
         {
             var g = W.GangById(b.ProtectorGangId);
             if (b.OwnerGangId == g.Id) AddLabel(_businessPanel, $"Run by {g.Name}'s own people.", Palette.Gang(W, g.Id));
+            else if (W.StrikeAt(b) != null) AddLabel(_businessPanel, $"Pays {g.Name} {b.ProtectionRate}%, but nothing while the pickets are out.", Palette.Gang(W, g.Id), wrap: true);
             else AddLabel(_businessPanel, $"Pays {g.Name}: {b.ProtectionRate}% (${b.Takings * b.ProtectionRate / 100}/week)", Palette.Gang(W, g.Id));
             var handler = W.Hoods.FirstOrDefault(h => h.Id == b.HandlerHoodId);
             if (handler != null) AddLabel(_businessPanel, $"Handled by {handler.Name}", Palette.InkQuiet);
@@ -344,6 +347,7 @@ public partial class Main : Control
         FrontLines(b);
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {Content.Rackets[b.Racket].Label}", Palette.Bad);
         BoozeLine(b);
+        UnionLine(b);
         if (!b.IsOpen) AddLabel(_businessPanel, W.Week - b.BurnedWeek <= 8 ? $"Burned out. Rebuilding for {b.ShutWeeks} more weeks." : $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
 
         if (_map.Live)
@@ -361,12 +365,16 @@ public partial class Main : Control
             if (_map.Clock >= Simulation.LastOrderTick - 1) { AddLabel(_businessPanel, "It's too late in the week to send anyone. Orders resume Monday.", Palette.InkQuiet, wrap: true); return; }
             AddLabel(_businessPanel, "The week is under way. Men you send now set out from headquarters straight away.", Palette.InkQuiet, wrap: true);
         }
+        // When you run the shop's local, the strike comes first.
+        bool unionFirst = W.LocalOf(b)?.OwnerGangId == Me;
+        if (unionFirst) UnionActions(b);
         if (b.ProtectorGangId == Me) { BoozeActions(b); FrontOffer(b); OwnBusinessActions(b); }
         else if (b.IsOpen)
         {
             TargetActions(b);
             if (b.IsProtected) RivalBusinessCrimes(b);
         }
+        if (!unionFirst) UnionActions(b);
     }
 
     /// <summary>Queue an order while planning, or send the men at once during the live week.</summary>
@@ -1052,6 +1060,19 @@ public partial class Main : Control
             W.Put(rivals[1], OfferKind.Truce, Content.TributeAsk(W.Income(rivals[1])));
             _talkTo = rivals[0].Id;
             W.AddGrudge(rivals[0].Id, Me, 30 - W.GrudgeOf(rivals[0].Id, Me));
+        }
+        if (Flag("--union"))
+        {
+            // You run the local of the trade with the most shops near home, and its members are out at the best one a rival protects.
+            W.Pacts.RemoveAll(p => p.Involves(Me));
+            var shop = W.Businesses.Where(b => b.IsOpen && b.IsProtected && b.ProtectorGangId != Me && W.LocalOf(b) is { IsDocks: false })
+                .OrderBy(b => W.BlocksFromHq(W.Player, b)).ThenByDescending(b => b.Takings).First();
+            var local = W.LocalOf(shop)!;
+            local.OwnerGangId = Me;
+            local.PresidentHoodId = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderByDescending(h => h.Intimidation).First().Id;
+            W.CallStrike(W.Player, local, shop);
+            local.StrikeWeek = W.Week - 2;
+            _map.SelectedBusiness = shop.Id;
         }
         if (Flag("--war"))
         {

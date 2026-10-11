@@ -458,6 +458,7 @@ public partial class MapView : Control
             s = s * 31 + (int)racket;
             s = s * 31 + (b.IsOpen || Live ? 1 : 0);
             s = s * 31 + (Burnt(b) ? 1 : 0);
+            s = s * 31 + (World.StrikeAt(b) != null ? 1 : 0);
         }
         return s;
     }
