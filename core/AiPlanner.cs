@@ -152,7 +152,7 @@ public static partial class AiPlanner
                     double win = Math.Clamp(0.5 + edge, 0.05, 0.95);
                     double score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost - extra * 150;
                     if (g.Heat > 60) score *= 0.3;
-                    if (rival.IsPlayer && !g.IsPlayer) score *= w.Settings.RivalWariness(w.Week / Content.WeeksPerYear);
+                    if (rival.IsPlayer && !g.IsPlayer) score *= w.RivalWariness;
                     double spited = score > 0 ? score * spite : score;
                     if (spited > bestScore) { bestScore = spited; bestWorth = score; best = biz; bestBackup = backup; }
                 }
@@ -314,7 +314,7 @@ public static partial class AiPlanner
 
         bool Near(Business b) => w.BlocksFromHq(g, b) <= 4;
         bool WaryOf(int gangId) => w.AtPeace(g.Id, gangId)
-            || w.GangById(gangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1;
+            || w.GangById(gangId).IsPlayer && w.RivalWariness < 1;
         bool Wary(Business b) => WaryOf(b.ProtectorGangId);
 
         if (beat == 1 && w.Prohibition && g.Heat < 40 && hoods.Count >= 3)
@@ -361,7 +361,7 @@ public static partial class AiPlanner
             var lead = hoods[0];
             var backup = hoods.Skip(1).Take(1).ToList();
             var target = w.Hoods.Where(h => h.IsAvailable && h.GangId != g.Id && w.GangById(h.GangId).Alive && w.GangById(h.GangId).BossHoodId != h.Id && !w.AtPeace(g.Id, h.GangId)
-                    && !(w.GangById(h.GangId).IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1))
+                    && !(w.GangById(h.GangId).IsPlayer && w.RivalWariness < 1))
                 .Where(h => w.Map.Distance(w.HqOf(g), w.Map.LotAt(Simulation.HauntOf(w, h))) <= CityMap.StrideX * 4)
                 .OrderByDescending(h => w.Businesses.Count(b => b.HandlerHoodId == h.Id)).ThenByDescending(h => h.Strength).ThenBy(h => h.Id)
                 .FirstOrDefault();

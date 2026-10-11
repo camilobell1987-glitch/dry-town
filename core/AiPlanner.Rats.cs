@@ -46,7 +46,7 @@ public static partial class AiPlanner
             var crews = w.CrewsOf(g.Id).Select(c => c.LieutenantHoodId).ToHashSet();
             var spy = hoods.Where(h => h.Id != g.BossHoodId && h.Id != g.HeirHoodId && !crews.Contains(h.Id) && Simulation.PlantChance(h) >= 0.6)
                 .OrderByDescending(Simulation.PlantChance).ThenBy(h => h.Id).FirstOrDefault();
-            if (enemy != null && spy != null && !(enemy.IsPlayer && w.Settings.RivalWariness(w.Week / Content.WeeksPerYear) < 1))
+            if (enemy != null && spy != null && !(enemy.IsPlayer && w.RivalWariness < 1))
             {
                 hoods.Remove(spy);
                 orders.Add(new PlantOrder(g.Id, spy.Id, enemy.Id));

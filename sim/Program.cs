@@ -2,7 +2,8 @@ using DryTown.Core;
 
 // Headless runner.
 //   dotnet run --project sim -- soak --seeds 5 --years 10
-//   dotnet run --project sim -- play --seed 42
+//   dotnet run --project sim -- play --seed 42 [--scenario LastCall]
+//   dotnet run --project sim -- scenarios --seeds 40
 
 string mode = args.Length > 0 ? args[0] : "play";
 ulong seed = ulong.Parse(Arg("--seed", "1"));
@@ -10,11 +11,13 @@ int years = int.Parse(Arg("--years", "10"));
 int seeds = int.Parse(Arg("--seeds", "1"));
 var difficulty = Enum.Parse<Difficulty>(Arg("--difficulty", "Normal"), true);
 var size = Enum.Parse<CitySize>(Arg("--size", "Small"), true);
+var scenario = Enum.Parse<ScenarioKind>(Arg("--scenario", "None"), true);
 
 return mode switch
 {
     "soak" => Soak(),
     "play" => Play(),
+    "scenarios" => ScenarioRuns(),
     _ => Usage(),
 };
 
@@ -26,7 +29,7 @@ string Arg(string name, string fallback)
 
 int Usage()
 {
-    Console.WriteLine("usage: soak [--seed N] [--seeds N] [--years N] | play [--seed N]");
+    Console.WriteLine("usage: soak [--seed N] [--seeds N] [--years N] | play [--seed N] [--scenario name] | scenarios [--seed N] [--seeds N] [--scenario name]");
     return 2;
 }
 
@@ -149,9 +152,31 @@ int Soak()
     return stalled == 0 ? 0 : 1;
 }
 
+// Each scenario played on autopilot until it's won or lost: how often the planner manages it, and how soon.
+int ScenarioRuns()
+{
+    foreach (var info in Scenarios.All.Where(i => scenario == ScenarioKind.None || i.Kind == scenario))
+    {
+        int won = 0, finished = 0;
+        var weeks = new List<int>();
+        for (ulong s = seed; s < seed + (ulong)seeds; s++)
+        {
+            var sim = Simulation.New(Scenarios.Settings(info.Kind, s));
+            var w = sim.World;
+            while (w.Goal.Outcome == ScenarioOutcome.Playing) sim.AdvanceWeek(playerAutopilot: true);
+            if (w.Goal.Outcome == ScenarioOutcome.Won) { won++; weeks.Add(w.Goal.Week - w.Settings.StartWeek + 1); }
+            else if (!w.Player.Alive) finished++;
+        }
+        weeks.Sort();
+        string when = weeks.Count > 0 ? $", in a median {weeks[weeks.Count / 2]} weeks" : "";
+        Console.WriteLine($"{info.Title}: won {won}/{seeds}{when}; outfit finished in {finished}.");
+    }
+    return 0;
+}
+
 int Play()
 {
-    var shell = new CommandShell(Simulation.New(new WorldSettings { Seed = seed, Size = size }));
+    var shell = new CommandShell(Simulation.New(scenario != ScenarioKind.None ? Scenarios.Settings(scenario, seed) : new WorldSettings { Seed = seed, Size = size }));
     Console.Write(shell.Welcome);
     while (true)
     {

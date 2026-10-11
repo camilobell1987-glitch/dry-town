@@ -59,7 +59,7 @@ public partial class Main : Control
     private void NewGame(ulong seed)
     {
         Palette.Reset();
-        _shell = new CommandShell(Simulation.New(new WorldSettings { Seed = seed, Size = _citySize }));
+        _shell = new CommandShell(Simulation.New(NewSettings(seed)));
         _map.World = W;
         _map.Select();
         _selectedWard = W.HqOf(W.Player).WardId;
@@ -67,8 +67,9 @@ public partial class Main : Control
         _ticker.Clear();
         _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]You run {W.Player.Name} out of a back room on {W.Map.StreetOf(W.HqOf(W.Player))} St. " +
                            "Click a business on the map to give orders, or press Plan for me. Then End week.[/color]\n");
-        _news.Text = "No reports yet. Your first week starts Monday.";
+        _news.Text = GoalSection() + "No reports yet. Your first week starts Monday.";
         RefreshAll();
+        ShowBriefing();
     }
 
     private int _bossAtStartOfWeek = -1;
@@ -106,6 +107,7 @@ public partial class Main : Control
         SaveGameTo(0);
         AnnounceNewBoss();
         AnnounceNews();
+        AnnounceVerdict();
         RefreshAll();
     }
 
@@ -196,6 +198,7 @@ public partial class Main : Control
         string C(Color c) => "#" + Palette.Hex(c);
         var sb = new System.Text.StringBuilder();
         sb.Append($"[font_size=18]Week {week % Content.WeeksPerYear + 1}, {Content.StartYear + week / Content.WeeksPerYear}[/font_size]\n\n");
+        sb.Append(GoalSection());
         if (W.LastLedger.TryGetValue(p.Id, out var l))
         {
             void Line(string label, long amount, bool cost)
@@ -726,6 +729,8 @@ public partial class Main : Control
         menu.AddItem("New huge city: twelve wards, seven outfits", 5);
         menu.AddItem("New metropolis: a river city of twenty wards, nine outfits", 6);
         menu.AddSeparator();
+        FillScenarioMenu(menu);
+        menu.AddSeparator();
         for (int i = 1; i <= Slots; i++) menu.AddItem($"Save to slot {i}" + (SlotLabel(i) is string l ? $": {l}" : ""), 10 + i);
         menu.AddSeparator();
         for (int i = 0; i <= Slots; i++)
@@ -738,7 +743,8 @@ public partial class Main : Control
 
     private void OnGameMenu(long id)
     {
-        if (id is >= 2 and <= 6) { _citySize = (CitySize)(id - 2); NewGame(GD.Randi()); }
+        if (id is >= 2 and <= 6) { _citySize = (CitySize)(id - 2); _scenario = ScenarioKind.None; NewGame(GD.Randi()); }
+        else if (id >= ScenarioMenuId && id < ScenarioMenuId + Scenarios.All.Length) StartScenario((int)id - ScenarioMenuId);
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
         else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
     }
@@ -1026,6 +1032,7 @@ public partial class Main : Control
         if (args.Length == 0) return;
 
         if (Arg("--size") is string size) _citySize = Enum.Parse<CitySize>(size, true);
+        if (Arg("--scenario") is string scenario) _scenario = Enum.Parse<ScenarioKind>(scenario, true);
         if (Arg("--seed") is string seed) NewGame(ulong.Parse(seed));
         if (Arg("--load") is string slot) GD.Print(LoadGame(int.Parse(slot)) ? $"Loaded {SlotPath(int.Parse(slot))}" : "Load failed");
         int weeks = int.Parse(Arg("--weeks") ?? "0");
