@@ -65,7 +65,11 @@ public sealed partial class Simulation
             List<Order> list;
             if (orders != null && orders.TryGetValue(g.Id, out var given)) list = given;
             else if (g.IsPlayer && !playerAutopilot) list = new List<Order>();
-            else list = AiPlanner.Plan(w, g);
+            else
+            {
+                if (g.IsPlayer) AiPlanner.TalkForPlayer(w);
+                list = AiPlanner.Plan(w, g);
+            }
             plans.Add((g, list));
         }
 
@@ -203,6 +207,7 @@ public sealed partial class Simulation
         PayWages();
         PayLawyers();
         Launder();
+        Diplomacy();
         w.Tick = Content.ReckoningTick;
         Police();
         Street();
@@ -349,6 +354,8 @@ public sealed partial class Simulation
         }
 
         var rival = w.GangById(biz.ProtectorGangId);
+        if (KeepsTheirWord(gang, rival.Id)) return;
+        w.Hostile(gang, rival, Content.GrudgeTakeover);
         var defender = DefenderAt(rival, biz);
         _guards.TryGetValue(biz.Id, out var guard);
         bool guarded = guard.Hood is { IsAvailable: true } && guard.Hood.GangId == rival.Id;
@@ -743,6 +750,8 @@ public sealed partial class Simulation
         var defectors = friends.Select(f => f.Id).Append(leader.Id).ToHashSet();
         foreach (var biz in w.Businesses.Where(b => b.ProtectorGangId == from.Id && defectors.Contains(b.HandlerHoodId)))
             biz.ProtectorGangId = gang.Id;
+        // Nobody forgives a man who walks out with their men and their turf.
+        w.AddGrudge(from.Id, gang.Id, 30);
 
         w.Log(EventKind.Breakaway, from.Id,
             $"{leader.Name} broke with {from.Name} and formed {gang.Name}, taking {friends.Count} men and {w.TurfOf(gang.Id).Count()} businesses.");
@@ -872,6 +881,7 @@ public sealed partial class Simulation
                 biz.Racket = RacketKind.None;
             }
             foreach (var biz in w.FrontsOf(gang.Id).ToList()) biz.OwnerGangId = -1;
+            w.ForgetDiplomacy(gang);
             w.Log(EventKind.GangDissolved, gang.Id, $"{gang.Name} is finished.");
         }
     }

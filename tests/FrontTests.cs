@@ -98,7 +98,9 @@ public class FrontTests
         me.Cash = me.CleanCash = 1_000_000;
         for (int i = 0; i < 30; i++) sim.AdvanceWeek();
         Assert.DoesNotContain(sim.World.Events, e => e.GangId == me.Id && e.Text.StartsWith("Treasury agents"));
-        Assert.True(me.Clean > 990_000);
+        // Wages, and any split in the outfit, come out of it; the Treasury takes none of it.
+        Assert.Equal(me.Cash, me.Clean);
+        Assert.True(me.Clean > 500_000);
     }
 
     [Fact]

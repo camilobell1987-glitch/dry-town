@@ -275,4 +275,36 @@ public static class Content
 
     /// <summary>How much less likely a conviction is with the judge paid, or with the jury leaned on.</summary>
     public const double JudgeCut = 0.35, JuryCut = 0.25;
+
+    // ---- Diplomacy -------------------------------------------------------------
+
+    /// <summary>How long a truce holds before it has to be renewed, and an alliance.</summary>
+    public const int TruceWeeks = 13, AllianceWeeks = 52;
+
+    /// <summary>A gang that holds this much against an outfit at least its own size wants out of the fight.</summary>
+    public const int GrudgeSuesForPeace = 45;
+
+    /// <summary>How much a gang comes to hate the one that did this to it.</summary>
+    public const int GrudgeTakeover = 15, GrudgeArson = 20, GrudgeHit = 25, GrudgeBossHit = 50, GrudgeHijack = 10;
+
+    /// <summary>A gang that breaks its word: what its partner holds against it, and what everyone else does.</summary>
+    public const int GrudgeBetrayed = 40, GrudgeWitnessed = 10;
+
+    /// <summary>A refused demand for tribute is an insult.</summary>
+    public const int GrudgeRefused = 25;
+
+    /// <summary>How much a grudge fades each week.</summary>
+    public const int GrudgeFade = 2;
+
+    /// <summary>Above this, a gang wants paying before it will call off the feud.</summary>
+    public const int GrudgeTooDeep = 50;
+
+    /// <summary>How long a proposal waits on an answer before it lapses.</summary>
+    public const int OfferWeeks = 2;
+
+    /// <summary>A gang this many times stronger than another wants tribute before it agrees to leave it alone.</summary>
+    public const double TributeRatio = 1.8;
+
+    /// <summary>Tribute worth asking for: a fifth of what the payer earns, in round fifties, and never less than $100.</summary>
+    public static int TributeAsk(long weeklyIncome) => (int)Math.Max(100, weeklyIncome / 5 / 50 * 50);
 }

@@ -58,8 +58,10 @@ public sealed partial class Simulation
         var w = World;
         var biz = w.Businesses.FirstOrDefault(b => b.Id == o.BusinessId);
         if (biz == null || !biz.IsOpen || !biz.IsProtected || biz.ProtectorGangId == gang.Id) return;
+        if (KeepsTheirWord(gang, biz.ProtectorGangId)) return;
         if (!TryUseHood(gang, o.HoodId, out var hood)) return;
         var rival = w.GangById(biz.ProtectorGangId);
+        w.Hostile(gang, rival, Content.GrudgeArson);
         _guards.TryGetValue(biz.Id, out var guard);
         bool guarded = guard.Hood is { IsAvailable: true } && guard.Hood.GangId == rival.Id;
         var lot = w.LotOf(biz);
@@ -116,10 +118,12 @@ public sealed partial class Simulation
         var w = World;
         var target = w.Hoods.FirstOrDefault(h => h.Id == o.TargetHoodId);
         if (target == null || !target.IsAvailable || target.GangId == gang.Id) return;
+        if (KeepsTheirWord(gang, target.GangId)) return;
         if (!TryUseHood(gang, o.HoodId, out var hood)) return;
         var backup = TakeBackup(gang, o.Backup);
         var backupIds = backup.Select(h => h.Id).ToList();
         var rival = w.GangById(target.GangId);
+        w.Hostile(gang, rival, rival.BossHoodId == target.Id ? Content.GrudgeBossHit : Content.GrudgeHit);
         int where = HauntOf(w, target);
 
         if (w.Rng.Chance(HitChance(w, hood, backup, target)))
@@ -202,10 +206,12 @@ public sealed partial class Simulation
         var w = World;
         var biz = w.Businesses.FirstOrDefault(b => b.Id == o.BusinessId);
         if (biz == null || !CanHijack(w, gang, biz)) return;
+        if (KeepsTheirWord(gang, biz.ProtectorGangId)) return;
         if (!TryUseHood(gang, o.HoodId, out var hood)) return;
         var backup = TakeBackup(gang, o.Backup);
         var backupIds = backup.Select(h => h.Id).ToList();
         var rival = w.GangById(biz.ProtectorGangId);
+        w.Hostile(gang, rival, Content.GrudgeHijack);
         var info = Content.Rackets[biz.Racket];
         double chance = HijackChance(w, hood, backup, biz);
         gang.Heat = Math.Min(100, gang.Heat + 3 + GunHeat(backup.Prepend(hood)));

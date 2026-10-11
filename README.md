@@ -2,7 +2,7 @@
 
 An open-ended Prohibition-era crime strategy game, inspired by how *Gangsters: Organized Crime* (1998) plays. It is a new game. It uses none of the original's art, audio, text, code, data or name.
 
-There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6 added a huge one. Phase 7, the current state, draws the city at an angle the way Gangsters: Organized Crime did, with buildings standing up off the map, and adds a metropolis split by a river. It also puts people on the street you can deal with (drifters to hire, beat cops to pay off, reporters to buy and witnesses to lean on) and harder crimes: arson, hits, bank jobs and hijacked beer trucks, plus bookies, gambling dens and counterfeiting presses. The city now comes in five sizes, the largest with twenty wards and nine outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out. Since then the crew has a rolodex of mugshots down the side of the screen, your men can carry guns and drive cars bought from the city's gun shops and motor dealers, you can buy businesses outright as fronts to wash your money before the tax men come for it, and a man charged with anything serious goes before a jury, where a lawyer, a paid judge or a visit to the jurors can still get him off.
+There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6 added a huge one. Phase 7, the current state, draws the city at an angle the way Gangsters: Organized Crime did, with buildings standing up off the map, and adds a metropolis split by a river. It also puts people on the street you can deal with (drifters to hire, beat cops to pay off, reporters to buy and witnesses to lean on) and harder crimes: arson, hits, bank jobs and hijacked beer trucks, plus bookies, gambling dens and counterfeiting presses. The city now comes in five sizes, the largest with twenty wards and nine outfits, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out. Since then the crew has a rolodex of mugshots down the side of the screen, your men can carry guns and drive cars bought from the city's gun shops and motor dealers, you can buy businesses outright as fronts to wash your money before the tax men come for it, and a man charged with anything serious goes before a jury, where a lawyer, a paid judge or a visit to the jurors can still get him off. The outfits also talk to each other now: they hold grudges, agree truces, pay or demand tribute, and band together against whoever runs too much of the city.
 
 ![Planning a week](docs/screenshots/planning.png)
 ![The crew rolodex](docs/screenshots/rolodex.png)
@@ -21,7 +21,7 @@ There is no win screen; the city keeps running. Phase 1 built the rules. Phase 2
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). To play the game, install the **.NET edition** of Godot 4.7, open `godot/project.godot` and press Play. If your editor is a different 4.x version, it updates the version in `DryTown.csproj` when it opens the project.
 
 ```sh
-dotnet test tests                                                    # 97 tests
+dotnet test tests                                                    # 111 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
@@ -124,6 +124,29 @@ The console has `cases`, `lawyer <none|storefront|mouthpiece>`, `judge <hood>` (
 
 ![The courts on the City Hall tab](docs/screenshots/courts.png)
 
+## Diplomacy
+
+Every outfit remembers who hurt it. A takeover, a fire, a hijacked truck or a hit leaves the victim with a grudge against the gang that did it, worth more for a dead boss than for a burned shop, and the victim's allies take half of it on too. Grudges fade a little every week.
+
+The **Gangs** tab lists every outfit and where you stand with each. Pick one to talk terms:
+
+| Deal | What it does | Who agrees |
+| --- | --- | --- |
+| Truce | Neither side moves on the other's turf or men for three months | Almost anyone. An outfit much stronger than you, or one that hates you, wants paying for it. |
+| Truce with tribute | One side pays the other every Sunday for the truce. If the money isn't there, the truce is off. | The tribute asked is a fifth of what the payer's turf brings in. |
+| Alliance | A truce for a year, and an attack on either partner makes the attacker an enemy of both | Only while some third outfit is bigger than both of you, and only if they trust you |
+| Demand tribute | You leave a much weaker outfit alone for a weekly envelope | Outfits a little over half your strength or less. Refusing you is an insult. |
+
+The rivals do the same among themselves once a month, and put proposals to you. These wait at the top of the Gangs tab for two weeks. A truce, an alliance or a payment offered to you costs nothing to take. A demand for tribute does, and turning it down, or not answering, makes an enemy.
+
+Your word is worth something. Rivals keep their pacts. If you send men against an outfit you have a pact with, the pact is broken, they hate you for it, every other outfit thinks less of you, and nobody will sign anything with you for a year. The map's business panel warns you before you give that order. An aggressive rival that has grown to twice its partner's strength may tear up a pact too.
+
+**Plan for me** answers proposals the way the rivals would: it takes any truce or alliance and pays tribute only to an outfit much stronger than you. Once a month it also looks for terms of its own, a truce when an outfit your size or bigger is giving you a beating, or an alliance when one outfit holds a third of the city. It never breaks your word and never demands tribute; that's left to you.
+
+The console has `relations`, `truce <gang> [tribute]`, `ally <gang>`, `demand <gang> <dollars>`, `break <gang>`, `accept <offer>` and `decline <offer>`, all answered on the spot.
+
+![Talking terms on the Gangs tab](docs/screenshots/diplomacy.png)
+
 ## City Hall
 
 The city is split into wards, and each ward has an alderman. Open the **City Hall** tab and the map shows the wards, each washed in the colour of the outfit that owns its alderman. Click a ward on the map or in the list to see who runs it.
@@ -197,7 +220,7 @@ Scroll to zoom, and drag with the right or middle mouse button to pan. Trackpad 
 ![Sending a man mid-week](docs/screenshots/mid-week.png)
 ![Saturday night](docs/screenshots/night.png)
 
-The **Console** tab and `sim play` take the same text orders: `extort <hood> <business>`, `racket <hood> <business> <kind>`, `guard <hood> <business>`, `recruit`, `bribe <dollars>`, `rate <business> <percent>`, `crews`, `crew new <hood>`, `crew add <crew> <hood>`, `send <crew> <business>`, `post <crew> <business>`, `wards`, `payoff <ward>`, `campaign <ward|mayor> <dollars>`, `street`, `hire <person>`, `paycop <person>`, `buystory <person>`, `silence <hood> <person>`, `torch <hood> <business>`, `hit <hood> <target> [backup…]`, `banks`, `rob <hood> <bank> [backup…]`, `hijack <hood> <business> [backup…]`, `shops`, `arm <hood> <pistol|shotgun|tommygun>`, `drive <hood> <modelt|packard|cadillac>`, `hand <from> <to> <gun|car>`, `fronts`, `buy <business>`, `cases`, `lawyer <none|storefront|mouthpiece>`, `judge <hood>`, `jury <hood> <defendant>`, `auto`, `end`. `arm`, `drive`, `buy`, `lawyer` and `judge` act on the spot.
+The **Console** tab and `sim play` take the same text orders: `extort <hood> <business>`, `racket <hood> <business> <kind>`, `guard <hood> <business>`, `recruit`, `bribe <dollars>`, `rate <business> <percent>`, `crews`, `crew new <hood>`, `crew add <crew> <hood>`, `send <crew> <business>`, `post <crew> <business>`, `wards`, `payoff <ward>`, `campaign <ward|mayor> <dollars>`, `street`, `hire <person>`, `paycop <person>`, `buystory <person>`, `silence <hood> <person>`, `torch <hood> <business>`, `hit <hood> <target> [backup…]`, `banks`, `rob <hood> <bank> [backup…]`, `hijack <hood> <business> [backup…]`, `shops`, `arm <hood> <pistol|shotgun|tommygun>`, `drive <hood> <modelt|packard|cadillac>`, `hand <from> <to> <gun|car>`, `fronts`, `buy <business>`, `cases`, `lawyer <none|storefront|mouthpiece>`, `judge <hood>`, `jury <hood> <defendant>`, `relations`, `truce <gang> [tribute]`, `ally <gang>`, `demand <gang> <dollars>`, `break <gang>`, `accept <offer>`, `decline <offer>`, `auto`, `end`. `arm`, `drive`, `buy`, `lawyer`, `judge` and the talks with other gangs act on the spot.
 
 ## Systems
 
@@ -207,6 +230,7 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 - **Turf wars and guards.** A hood sent at a rival's business fights whoever answers the door. That is the guard posted there, otherwise the business's handler. A guard fights harder than a handler who gets called in. The rest of the rival gang only backs him up if it isn't spread thin. Losers can die.
 - **Heat.** Rackets, violence and sheer size draw police attention. High heat brings raids, fines, closed rackets and arrests. Bribes cool it, and so do aldermen on the payroll and a mayor who owes you.
 - **Trials.** Serious charges go to a jury after three weeks. Lawyers, paid judges and frightened jurors lower the odds of a conviction (see above).
+- **Diplomacy.** Grudges, truces, tribute and alliances between outfits (see above).
 - **Feds.** Treasury tax cases hit gangs holding large amounts of dirty money. They can't be bribed, they seize money, and they can send the boss away. Money washed through a front is out of their reach (see above). Treasury agents also find counterfeiting presses.
 - **The street.** Drifters, beat cops, reporters and witnesses (see above). Violent crimes may leave a witness, and a gang that runs hot gets a reporter on its tail.
 - **Guns and cars.** A gun adds to a man's strength and his menace; a car gets a job there sooner and gets the men away when it goes wrong (see above).
@@ -222,13 +246,16 @@ All gangs, including the player's, were run by the AI planner. A city counts as 
 | --- | --- | --- | --- | --- | --- |
 | 10-year cities contested, seeds 1–80 (Normal) | 80/80 | 80/80 | 80/80 | 80/80 | 20/20 (seeds 100–119) |
 | 50-year cities contested (Phase 6, before the street) | 10/10 | | 10/10 | 8/8 | |
-| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 66/80 / 50/80 | 67/80 / 37/80 | 68/80 / 40/80 | 70/80 / 58/80 | 17/20 / 13/20 (seeds 100–119) |
-| Arson / hits / bank jobs / hijacks per city per year | 1.8 / 0.1 / 0.1 / 3.8 | 2.4 / 0.2 / 0.3 / 4.3 | 3.2 / 0.2 / 0.4 / 4.3 | 2.8 / 0.2 / 0.7 / 3.1 | 5.1 / 0.2 / 1.1 / 5.0 |
-| Guns and cars bought per city per year; men carrying a gun after 10 years | 36; 41% | 28; 21% | 31; 18% | 74; 26% | 156; 38% |
-| Fronts bought and tax cases per city per year; gangs' cash that is clean after 10 years | 0.9, 0.26; 47% | 0.7, 0.33; 41% | 0.7, 0.56; 37% | 1.6, 0.67; 78% | 5.5, 0.76; 86% |
-| Trials per city per year; acquitted | 29; 21% | 35; 19% | 39; 18% | 48; 17% | 62; 18% |
+| Player's gang alive after 3 / 10 years, seeds 1–80 (Normal) | 69/80 / 52/80 | 71/80 / 37/80 | 67/80 / 49/80 | 66/80 / 62/80 | 17/20 / 16/20 (seeds 100–119) |
+| Arson / hits / bank jobs / hijacks per city per year | 1.6 / 0.1 / 0.1 / 2.3 | 1.8 / 0.1 / 0.2 / 2.2 | 2.2 / 0.1 / 0.3 / 1.8 | 1.2 / 0.1 / 0.4 / 0.9 | 1.8 / 0.1 / 0.6 / 1.0 |
+| Guns and cars bought per city per year; men carrying a gun after 10 years | 47; 47% | 41; 32% | 39; 24% | 51; 22% | 103; 32% |
+| Fronts bought and tax cases per city per year; gangs' cash that is clean after 10 years | 1.3, 0.68; 58% | 1.3, 0.84; 60% | 1.2, 1.13; 68% | 1.6, 1.37; 77% | 5.1, 1.22; 90% |
+| Trials per city per year; acquitted | 29; 22% | 35; 20% | 35; 18% | 39; 17% | 51; 16% |
+| Truces / tribute deals / alliances / broken pacts per city per year; pacts standing after 10 years | 3.1 / 13 / 1.9 / 0.9; 6.0 | 2.0 / 15 / 2.9 / 1.1; 6.4 | 1.4 / 14 / 3.5 / 1.2; 5.6 | 1.0 / 13 / 3.2 / 1.1; 4.3 | 1.3 / 19 / 3.6 / 1.2; 7.5 |
 
-These runs include trials. When every rival hired a lawyer for every man, the player's gang lasted ten years in only 86 of 160 small cities against 105 before; with rivals going to court only for the boss and heir, it is 99 of 160 small and 79 of 160 medium (81 before). Before trials, with fronts, the player's gang was alive after 3 / 10 years in 64/49 small, 60/42 medium, 60/44 large, 73/54 huge and 17/16 metropolis runs.
+These runs include diplomacy. Most deals are short paid truces: a gang taking a beating from an outfit its size or bigger buys three months' peace, and an aggressive outfit leans on a much weaker one. The first version let any two gangs in a fight sign, for half a year, and by year ten most pairs of gangs in a small city had a pact; hijacks fell to a third. Truces now last three months and only the gang on the losing end asks for one. Even so, the outfits fight less than before, and the bigger the city the bigger the drop: hijacks are down about 40% in a small city and 80% in a metropolis, and arson about 10% and 65%. With less lost to fighting, gangs hold more money, so they buy more guns and fronts and draw about twice as many tax cases. The player's gang lasts as long as before or longer. Grudges also pick targets: a gang with a score to settle goes after that outfit first, though a grudge never makes it pick a fight it otherwise wouldn't. When grudges also made gangs fight more, the player's gang lasted three years in 248 of 320 medium cities against 265 before. Before diplomacy, with trials, the player's gang was alive after 3 / 10 years in 66/50 small, 67/37 medium, 68/40 large, 70/58 huge and 17/13 metropolis runs, and arson / hits / bank jobs / hijacks ran at 1.8/0.1/0.1/3.8 small, 2.4/0.2/0.3/4.3 medium, 3.2/0.2/0.4/4.3 large, 2.8/0.2/0.7/3.1 huge and 5.1/0.2/1.1/5.0 metropolis.
+
+Trials came in the change before. When every rival hired a lawyer for every man, the player's gang lasted ten years in only 86 of 160 small cities against 105 before; with rivals going to court only for the boss and heir, it is 99 of 160 small and 79 of 160 medium (81 before). Before trials, with fronts, the player's gang was alive after 3 / 10 years in 64/49 small, 60/42 medium, 60/44 large, 73/54 huge and 17/16 metropolis runs.
 
 Fronts and laundering came in the change before. The first version made fronts too cheap to run and let rivals wash all their money, and the medium city kept the player alive after ten years in only 67 of 160 runs, against 86 without fronts. Fronts now make a little more than protection but wash only half a week's takings, and rivals only buy once they hold enough dirty money for a tax case: 81 of 160. Before fronts, with guns and cars, the player's gang was alive after 3 / 10 years in 65/45 small, 62/43 medium, 60/35 large, 74/54 huge and 19/16 metropolis runs.
 
