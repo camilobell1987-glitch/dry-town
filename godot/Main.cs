@@ -141,6 +141,7 @@ public partial class Main : Control
         string fate = old.State switch
         {
             HoodState.Dead => $"{old.Name} is dead at {old.Age(W.Week)}.",
+            HoodState.Jailed when old.Case != null => $"{old.Name} is held for trial, charged {old.Case.Charge}.",
             HoodState.Jailed => $"{old.Name} is going away for {old.JailWeeks} weeks.",
             _ => $"{old.Name} is out.",
         };
@@ -491,7 +492,7 @@ public partial class Main : Control
         {
             var it = _menTree.CreateItem(root);
             jobs.TryGetValue(h.Id, out var job);
-            string state = h.Id == W.Player.BossHoodId ? "Boss" : h.State == HoodState.Jailed ? $"Jail {h.JailWeeks}w" : busy.Contains(h.Id) ? "Job" : "Free";
+            string state = h.Id == W.Player.BossHoodId ? "Boss" : h.State == HoodState.Jailed ? (h.Case != null ? $"Trial {h.JailWeeks}w" : $"Jail {h.JailWeeks}w") : busy.Contains(h.Id) ? "Job" : "Free";
             if (h.Id == W.Player.HeirHoodId) state = h.State == HoodState.Jailed ? state : "Heir";
             var crew = W.CrewOfHood(h.Id);
             string crewText = crew == null ? "" : crew.LieutenantHoodId == h.Id ? "Lt" : World.Surname(W.HoodById(crew.LieutenantHoodId).Name);
@@ -1032,6 +1033,18 @@ public partial class Main : Control
             foreach (var b in W.TurfOf(Me).Where(b => b.IsOpen).OrderByDescending(b => b.Takings).Take(int.Parse(fronts)).ToList()) W.BuyFront(W.Player, b);
             int then = int.Parse(Arg("--then") ?? "0");
             for (int i = 0; i < then; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
+        }
+        if (Flag("--trial"))
+        {
+            // Two of your men in the cells waiting on juries: one with a lawyer and a paid judge, one with neither yet.
+            W.Player.Cash += 10_000;
+            var men = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderByDescending(h => h.Strength).ToList();
+            W.Retain(W.Player, Lawyer.Storefront);
+            _shell.Sim.Jail(men[0], 52, $"with the hold-up at {W.Banks[0].Name}");
+            W.Retain(W.Player, Lawyer.None);
+            _shell.Sim.Jail(men[1], 20, "with attempted arson");
+            W.Retain(W.Player, Lawyer.Storefront);
+            W.PayJudge(W.Player, men[0]);
         }
         if (Flag("--plan")) _shell.Execute("auto");
         if (Arg("--select-front") is string which)

@@ -115,6 +115,9 @@ public sealed partial class Simulation
                 case SilenceOrder o: Silence(gang, o); break;
                 case ArmOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Arm(gang, man, o.Weapon); break;
                 case CarOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Drive(gang, man, o.Car); break;
+                case JuryOrder o: Jury(gang, o); break;
+                case LawyerOrder o: w.Retain(gang, o.Lawyer); break;
+                case JudgeOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.DefendantId) is { } man: w.PayJudge(gang, man); break;
                 case FrontOrder o when o.BusinessId >= 0 && o.BusinessId < w.Businesses.Count: w.BuyFront(gang, w.Businesses[o.BusinessId]); break;
             }
         }
@@ -158,6 +161,7 @@ public sealed partial class Simulation
             HitOrder h => HauntOf(w, w.HoodById(h.TargetHoodId)),
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
+            JuryOrder => w.PrecinctNear(w.Map.LotAt(hq)).Id,
             _ => hq,
         };
     }
@@ -181,6 +185,7 @@ public sealed partial class Simulation
         RobberyOrder r => r.Team,
         HijackOrder h => h.Team,
         SilenceOrder s => new[] { s.HoodId },
+        JuryOrder j => new[] { j.HoodId },
         _ => Array.Empty<int>(),
     };
 
@@ -196,6 +201,7 @@ public sealed partial class Simulation
         w.Tick = Content.CollectionTick;
         Collect();
         PayWages();
+        PayLawyers();
         Launder();
         w.Tick = Content.ReckoningTick;
         Police();
@@ -232,7 +238,7 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder or ArmOrder or CarOrder or FrontOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
@@ -584,7 +590,7 @@ public sealed partial class Simulation
             var boss = w.HoodById(gang.BossHoodId);
             if (boss.IsAvailable)
             {
-                Jail(boss, w.Rng.Range(52, 260), "for tax evasion");
+                Jail(boss, w.Rng.Range(52, 260), "with tax evasion", federal: true);
                 w.Log(EventKind.Raid, gang.Id, $"Treasury agents brought a tax case against {gang.Name}: ${seized} seized and {boss.Name} convicted.");
             }
             else
@@ -665,9 +671,10 @@ public sealed partial class Simulation
             gang.Heat = Math.Max(0, gang.Heat - 15);
         }
 
-        foreach (var hood in w.Hoods.Where(h => h.State == HoodState.Jailed))
+        foreach (var hood in w.Hoods.Where(h => h.State == HoodState.Jailed).ToList())
         {
             if (--hood.JailWeeks > 0) continue;
+            if (hood.Case != null) { Trial(hood); continue; }
             hood.State = HoodState.Free;
             hood.Loyalty = Math.Max(0, hood.Loyalty - 10);
             w.Log(EventKind.HoodReleased, hood.GangId, $"{hood.Name} is out of jail.");
@@ -890,10 +897,4 @@ public sealed partial class Simulation
         World.Log(EventKind.HoodKilled, gang.Id, $"{hood.Name} of {gang.Name} was killed {where}.");
     }
 
-    private void Jail(Hood hood, int weeks, string why)
-    {
-        hood.State = HoodState.Jailed;
-        hood.JailWeeks = weeks;
-        World.Log(EventKind.HoodJailed, hood.GangId, $"{hood.Name} got {weeks} weeks {why}.");
-    }
 }

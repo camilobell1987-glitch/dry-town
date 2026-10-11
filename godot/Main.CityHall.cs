@@ -45,6 +45,8 @@ public partial class Main
             AddLabel(_hallPanel, (mine > 0 ? $"You've put in ${mine:N0}. " : "") + "The biggest backer has the new mayor's ear, if he wins. Every $400 draws a little heat.", Palette.InkQuiet, wrap: true);
         }
 
+        CourtsSection();
+
         // The selected ward in full.
         _selectedWard = Math.Clamp(_selectedWard, 0, W.Wards.Count - 1);
         var ward = W.Wards[_selectedWard];

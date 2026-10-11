@@ -94,7 +94,7 @@ public sealed partial class Simulation
         }
         else if (w.Rng.Chance((0.25 + (10 - hood.Stealth) * 0.02) * stay))
         {
-            Jail(hood, w.Rng.Range(10, 30), "for attempted arson");
+            Jail(hood, w.Rng.Range(10, 30), "with attempted arson");
             casualty = hood.Id;
             result = ActionResult.Arrested;
             fail = $"{hood.Name} was picked up with a can of gasoline outside {biz.Name}.";
@@ -186,7 +186,7 @@ public sealed partial class Simulation
         foreach (var man in team)
         {
             if (w.Rng.Chance(0.12 * stay)) { Kill(man, $"in a shoot-out at {bank.Name}"); casualty = man.Id; continue; }
-            if (w.Rng.Chance((0.45 - man.Stealth * 0.025) * stay)) { Jail(man, w.Rng.Range(26, 78), $"for the hold-up at {bank.Name}"); pinched.Add(man); }
+            if (w.Rng.Chance((0.45 - man.Stealth * 0.025) * stay)) { Jail(man, w.Rng.Range(26, 78), $"with the hold-up at {bank.Name}"); pinched.Add(man); }
         }
         string fail = $"The hold-up at {bank.Name} went wrong for {gang.Name}" +
             (casualty >= 0 ? $": {w.HoodById(casualty).Name} was shot" : "") +
@@ -351,7 +351,7 @@ public sealed partial class Simulation
                 var hood = w.Hoods.FirstOrDefault(h => h.Id == p.HoodId);
                 if (hood is not { IsAvailable: true } || hood.GangId != gang.Id) continue;
                 gang.Heat = Math.Min(100, gang.Heat + 5);
-                Jail(hood, w.Rng.Range(20, 40), $"after {p.Name} testified");
+                Jail(hood, w.Rng.Range(20, 40), $"on {p.Name}'s evidence", strength: 0.9);
             }
             else if (p.Kind == PersonKind.Reporter && gang is { Alive: true })
             {
@@ -416,7 +416,7 @@ public sealed partial class Simulation
             biz.Racket = RacketKind.None;
             biz.ShutWeeks = 6;
             var printer = w.Hoods.FirstOrDefault(h => h.Id == biz.HandlerHoodId);
-            if (printer is { IsAvailable: true }) Jail(printer, w.Rng.Range(26, 52), "for counterfeiting");
+            if (printer is { IsAvailable: true }) Jail(printer, w.Rng.Range(26, 52), "with counterfeiting", federal: true);
             w.Log(EventKind.Raid, gang.Id, $"Treasury agents found the counterfeiting press behind {biz.Name} and fined {gang.Name} ${fine}.");
         }
     }

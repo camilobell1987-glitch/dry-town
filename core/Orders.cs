@@ -23,6 +23,9 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(ArmOrder), "arm")]
 [JsonDerivedType(typeof(CarOrder), "car")]
 [JsonDerivedType(typeof(FrontOrder), "front")]
+[JsonDerivedType(typeof(JuryOrder), "jury")]
+[JsonDerivedType(typeof(LawyerOrder), "lawyer")]
+[JsonDerivedType(typeof(JudgeOrder), "judge")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -99,3 +102,12 @@ public sealed record CarOrder(int GangId, int HoodId, Car Car) : Order(GangId);
 
 /// <summary>Buy a business the gang protects outright, as a front to wash money through.</summary>
 public sealed record FrontOrder(int GangId, int BusinessId) : Order(GangId);
+
+/// <summary>Send a man to lean on the jurors in a case against one of the gang's own.</summary>
+public sealed record JuryOrder(int GangId, int HoodId, int DefendantId) : Order(GangId);
+
+/// <summary>Put a lawyer on retainer, change him, or let him go.</summary>
+public sealed record LawyerOrder(int GangId, Lawyer Lawyer) : Order(GangId);
+
+/// <summary>Pay off the judge in the case against one of the gang's men.</summary>
+public sealed record JudgeOrder(int GangId, int DefendantId) : Order(GangId);

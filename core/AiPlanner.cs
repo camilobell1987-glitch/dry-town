@@ -41,6 +41,7 @@ public static class AiPlanner
         cash -= PlanStreet(w, g, cash, orders);
         cash -= PlanGear(w, g, cash, orders);
         cash -= PlanFronts(w, g, turf, cash, orders);
+        cash -= PlanCourts(w, g, turf, cash, orders);
 
         // An aging boss with money to spare brings his family into the business.
         if (w.HoodById(g.BossHoodId).Age(w.Week) >= 45 && cash > Content.FamilyCost * 5 && Simulation.CanBringInFamily(w, g))
@@ -173,6 +174,32 @@ public static class AiPlanner
         if (buy == null) return 0;
         orders.Add(new FrontOrder(g.Id, buy.Id));
         return Content.FrontPrice(buy);
+    }
+
+    /// <summary>
+    /// A lawyer while the boss or his heir is waiting on a trial, and the judge paid in the boss's case
+    /// if it isn't a federal one. Rival outfits don't lean on juries.
+    /// </summary>
+    private static long PlanCourts(World w, Gang g, List<Business> turf, long cash, List<Order> orders)
+    {
+        long spent = 0;
+        // Rivals only go to the trouble when the man in the dock is the boss or the one who'd take over.
+        // Your own autopilot plays the same way, so it's no better than they are.
+        bool trial = w.OnTrial(g.Id).Any(h => h.Id == g.BossHoodId || h.Id == g.HeirHoodId);
+        var want = trial && cash > 1500 ? (cash > 20_000 ? Lawyer.Mouthpiece : Lawyer.Storefront) : Lawyer.None;
+        if (want != g.Lawyer && !(trial && want < g.Lawyer)) orders.Add(new LawyerOrder(g.Id, want));
+
+        foreach (var man in w.OnTrial(g.Id))
+        {
+            if (man.Id != g.BossHoodId) continue;
+            int price = w.JudgePrice(man);
+            if (w.CannotPayJudge(g, man) == null && cash - spent > price * 3)
+            {
+                orders.Add(new JudgeOrder(g.Id, man.Id));
+                spent += price;
+            }
+        }
+        return spent;
     }
 
     private static long PlanGear(World w, Gang g, long cash, List<Order> orders)

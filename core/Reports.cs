@@ -75,6 +75,26 @@ public static class Reports
         return sb.ToString();
     }
 
+    /// <summary>The gang's lawyer and every man of it held for trial, with the odds against him.</summary>
+    public static string Cases(World w, int gangId)
+    {
+        var g = w.GangById(gangId);
+        var sb = new StringBuilder();
+        var lawyer = Content.Lawyers[g.Lawyer];
+        sb.AppendLine(g.Lawyer == Lawyer.None ? "You have no lawyer. Your men go to court with whoever the court gives them."
+            : $"You keep {lawyer.Label} for ${lawyer.Weekly} a week: every case is {lawyer.Cut * 100:0} points likelier to end in an acquittal.");
+        var cases = w.OnTrial(gangId).ToList();
+        if (cases.Count == 0) sb.AppendLine("Nobody is waiting on a trial.");
+        foreach (var h in cases)
+        {
+            var c = h.Case!;
+            string help = (c.JudgePaid ? ", judge paid" : "") + (c.JuryFixed ? ", jury leaned on" : "");
+            sb.AppendLine($"  {h.Id,4} {h.Name,-28} charged {c.Charge}; trial in {h.JailWeeks}w, faces {c.Sentence}w{(c.Federal ? " (federal)" : "")}; " +
+                $"{Simulation.ConvictionChance(w, h) * 100:0}% to convict{help}" + (c.Federal || c.JudgePaid ? "" : $"; the judge wants ${w.JudgePrice(h):N0}"));
+        }
+        return sb.ToString();
+    }
+
     /// <summary>The gang's fronts, what they wash, and how much of the safe is still dirty.</summary>
     public static string Fronts(World w, int gangId)
     {
@@ -121,7 +141,7 @@ public static class Reports
         sb.AppendLine($"{"Id",4} {"Name",-30} {"Age",3} {"Int",3} {"Mus",3} {"Brn",3} {"Stl",3} {"Loy",3} {"Wage",4}  {"State",-10} Carries / drives");
         foreach (var h in w.HoodsOf(gangId).OrderBy(h => h.Id))
         {
-            string state = h.State == HoodState.Jailed ? $"jailed {h.JailWeeks}w" : h.Id == gang.BossHoodId ? "boss" : h.Id == gang.HeirHoodId ? "heir" : "free";
+            string state = h.State == HoodState.Jailed ? (h.Case != null ? $"trial in {h.JailWeeks}w" : $"jailed {h.JailWeeks}w") : h.Id == gang.BossHoodId ? "boss" : h.Id == gang.HeirHoodId ? "heir" : "free";
             sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {h.Age(w.Week),3} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state,-10} {Gear(h)}");
         }
         return sb.ToString();

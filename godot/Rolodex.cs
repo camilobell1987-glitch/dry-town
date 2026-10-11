@@ -275,7 +275,8 @@ public partial class Rolodex : Control
         sy += 20;
 
         // What he's up to, and a note when he is trouble.
-        string now = h.State == HoodState.Jailed ? $"In jail, {h.JailWeeks} more week{(h.JailWeeks == 1 ? "" : "s")}."
+        string now = h is { State: HoodState.Jailed, Case: { } c } ? $"Held for trial in {h.JailWeeks} week{(h.JailWeeks == 1 ? "" : "s")}, charged {c.Charge}."
+            : h.State == HoodState.Jailed ? $"In jail, {h.JailWeeks} more week{(h.JailWeeks == 1 ? "" : "s")}."
             : JobOf(h.Id) is { } job ? job
             : h.Id == gang.BossHoodId ? "Running the outfit."
             : "Free for work.";

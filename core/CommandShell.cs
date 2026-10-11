@@ -36,6 +36,7 @@ public sealed class CommandShell
         "torch <hood> <biz> | hit <hood> <target hood> [backup..] | banks | rob <hood> <bank> [backup..] | hijack <hood> <biz> [backup..]\n" +
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
+        "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -76,6 +77,12 @@ public sealed class CommandShell
                 case "shops": return Reports.Shops(W, Me);
                 case "fronts": return Reports.Fronts(W, Me);
                 case "buy": return BuyFront(int.Parse(p[1]));
+                case "cases": return Reports.Cases(W, Me);
+                case "lawyer":
+                    W.Retain(W.Player, Enum.Parse<Lawyer>(p[1], true));
+                    return $"You now keep {Content.Lawyers[W.Player.Lawyer].Label}" + (W.Player.Lawyer == Lawyer.None ? ".\n" : $", ${Content.Lawyers[W.Player.Lawyer].Weekly} a week.\n");
+                case "judge": return PayJudge(int.Parse(p[1]));
+                case "jury": return Queue(new JuryOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "arm": return Buy(int.Parse(p[1]), gun: Enum.Parse<Weapon>(p[2], true));
                 case "drive": return Buy(int.Parse(p[1]), car: Enum.Parse<Car>(p[2], true));
                 case "hand": return Hand(int.Parse(p[1]), int.Parse(p[2]), p[3].ToLowerInvariant() == "car");
@@ -118,6 +125,15 @@ public sealed class CommandShell
         if (W.CannotDrive(W.Player, hood, c) is string no2) return no2 + "\n";
         int paid = W.Drive(W.Player, hood, c);
         return $"{hood.Name} now drives a {Content.Cars[c].Label}. That cost ${paid}.\n";
+    }
+
+    private string PayJudge(int hoodId)
+    {
+        var man = W.Hoods.FirstOrDefault(h => h.Id == hoodId);
+        if (man == null) return "No such man. Type 'cases'.\n";
+        if (W.CannotPayJudge(W.Player, man) is string no) return no + "\n";
+        int price = W.PayJudge(W.Player, man);
+        return $"The judge in {man.Name}'s case took ${price:N0}. The odds of a conviction are now {Simulation.ConvictionChance(W, man) * 100:0}%.\n";
     }
 
     private string BuyFront(int bizId)
@@ -233,6 +249,9 @@ public sealed class CommandShell
             ArmOrder a => CheckHood(a.HoodId, allowJailed: true) ?? W.CannotArm(W.Player, W.HoodById(a.HoodId), a.Weapon),
             CarOrder c => CheckHood(c.HoodId, allowJailed: true) ?? W.CannotDrive(W.Player, W.HoodById(c.HoodId), c.Car),
             FrontOrder f => CheckBiz(f.BusinessId) ?? W.CannotBuyFront(W.Player, W.BusinessById(f.BusinessId)),
+            JuryOrder j => W.Hoods.FirstOrDefault(h => h.Id == j.DefendantId) is not { Case: not null } d || d.GangId != Me ? "He isn't one of yours waiting on a trial. Type 'cases'."
+                : d.Case.JuryFixed || Pending.Any(o => o is JuryOrder q && q.DefendantId == j.DefendantId) ? "Someone is already seeing to that jury."
+                : CheckHood(j.HoodId),
             _ => CheckStreet(order),
         };
         if (problem != null) return problem + "\n";
@@ -263,6 +282,9 @@ public sealed class CommandShell
         SilenceOrder s => $"{HoodName(s.HoodId)} has a word with {PersonName(s.PersonId)}",
         ArmOrder a => $"buy {HoodName(a.HoodId)} a {Content.Guns[a.Weapon].Label}",
         CarOrder c => $"buy {HoodName(c.HoodId)} a {Content.Cars[c.Car].Label}",
+        JuryOrder j => $"{HoodName(j.HoodId)} leans on the jury in {HoodName(j.DefendantId)}'s case",
+        LawyerOrder l => $"keep {Content.Lawyers[l.Lawyer].Label}",
+        JudgeOrder j => $"pay the judge in {HoodName(j.DefendantId)}'s case",
         FrontOrder f => $"buy {BizName(f.BusinessId)} outright (${Content.FrontPrice(W.BusinessById(f.BusinessId)):N0})",
         _ => o.ToString(),
     };

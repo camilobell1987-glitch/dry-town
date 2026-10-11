@@ -248,4 +248,31 @@ public static class Content
 
     /// <summary>Dirty money above this draws the Treasury's tax men. Clean money is beyond them.</summary>
     public const int TaxCaseDirty = 25_000;
+
+    // ---- Lawyers and trials ----------------------------------------------------
+
+    /// <summary>A charge that carries no more than this many weeks is dealt with by a magistrate the same day. Anything longer goes to a jury.</summary>
+    public const int PettySentence = 8;
+
+    /// <summary>Weeks a man is held between his arrest and his trial.</summary>
+    public const int WeeksToTrial = 3;
+
+    /// <summary>How likely a jury is to convict with no help: a city court, and the Treasury's.</summary>
+    public const double CityCase = 0.85, FederalCase = 0.9;
+
+    /// <summary>A lawyer on retainer: his weekly fee, and how much less likely each of the gang's men is to be convicted.</summary>
+    public sealed record LawyerInfo(string Label, int Weekly, double Cut);
+
+    public static readonly IReadOnlyDictionary<Lawyer, LawyerInfo> Lawyers = new Dictionary<Lawyer, LawyerInfo>
+    {
+        [Lawyer.None] = new("no lawyer", 0, 0),
+        [Lawyer.Storefront] = new("a storefront lawyer", 60, 0.15),
+        [Lawyer.Mouthpiece] = new("a downtown mouthpiece", 220, 0.3),
+    };
+
+    /// <summary>What a judge wants to see a case thrown out: more for a longer stretch, and twice as much under a reform mayor.</summary>
+    public static int JudgePrice(Case c, bool reform) => (400 + c.Sentence * 20) * (reform ? 2 : 1);
+
+    /// <summary>How much less likely a conviction is with the judge paid, or with the jury leaned on.</summary>
+    public const double JudgeCut = 0.35, JuryCut = 0.25;
 }
