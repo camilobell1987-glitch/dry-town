@@ -38,6 +38,7 @@ int Soak()
     var rackets = new Dictionary<RacketKind, int>();
     var ratCounts = new Dictionary<string, int>();
     long rivalCrews = 0, crewedMen = 0, rivalMen = 0;
+    long warsDeclared = 0, warsOnPlayer = 0, warsCalledOff = 0, warsMadePeace = 0, warsFinished = 0, warsAtEnd = 0;
     long linesBought = 0, shipmentsStopped = 0, linesSwitched = 0, badBatches = 0, linesHeld = 0, linesTotal = 0;
     long gearBought = 0, armedAtEnd = 0, menAtEnd = 0;
     long frontsBought = 0, taxCases = 0, cleanAtEnd = 0, cashAtEnd = 0;
@@ -100,6 +101,12 @@ int Soak()
             crewedMen += sim.World.CrewsOf(g.Id).Sum(c => c.Everyone.Count());
             rivalMen += sim.World.HoodsOf(g.Id).Count();
         }
+        warsDeclared += ev.Count(e => e.Text.Contains(" went to the mattresses against "));
+        warsOnPlayer += ev.Count(e => e.Text.Contains($" went to the mattresses against {sim.World.Player.Name}."));
+        warsCalledOff += ev.Count(e => e.Text.Contains(" called off the war with "));
+        warsMadePeace += ev.Count(e => e.Text.Contains(" is over, and the men are home from the mattresses."));
+        warsFinished += ev.Count(e => e.Text.Contains("'s men came home from the mattresses."));
+        warsAtEnd += sim.World.Wars.Count;
         linesBought += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(" to take over "));
         shipmentsStopped += ev.Count(e => e.Kind == EventKind.Hijack && e.Text.Contains(" and sold the load for ") && (e.Text.Contains("'s shipment on ") || e.Text.Contains("'s landing on ")));
         linesSwitched += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(" would rather deal with "));
@@ -124,6 +131,7 @@ int Soak()
     Console.WriteLine($"Elections per city-year: men run for alderman {running / cy:0.00}, own men elected {ownMenWon / cy:0.00}, weeks worked at the polls {pollsWorked / cy:0.0} with {pollsCaught * 100 / Math.Max(1, pollsWorked + pollsCaught)}% caught; reform DAs elected {reformDAs / cy:0.00}; seats held by an outfit's own man at the end: {ownSeatsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Random city events per city-year: {cityEvents / cy:0.0}.");
     Console.WriteLine($"Rival crews at the end: {rivalCrews / (double)seeds:0.0} a city, with {crewedMen * 100 / Math.Max(1, rivalMen)}% of rival men in one.");
+    Console.WriteLine($"Wars per city-year: declared {warsDeclared / cy:0.00} ({warsOnPlayer / cy:0.00} on your gang), called off {warsCalledOff / cy:0.00}, ended in a pact {warsMadePeace / cy:0.00}, ended with one side finished {warsFinished / cy:0.00}; still going at the end: {warsAtEnd}/{seeds}.");
     Console.WriteLine($"Rum-running per city-year: lines bought {linesBought / cy:0.00}, shipments stopped {shipmentsStopped / cy:0.00}, lines changing hands after one {linesSwitched / cy:0.00}, bad batches {badBatches / cy:0.00}; lines held at the end: {linesHeld}/{linesTotal}.");
     Console.WriteLine($"Rats per city-year: {string.Join(", ", RatLines.Select(r => $"{r.Label} {ratCounts.GetValueOrDefault(r.Label) / cy:0.00}"))}.");
     Console.WriteLine($"Rackets opened: {string.Join(", ", rackets.OrderBy(c => c.Key).Select(c => $"{Content.Rackets[c.Key].Label} {c.Value}"))}.");

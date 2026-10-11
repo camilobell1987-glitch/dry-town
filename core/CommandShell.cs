@@ -43,6 +43,7 @@ public sealed class CommandShell
         "rats (who's talking, and your men inside) | care <hood> (look after a jailed man's family) | seeto <hood> <rat>\n" +
         "hunt <hood> (look for a rat) | plant <hood> <gang> (sign him on with a rival) | recall <hood> (bring him home)\n" +
         "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
+        "war <gang> (go to the mattresses against them) | calloff (end a war you started)\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
@@ -102,6 +103,8 @@ public sealed class CommandShell
                 case "ally": return Talk(p[1], g => W.Propose(W.Player, g, PactKind.Alliance));
                 case "demand": return Talk(p[1], g => W.Demand(W.Player, g, int.Parse(p[2])));
                 case "break": return Talk(p[1], g => W.Break(W.Player, g));
+                case "war": return Talk(p[1], g => W.Declare(W.Player, g));
+                case "calloff": return W.CallOff(W.Player) + "\n";
                 case "accept":
                 case "decline":
                     if (W.Offers.FirstOrDefault(o => o.Id == int.Parse(p[1])) is not { } offer) return "No such offer. Type 'relations'.\n";

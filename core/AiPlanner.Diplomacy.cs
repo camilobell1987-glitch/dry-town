@@ -6,7 +6,7 @@ public static partial class AiPlanner
     /// <summary>One round of talks for a gang. The player's gang never goes back on its word on its own.</summary>
     public static void Negotiate(World w, Gang g)
     {
-        if (TearUp(w, g) || SeekTruce(w, g) || SeekAlliance(w, g)) return;
+        if (PlanWar(w, g) || TearUp(w, g) || SeekTruce(w, g) || SeekAlliance(w, g)) return;
         DemandTribute(w, g);
     }
 

@@ -126,6 +126,8 @@ public sealed partial class World
                 ? $"{GangById(payerId).Name} will pay {GangById(pact.Other(payerId)).Name} ${tribute} a week to be left alone."
                 : $"{a.Name} and {b.Name} agreed a truce.";
         Log(EventKind.Diplomacy, a.Id, text);
+        if (Wars.FirstOrDefault(x => x.Involves(a.Id) && x.Involves(b.Id)) is { } war)
+            EndWar(war, $"The war between {a.Name} and {b.Name} is over, and the men are home from the mattresses.");
         return pact;
     }
 

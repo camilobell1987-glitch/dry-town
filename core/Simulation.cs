@@ -236,6 +236,8 @@ public sealed partial class Simulation
         Rats();
         Street();
         Politics.Step(w, w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.HoodKilled));
+        // After the city's temper has cooled for the week, so the war's share of it stays.
+        Wars();
         Feds();
         CityNews();
         Loyalty();
@@ -651,7 +653,7 @@ public sealed partial class Simulation
         foreach (var gang in w.LivingGangs)
         {
             var hoods = w.HoodsOf(gang.Id).Where(h => h.Id != gang.BossHoodId).ToList();
-            long bill = hoods.Sum(h => h.State == HoodState.Jailed ? h.Wage / 2 : h.Wage);
+            long bill = hoods.Sum(h => h.State == HoodState.Jailed ? h.Wage / 2 : h.Wage) + MattressBill(w, gang);
             var ledger = w.Ledger(gang.Id);
             if (gang.Cash >= bill)
             {

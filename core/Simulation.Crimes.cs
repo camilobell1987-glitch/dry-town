@@ -14,13 +14,14 @@ public sealed partial class Simulation
 
     /// <summary>A boss with soldiers around him is hard to get to.</summary>
     public static bool IsGuardedBoss(World w, Hood target) =>
-        w.GangById(target.GangId).BossHoodId == target.Id && w.AvailableHoodsOf(target.GangId).Count() >= 3;
+        w.GangById(target.GangId).BossHoodId == target.Id && (w.AvailableHoodsOf(target.GangId).Count() >= 3 || w.AtWar(target.GangId));
 
     /// <summary>Chance a hit comes off: stealth to get close, then strength against the target's.</summary>
     public static double HitChance(World w, Hood hood, IEnumerable<Hood> backup, Hood target) =>
         Math.Clamp(0.45 + hood.Stealth * 0.03 + (hood.Strength + BackupStrength(backup) - target.Strength) * 0.03
             - (IsGuardedBoss(w, target) ? 0.25 : 0) - (target.Car == Car.Cadillac ? Content.ArmouredCar : 0)
-            + Inside(w, hood.GangId, target.GangId, w.GangById(target.GangId).BossHoodId == target.Id ? Content.InsideBossHit : Content.InsideHit), 0.05, 0.9);
+            + Inside(w, hood.GangId, target.GangId, w.GangById(target.GangId).BossHoodId == target.Id ? Content.InsideBossHit : Content.InsideHit)
+            + (w.AtWar(hood.GangId, target.GangId) ? Content.WarHit : 0), 0.05, 0.9);
 
     /// <summary>What men planted on either side do to a job's chances: help their own side's, spoil the other's.</summary>
     public static double Inside(World w, int gangId, int targetGangId, double help) =>
@@ -138,7 +139,8 @@ public sealed partial class Simulation
             bool boss = rival.BossHoodId == target.Id;
             Kill(target, boss ? $"in a hit ordered by {gang.Name}" : $"on the street, in a hit ordered by {gang.Name}");
             hood.Deeds.Kills++;
-            gang.Heat = Math.Min(100, gang.Heat + 10 + GunHeat(backup.Prepend(hood)));
+            // In a war the police write it off as gangland business, and look a little less hard.
+            gang.Heat = Math.Min(100, gang.Heat + (w.AtWar(gang.Id, rival.Id) ? 5 : 10) + GunHeat(backup.Prepend(hood)));
             string text = boss
                 ? $"{hood.Name} gunned down {target.Name}, boss of {rival.Name}."
                 : $"{hood.Name} of {gang.Name} gunned down {target.Name} of {rival.Name}.";
