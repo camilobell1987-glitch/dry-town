@@ -28,7 +28,7 @@ public sealed class CommandShell
         "gangs | hoods | turf | targets | log\n" +
         "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit>\n" +
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
-        "crews | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
+        "crews [gang] (yours, or a rival's) | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
         "heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
         "wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
@@ -65,7 +65,7 @@ public sealed class CommandShell
                 case "recruit": return Queue(new RecruitOrder(Me));
                 case "bribe": return Queue(new BribeOrder(Me, int.Parse(p[1])));
                 case "rate": return Queue(new SetRateOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
-                case "crews": return Reports.Crews(W, Me);
+                case "crews": return p.Length > 1 ? RivalCrews(int.Parse(p[1])) : Reports.Crews(W, Me);
                 case "wards": return Reports.Wards(W, Me);
                 case "payoff": return Queue(new PayoffOrder(Me, int.Parse(p[1])));
                 case "campaign": return Queue(new CampaignOrder(Me, p[1].ToLowerInvariant() == "mayor" ? -1 : int.Parse(p[1]), int.Parse(p[2])));
@@ -215,6 +215,14 @@ public sealed class CommandShell
         if (hood.Id == W.Player.BossHoodId) return "He's already the boss.\n";
         W.NameHeir(W.Player, hood);
         return $"{hood.Name} will take over when {W.HoodById(W.Player.BossHoodId).Name} is gone.\n";
+    }
+
+    private string RivalCrews(int gangId)
+    {
+        var gang = W.Gangs.FirstOrDefault(g => g.Id == gangId && g.Alive);
+        if (gang == null) return "No such gang. Type 'gangs'.\n";
+        if (gang.Id == Me) return Reports.Crews(W, Me);
+        return Reports.RivalCrews(W, gang, W.HasManInside(Me, gang.Id));
     }
 
     private string CrewCommand(string[] p)

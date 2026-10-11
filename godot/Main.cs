@@ -1052,6 +1052,14 @@ public partial class Main : Control
             _talkTo = rivals[0].Id;
             W.AddGrudge(rivals[0].Id, Me, 30 - W.GrudgeOf(rivals[0].Id, Me));
         }
+        if (Flag("--gang-crews"))
+        {
+            // Talk to the outfit with the most crews, with a man of yours inside it.
+            var rival = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(g => W.CrewsOf(g.Id).Count()).First();
+            _talkTo = rival.Id;
+            var spy = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderBy(h => h.Strength).FirstOrDefault();
+            if (spy != null) { spy.State = HoodState.Inside; spy.InsideGangId = rival.Id; spy.InsideSinceWeek = W.Week; }
+        }
         if (Arg("--event") is string news)
         {
             // Break the news on Sunday night, as the game would, and show the front page.

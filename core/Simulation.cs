@@ -237,6 +237,7 @@ public sealed partial class Simulation
         Successions();
         Dissolutions();
         w.TidyCrews();
+        RivalCrews();
         Director.Step();
 
         Metrics.Record(w, takeoversThisWeek);
