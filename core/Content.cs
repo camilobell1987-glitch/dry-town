@@ -307,4 +307,15 @@ public static class Content
 
     /// <summary>Tribute worth asking for: a fifth of what the payer earns, in round fifties, and never less than $100.</summary>
     public static int TributeAsk(long weeklyIncome) => (int)Math.Max(100, weeklyIncome / 5 / 50 * 50);
+
+    // ---- Rap sheets ------------------------------------------------------------
+
+    /// <summary>Each conviction already on a man's record adds this share to the next sentence.</summary>
+    public const double PriorSentence = 0.5;
+
+    /// <summary>The habitual offender law: a man with this many convictions who is convicted again goes away for life.</summary>
+    public const int HabitualOffender = 3;
+
+    /// <summary>A sentence for a man with this record: longer for every conviction behind him.</summary>
+    public static int Sentence(int weeks, int convictions) => (int)Math.Round(weeks * (1 + PriorSentence * convictions));
 }

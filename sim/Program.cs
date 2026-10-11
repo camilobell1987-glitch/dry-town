@@ -40,6 +40,7 @@ int Soak()
     long frontsBought = 0, taxCases = 0, cleanAtEnd = 0, cashAtEnd = 0;
     long trials = 0, acquittals = 0, judgesPaid = 0, juries = 0, lawyered = 0, gangsAtEnd = 0;
     long truces = 0, alliances = 0, tributes = 0, broken = 0, pactsAtEnd = 0;
+    long lifers = 0, repeat = 0, convictedAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
     {
         var sim = Simulation.New(new WorldSettings { Seed = s, Difficulty = difficulty, Size = size, PoliticsEnabled = !args.Contains("--no-politics") });
@@ -75,6 +76,9 @@ int Soak()
         tributes += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" a week to be left alone"));
         broken += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" broke the "));
         pactsAtEnd += sim.World.Pacts.Count;
+        lifers += ev.Count(e => e.Text.Contains("habitual offender law"));
+        repeat += sim.World.Hoods.Count(h => h.IsActive && h.Convictions >= 2);
+        convictedAtEnd += sim.World.Hoods.Count(h => h.IsActive && h.Convictions >= 1);
         foreach (var e in ev.Where(e => e.Kind == EventKind.RacketOpened && e.Text.Contains(" opened a ")))
             foreach (var info in Content.Rackets.Values.Where(r => e.Text.Contains($" opened a {r.Label} ")))
                 rackets[info.Kind] = rackets.GetValueOrDefault(info.Kind) + 1;
@@ -90,6 +94,7 @@ int Soak()
     Console.WriteLine($"Trials per city-year: {trials / (double)(seeds * years):0.0}, {acquittals * 100 / Math.Max(1, trials)}% acquitted; judges paid {judgesPaid / (double)(seeds * years):0.0}, juries leaned on {juries / (double)(seeds * years):0.00} per city-year; gangs with a lawyer at the end: {lawyered * 100 / Math.Max(1, gangsAtEnd)}%.");
     double cy = seeds * years;
     Console.WriteLine($"Pacts per city-year: truces {truces / cy:0.0}, tribute deals {tributes / cy:0.0}, alliances {alliances / cy:0.0}, broken {broken / cy:0.0}; pacts standing at the end: {pactsAtEnd / (double)seeds:0.0} a city.");
+    Console.WriteLine($"Life sentences for a fourth conviction per city-year: {lifers / cy:0.00}; men with a conviction at the end: {convictedAtEnd * 100 / Math.Max(1, menAtEnd)}%, with two or more: {repeat * 100 / Math.Max(1, menAtEnd)}%.");
     Console.WriteLine($"Rackets opened: {string.Join(", ", rackets.OrderBy(c => c.Key).Select(c => $"{Content.Rackets[c.Key].Label} {c.Value}"))}.");
     Console.WriteLine($"Your gang on autopilot ({difficulty}): alive after 3 years in {aliveAt3}/{seeds}, after {years} years in {aliveAtEnd}/{seeds}.");
     return stalled == 0 ? 0 : 1;

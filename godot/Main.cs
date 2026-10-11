@@ -1062,6 +1062,13 @@ public partial class Main : Control
             _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));
         if (Flag("--select-hood")) _map.Select(hood: W.Hoods.First(h => h.IsAvailable && h.GangId != Me && W.GangById(h.GangId).Alive).Id);
         if (Arg("--card") is string card) { RefreshAll(); _rolodex.Show(W.HoodsOf(Me).OrderBy(h => h.Id).ElementAt(int.Parse(card)).Id); }
+        if (Flag("--sheet"))
+        {
+            // The man of yours with the longest record, his card turned over.
+            RefreshAll();
+            _rolodex.Show(W.HoodsOf(Me).OrderByDescending(h => h.Record.Count + (h.Deeds.Any ? 1 : 0)).ThenBy(h => h.Id).First().Id);
+            _rolodex.ShowSheets = true;
+        }
         if (Flag("--clear")) _shell.Pending.Clear();
         if (Flag("--crimes"))
         {

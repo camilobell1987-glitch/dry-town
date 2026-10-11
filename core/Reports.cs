@@ -90,11 +90,48 @@ public static class Reports
         {
             var c = h.Case!;
             string help = (c.JudgePaid ? ", judge paid" : "") + (c.JuryFixed ? ", jury leaned on" : "");
-            sb.AppendLine($"  {h.Id,4} {h.Name,-28} charged {c.Charge}; trial in {h.JailWeeks}w, faces {c.Sentence}w{(c.Federal ? " (federal)" : "")}; " +
+            sb.AppendLine($"  {h.Id,4} {h.Name,-28} charged {c.Charge}; trial in {h.JailWeeks}w, faces {(c.Life ? "life" : $"{c.Sentence}w")}{(c.Federal ? " (federal)" : "")}; " +
                 $"{Simulation.ConvictionChance(w, h) * 100:0}% to convict{help}" + (c.Federal || c.JudgePaid ? "" : $"; the judge wants ${w.JudgePrice(h):N0}"));
         }
         return sb.ToString();
     }
+
+    /// <summary>A man's rap sheet: what he has done for the outfit, and every time the police had him.</summary>
+    public static string Sheet(World w, Hood h)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"{h.Name} of {w.GangById(h.GangId).Name}, {h.Age(w.Week)}. {Known(h)}");
+        sb.AppendLine(Priors(h));
+        foreach (var r in h.Record) sb.AppendLine($"  {Date(w, r.Week),-16} {r.Text}");
+        return sb.ToString();
+    }
+
+    /// <summary>His work for the outfit in one line.</summary>
+    public static string Known(Hood h)
+    {
+        var d = h.Deeds;
+        var parts = new List<string>();
+        void Add(int n, string one, string many) { if (n > 0) parts.Add(n == 1 ? one : $"{n} {many}"); }
+        Add(d.Shakedowns, "one shop shaken down", "shops shaken down");
+        Add(d.Takeovers, "one business taken from a rival", "businesses taken from rivals");
+        Add(d.Kills, "one man killed", "men killed");
+        Add(d.Fires, "one fire", "fires");
+        Add(d.Heists, "one heist", "heists");
+        return parts.Count == 0 ? "No work to his name yet." : "Known for " + string.Join(", ", parts) + ".";
+    }
+
+    /// <summary>How the police see him: arrests and convictions, and what the next one means.</summary>
+    public static string Priors(Hood h)
+    {
+        if (h.Record.Count == 0) return "No police record.";
+        int arrests = h.Record.Count(r => r.Kind is RapKind.Petty or RapKind.Charged);
+        int convictions = h.Convictions;
+        string next = convictions >= Content.HabitualOffender ? " One more conviction and he goes away for life."
+            : convictions > 0 ? $" His next sentence will be {Content.PriorSentence * convictions * 100:0}% longer." : "";
+        return $"Arrested {arrests} time{(arrests == 1 ? "" : "s")}, convicted {convictions} time{(convictions == 1 ? "" : "s")} by a jury.{next}";
+    }
+
+    public static string Date(World w, int week) => $"Week {week % Content.WeeksPerYear + 1}, {Content.StartYear + week / Content.WeeksPerYear}";
 
     /// <summary>The gang's fronts, what they wash, and how much of the safe is still dirty.</summary>
     public static string Fronts(World w, int gangId)

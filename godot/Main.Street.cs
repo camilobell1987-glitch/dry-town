@@ -142,6 +142,7 @@ public partial class Main
         AddLabel(panel, $"Intimidation {target.Intimidation} · Muscle {target.Muscle} · Brains {target.Brains} · Stealth {target.Stealth}", Palette.Ink);
         int handles = W.Businesses.Count(b => b.HandlerHoodId == target.Id && b.ProtectorGangId == gang.Id);
         if (handles > 0) AddLabel(panel, $"Collects from {handles} business{(handles == 1 ? "" : "es")}.", Palette.InkQuiet);
+        RapSheet(panel, target);
         if (target.GangId == Me)
         {
             AddLabel(panel, "One of yours. Give him work from a business, a bank or someone on the street.", Palette.InkQuiet, wrap: true);
@@ -164,6 +165,16 @@ public partial class Main
         CrewPicker(panel, "Send the crew", team => $"{Simulation.HitChance(W, team[0], team.Skip(1), target):P0} chance",
             (lead, backup) => new HitOrder(Me, lead, target.Id, backup), byStealth: true);
         if (hoods.Count == 0 && !W.CrewsOf(Me).Any()) AddLabel(panel, "All your men are busy.", Palette.InkQuiet);
+    }
+
+    /// <summary>What the man has done, and what the police have on him: the last few lines of it.</summary>
+    private void RapSheet(VBoxContainer panel, Hood man)
+    {
+        AddLabel(panel, Reports.Known(man), Palette.Ink, 13, wrap: true);
+        AddLabel(panel, Reports.Priors(man), man.Convictions >= Content.HabitualOffender ? Palette.Bad : Palette.InkQuiet, 13, wrap: true);
+        foreach (var e in man.Record.TakeLast(4).Reverse())
+            AddLabel(panel, $"{Reports.Date(W, e.Week)}: {e.Text}", e.Kind == RapKind.Convicted ? Palette.Bad : e.Kind == RapKind.Acquitted ? Palette.Good : Palette.InkQuiet, 12, wrap: true);
+        if (man.Record.Count > 4) AddLabel(panel, $"…and {man.Record.Count - 4} older. The whole sheet is on the back of his card.", Palette.InkQuiet, 12, wrap: true);
     }
 
     // ---- Banks ----------------------------------------------------------------

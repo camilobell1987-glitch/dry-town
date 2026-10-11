@@ -47,6 +47,15 @@ public sealed class Hood
     /// <summary>The charge he's held on until his trial, or null. While it's open, JailWeeks counts down to the trial.</summary>
     public Case? Case { get; set; }
 
+    /// <summary>His police record, oldest first: every arrest and how it came out.</summary>
+    public List<RapEntry> Record { get; set; } = new();
+
+    /// <summary>What he has done for the outfit on the street.</summary>
+    public Deeds Deeds { get; set; } = new();
+
+    /// <summary>Times a jury has convicted him. Each one makes the next sentence longer.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public int Convictions => Record.Count(r => r.Kind == RapKind.Convicted);
+
     public bool IsAvailable => State == HoodState.Free;
     public bool IsActive => State is HoodState.Free or HoodState.Jailed;
 
@@ -176,6 +185,36 @@ public sealed class Offer
 
 public enum Lawyer { None, Storefront, Mouthpiece }
 
+public enum RapKind { Petty, Charged, Convicted, Acquitted, Turned }
+
+/// <summary>One line on a man's police record.</summary>
+public sealed class RapEntry
+{
+    public int Week { get; set; }
+    public RapKind Kind { get; set; }
+    public string Text { get; set; } = "";
+}
+
+/// <summary>A man's work for the outfit, counted.</summary>
+public sealed class Deeds
+{
+    /// <summary>Shopkeepers he put under the gang's protection.</summary>
+    public int Shakedowns { get; set; }
+
+    /// <summary>Businesses he took from other outfits.</summary>
+    public int Takeovers { get; set; }
+
+    /// <summary>Men he killed, in a fight or a hit.</summary>
+    public int Kills { get; set; }
+
+    public int Fires { get; set; }
+
+    /// <summary>Banks robbed and beer trucks hijacked.</summary>
+    public int Heists { get; set; }
+
+    public bool Any => Shakedowns + Takeovers + Kills + Fires + Heists > 0;
+}
+
 /// <summary>A man held for trial: what he's charged with, what he faces, and what has been done to help him.</summary>
 public sealed class Case
 {
@@ -195,6 +234,9 @@ public sealed class Case
 
     public bool JudgePaid { get; set; }
     public bool JuryFixed { get; set; }
+
+    /// <summary>A fourth felony: under the habitual offender law, a conviction means life.</summary>
+    public bool Life { get; set; }
 }
 
 /// <summary>
