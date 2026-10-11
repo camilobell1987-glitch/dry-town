@@ -39,6 +39,7 @@ public static class AiPlanner
         }
 
         cash -= PlanStreet(w, g, cash, orders);
+        cash -= PlanGear(w, g, cash, orders);
 
         // An aging boss with money to spare brings his family into the business.
         if (w.HoodById(g.BossHoodId).Age(w.Week) >= 45 && cash > Content.FamilyCost * 5 && Simulation.CanBringInFamily(w, g))
@@ -132,7 +133,7 @@ public static class AiPlanner
                 for (int extra = 0; extra <= (canBackUp ? 2 : 0); extra++)
                 {
                     var backup = spare.Take(extra).ToList();
-                    double edge = (hood.Strength + Simulation.BackupStrength(backup) - defence) / 10.0;
+                    double edge = (Simulation.StormingStrength(hood, backup) - defence) / 10.0;
                     double win = Math.Clamp(0.5 + edge, 0.05, 0.95);
                     double score = value * win * (0.4 + g.Aggression) - (1 - win) * 0.25 * manCost - extra * 150;
                     if (g.Heat > 60) score *= 0.3;
@@ -151,6 +152,42 @@ public static class AiPlanner
     }
 
     /// <summary>Kill a story before it runs, and pay the beat cop when the precinct is breathing down the gang's neck.</summary>
+    /// <summary>
+    /// Arm the men, best first, out of money the gang can spare: revolvers all round, then a car
+    /// to get away in, then heavier guns for the hard men, and armour for a rich boss.
+    /// </summary>
+    private static long PlanGear(World w, Gang g, long cash, List<Order> orders)
+    {
+        long budget = Math.Max(0, (cash - 10000) / 12);
+        long spent = 0;
+        var men = w.AvailableHoodsOf(g.Id).OrderByDescending(h => h.Strength).ThenBy(h => h.Id).ToList();
+        bool Buy(int cost) { if (spent + cost > budget) return false; spent += cost; return true; }
+        int Cost(Weapon from, Weapon to) => Content.Guns[to].Price - Content.TradeIn(Content.Guns[from].Price);
+        int CarCost(Car from, Car to) => Content.Cars[to].Price - Content.TradeIn(Content.Cars[from].Price);
+
+        // An outfit that already runs a third of the city spends on holding it: no more iron, and a few cars.
+        bool topDog = w.Businesses.Count(b => b.ProtectorGangId == g.Id) * 3 > w.Businesses.Count;
+        // Half the men armed is plenty; the rest are collectors and lookouts.
+        int armed = men.Count(h => h.Weapon != Weapon.None);
+        if (!topDog && armed * 2 < men.Count && men.FirstOrDefault(h => h.Weapon == Weapon.None) is { } bare && Buy(Cost(bare.Weapon, Weapon.Pistol)))
+            orders.Add(new ArmOrder(g.Id, bare.Id, Weapon.Pistol));
+        int cars = w.HoodsOf(g.Id).Count(h => h.Car != Car.None);
+        var driver = men.FirstOrDefault(h => h.Car == Car.None && h.Id != g.BossHoodId);
+        if (driver != null && cars < (topDog ? 3 : 1 + men.Count / 6))
+        {
+            var car = cash > 9000 ? Car.Packard : Car.ModelT;
+            if (Buy(CarCost(Car.None, car))) orders.Add(new CarOrder(g.Id, driver.Id, car));
+        }
+        if (!topDog && cash > 8000 && men.FirstOrDefault(h => h.Weapon == Weapon.Pistol) is { } hard && Buy(Cost(hard.Weapon, Weapon.Shotgun)))
+            orders.Add(new ArmOrder(g.Id, hard.Id, Weapon.Shotgun));
+        if (!topDog && cash > 15000 && g.Heat < 60 && men.FirstOrDefault(h => h.Weapon == Weapon.Shotgun) is { } heavy && Buy(Cost(heavy.Weapon, Weapon.TommyGun)))
+            orders.Add(new ArmOrder(g.Id, heavy.Id, Weapon.TommyGun));
+        var boss = w.HoodById(g.BossHoodId);
+        if (cash > 25000 && boss.Car != Car.Cadillac && Buy(CarCost(boss.Car, Car.Cadillac)))
+            orders.Add(new CarOrder(g.Id, boss.Id, Car.Cadillac));
+        return spent;
+    }
+
     private static long PlanStreet(World w, Gang g, long cash, List<Order> orders)
     {
         long spent = 0;

@@ -224,6 +224,8 @@ public partial class MapView
             case LotUse.Precinct: return 0.72f;
             case LotUse.Headquarters: return 0.62f;
             case LotUse.Bank: return 0.68f;
+            case LotUse.GunShop: return 0.5f + 0.15f * h;
+            case LotUse.CarDealer: return 0.24f;
             case LotUse.Business:
                 return World.BusinessById(lot.BusinessId).Kind switch
                 {
@@ -529,6 +531,12 @@ public partial class MapView
                 break;
             case LotUse.Bank:
                 DrawBank(lot);
+                break;
+            case LotUse.GunShop:
+                DrawGunShop(lot);
+                break;
+            case LotUse.CarDealer:
+                DrawCarDealer(lot);
                 break;
             default:
                 DrawFiller(lot);

@@ -155,7 +155,7 @@ public partial class MapView : Control
         {
             var a = World.Script[i];
             var path = StreetPath(a.FromLot, a.ToLot);
-            float hours = Simulation.WalkHours(World, a.FromLot, a.ToLot);
+            float hours = Simulation.TravelHours(World, a.FromLot, a.ToLot, Men(a.Backup.Prepend(a.HoodId)));
             float arrive = a.Tick;
             // Sunday collectors set out in waves rather than all at once.
             if (a.Kind == ActionKind.Collect) arrive += (_collectIndex++ % 10) * 0.6f;
@@ -264,6 +264,11 @@ public partial class MapView : Control
                 Select(bank: bank.Id);
                 BankClicked?.Invoke(bank.Id);
             }
+            else if (lot.Use is LotUse.GunShop or LotUse.CarDealer)
+            {
+                Select(shop: lot.Id);
+                ShopClicked?.Invoke(lot.Id);
+            }
         }
     }
 
@@ -311,6 +316,8 @@ public partial class MapView : Control
             case LotUse.Bank:
                 var bank = World.BankAt(lot.Id);
                 return bank == null ? "" : $"{bank.Name}\nAbout ${bank.Vault / 500 * 500:N0} in the vault · {bank.Guards} guard{(bank.Guards == 1 ? "" : "s")}{WardLine(lot)}";
+            case LotUse.GunShop or LotUse.CarDealer:
+                return ShopTooltip(lot);
             default:
                 return lot.Terrain == Terrain.Land ? FillerName(lot) : "";
         }
@@ -611,7 +618,8 @@ public partial class MapView : Control
         if (rim is Color r) C.DrawPolyline(closed, r with { A = 0.9f }, width);
 
         bool selected = (lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness)
-            || (lot.Use == LotUse.Bank && SelectedBank >= 0 && w.BankById(SelectedBank)?.LotId == lot.Id);
+            || (lot.Use == LotUse.Bank && SelectedBank >= 0 && w.BankById(SelectedBank)?.LotId == lot.Id)
+            || lot.Id == SelectedShop;
         if (selected)
         {
             float pulse = 0.75f + 0.25f * Mathf.Sin(_anim * 4);
@@ -693,6 +701,13 @@ public partial class MapView : Control
 
             var pos = at * t;
             bool atScene = now >= actor.Arrive && now <= actor.Leave;
+
+            // Men with a car drive there and back, and get out at the door.
+            if (walking && a.Kind is not (ActionKind.Raid or ActionKind.Collect) && CarFor(a.Backup.Prepend(a.HoodId)) is var car and not Car.None)
+            {
+                DrawGangCar(at, ahead, actor.Colour, car);
+                continue;
+            }
 
             // Outcome rings round his feet while the man is on the job.
             if (atScene && a.Kind != ActionKind.Guard && a.Kind != ActionKind.Collect)
@@ -780,7 +795,8 @@ public partial class MapView : Control
             if (!Simulation.TeamOf(job.Order).Any()) continue;
             var gang = World!.GangById(job.GangId);
             int toLot = Simulation.TargetLot(World, job.Order);
-            float hours = Simulation.WalkHours(World, gang.HqLotId, toLot);
+            var team = Simulation.TeamOf(job.Order).ToList();
+            float hours = Simulation.TravelHours(World, gang.HqLotId, toLot, Men(team));
             if (now < job.Tick - hours || now >= job.Tick) continue;
             var path = StreetPath(gang.HqLotId, toLot);
             float f = (now - (job.Tick - hours)) / hours;
@@ -788,6 +804,7 @@ public partial class MapView : Control
             var pos = at * t;
             var ahead = Along(path, f + 0.02f) - at;
             var colour = Palette.Gang(World, gang.Id);
+            if (CarFor(team) is var car and not Car.None) { DrawGangCar(at, ahead, colour, car); continue; }
             DrawBackup(pos, ahead, radius, colour, Simulation.TeamOf(job.Order).Count() - 1, true);
             DrawFigure(pos, ahead, radius, colour, new Color("1c1a19"), colour.Lightened(0.25f), true);
         }
