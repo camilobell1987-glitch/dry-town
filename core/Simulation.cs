@@ -602,13 +602,20 @@ public sealed partial class Simulation
             if (biz.Racket != RacketKind.None)
             {
                 var info = Content.Rackets[biz.Racket];
-                bool legalNow = info.NeedsProhibition && !w.Prohibition;
+                // Since repeal a brewery is an honest business, at honest prices.
+                bool brewing = biz.Racket == RacketKind.Brewery && !w.Prohibition;
+                bool legalNow = info.NeedsProhibition && !w.Prohibition && !brewing;
                 if (!supplied.TryGetValue(gang.Id, out var real)) supplied[gang.Id] = real = w.Supplied(gang.Id);
-                int income = (int)((legalNow ? info.WeeklyIncome * 3 / 10 : info.WeeklyIncome) * w.RacketFactor(biz.Racket) * w.BoozeFactor(biz, gang, real));
-                int heat = legalNow ? 0 : info.WeeklyHeat * w.RacketHeatFactor(biz.Racket);
+                int income = (int)((legalNow ? info.WeeklyIncome * 3 / 10 : brewing ? info.WeeklyIncome / 2 : info.WeeklyIncome) * w.RacketFactor(biz.Racket) * w.BoozeFactor(biz, gang, real));
+                int heat = legalNow || brewing ? 0 : info.WeeklyHeat * w.RacketHeatFactor(biz.Racket);
                 if (biz.Racket == RacketKind.Bookie) income = Wire(gang, income);
                 gang.Cash += income;
-                if (biz.Racket == RacketKind.Casino)
+                if (brewing)
+                {
+                    gang.CleanCash += income;
+                    ledger.Legit += income;
+                }
+                else if (biz.Racket == RacketKind.Casino)
                 {
                     // A casino keeps books like any hotel. Its money comes in clean, but the ward has to look the other way.
                     gang.CleanCash += income;

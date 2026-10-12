@@ -9,17 +9,36 @@ public partial class Main
     /// <summary>A line under a speakeasy or still's details: real liquor or bathtub gin, and the risk of a bad batch.</summary>
     private void BoozeLine(Business b)
     {
+        if (b.Racket == RacketKind.Brewery && b.IsProtected && W.Prohibition && b.IsOpen)
+        {
+            var owner = W.GangById(b.ProtectorGangId);
+            int tap = W.OnTap(owner.Id, W.Supplied(owner.Id, thisWeek: false)).Count;
+            AddLabel(_businessPanel, tap == 0 ? $"It brews beer for {owner.Name}, which has no speakeasies on bathtub gin to pour it in."
+                : $"It keeps {tap} of {owner.Name}'s speakeasies in beer.", Palette.InkQuiet, 13, wrap: true);
+            return;
+        }
         if (!World.Liquor(b.Racket) || !b.IsProtected || !W.Prohibition || !b.IsOpen) return;
         var g = W.GangById(b.ProtectorGangId);
-        bool real = b.Racket == RacketKind.Speakeasy && W.Supplied(g.Id, thisWeek: false).Contains(b.Id);
+        var supplied = W.Supplied(g.Id, thisWeek: false);
+        bool real = b.Racket == RacketKind.Speakeasy && supplied.Contains(b.Id);
+        bool beer = !real && W.Beer(b, g, supplied);
         var lines = W.LinesOf(g.Id).ToList();
         string from = lines.Count == 0 ? $"{g.Name}'s boats brought in"
             : (lines.Count == 1 ? $"off {lines[0].Name}" : $"off {g.Name}'s supply lines") + (g.Cellar > 0 ? " and boats" : "");
-        string pour = b.Racket == RacketKind.Still ? "It makes its own rotgut" : real ? $"It pours real liquor {from}" : "It sells bathtub gin";
+        string pour = b.Racket == RacketKind.Still ? "It makes its own rotgut" : real ? $"It pours real liquor {from}" : beer ? $"It pours beer from {g.Name}'s brewery" : "It sells bathtub gin";
         if (g.Id == Me)
-            AddLabel(_businessPanel, $"{pour}, {Content.Label(g.Cut)}. Chance of a bad batch this week: {W.BadBatchChance(b, g):P1}.", W.BadBatchChance(b, g) >= 0.01 ? Palette.Bad : Palette.InkQuiet, 13, wrap: true);
+            AddLabel(_businessPanel, $"{pour}, {Content.Label(g.Cut)}. Chance of a bad batch this week: {W.BadBatchChance(b, g):0.0%}.", W.BadBatchChance(b, g) >= 0.01 ? Palette.Bad : Palette.InkQuiet, 13, wrap: true);
         else
             AddLabel(_businessPanel, $"{pour}.", Palette.InkQuiet, 13, wrap: true);
+    }
+
+    /// <summary>What the player's brewery adds, or a word on opening one.</summary>
+    private string Brewing()
+    {
+        int tap = W.OnTap(Me).Count;
+        return W.BreweryOf(Me) is { } brewery
+            ? $" Your brewery at {brewery.Name} keeps {tap} more in beer, for {Content.BeerBonus:0%} more than gin."
+            : $" A brewery in one of your warehouses would keep {Content.BreweryRoom} of the rest in beer, for {Content.BeerBonus:0%} more than gin.";
     }
 
     /// <summary>On one of your speakeasies or stills: the supply lines to buy, and how far to stretch the liquor.</summary>
@@ -33,7 +52,7 @@ public partial class Main
         int real = W.Supplied(Me, thisWeek: false).Count;
         AddLabel(_businessPanel, speakeasies == 0
                 ? "A supply line keeps speakeasies in real liquor. You have none to pour it in yet."
-                : $"{real} of your {speakeasies} speakeasies pour real liquor, which takes {Content.LineBonus:P0} more than bathtub gin and never poisons anyone served straight. Rivals can stop your shipments.",
+                : $"{real} of your {speakeasies} speakeasies pour real liquor, which takes {Content.LineBonus:0%} more than bathtub gin and never poisons anyone served straight. Rivals can stop your shipments." + Brewing(),
             Palette.InkQuiet, 13, wrap: true);
         foreach (var line in W.SupplyLines)
         {

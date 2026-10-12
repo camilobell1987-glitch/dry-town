@@ -120,6 +120,7 @@ public static partial class Content
         [RacketKind.Counterfeit] = new(RacketKind.Counterfeit, "counterfeiting press", 1200, 260, 1, false),
         [RacketKind.Slots] = new(RacketKind.Slots, "row of slot machines", 300, 100, 1, false, AfterRepeal: true),
         [RacketKind.Casino] = new(RacketKind.Casino, "casino", 5000, 600, 1, false, AfterRepeal: true),
+        [RacketKind.Brewery] = new(RacketKind.Brewery, "brewery", 3000, 200, 3, true),
     };
 
     /// <summary>Weekly chance the Treasury finds each counterfeiting press a gang runs.</summary>
@@ -131,7 +132,7 @@ public static partial class Content
         BusinessKind.Hotel => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.GamblingDen, RacketKind.Slots, RacketKind.Casino },
         BusinessKind.PoolHall => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.GamblingDen, RacketKind.Slots },
         BusinessKind.Diner => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.Slots },
-        BusinessKind.Warehouse => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.GamblingDen, RacketKind.Counterfeit },
+        BusinessKind.Warehouse => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.GamblingDen, RacketKind.Counterfeit, RacketKind.Brewery },
         BusinessKind.Garage or BusinessKind.Laundry => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.Counterfeit },
         BusinessKind.Barber => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Bookie, RacketKind.Slots },
         BusinessKind.Grocer or BusinessKind.Pharmacy => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Slots },

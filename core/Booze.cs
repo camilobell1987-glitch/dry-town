@@ -93,14 +93,18 @@ public sealed partial class World
     public double BoozeFactor(Business b, Gang gang, HashSet<int>? supplied = null)
     {
         if (!Liquor(b.Racket) || !Prohibition) return 1;
-        bool real = b.Racket == RacketKind.Speakeasy && (supplied ?? Supplied(gang.Id)).Contains(b.Id);
-        return (1 + Content.CutIncome(gang.Cut)) * (real ? 1 + Content.LineBonus : 1);
+        supplied ??= Supplied(gang.Id);
+        bool real = b.Racket == RacketKind.Speakeasy && supplied.Contains(b.Id);
+        return (1 + Content.CutIncome(gang.Cut)) * (real ? 1 + Content.LineBonus : Beer(b, gang, supplied) ? 1 + Content.BeerBonus : 1);
     }
 
-    /// <summary>The weekly chance this speakeasy or still poisons someone.</summary>
-    public double BadBatchChance(Business b, Gang gang, HashSet<int>? supplied = null) =>
-        !Liquor(b.Racket) || !Prohibition ? 0
-            : Content.BadBatchChance(gang.Cut, b.Racket == RacketKind.Speakeasy && (supplied ?? Supplied(gang.Id, thisWeek: false)).Contains(b.Id));
+    /// <summary>The weekly chance this speakeasy or still poisons someone. Beer from the outfit's own brewery is as safe as real liquor.</summary>
+    public double BadBatchChance(Business b, Gang gang, HashSet<int>? supplied = null)
+    {
+        if (!Liquor(b.Racket) || !Prohibition) return 0;
+        supplied ??= Supplied(gang.Id, thisWeek: false);
+        return Content.BadBatchChance(gang.Cut, b.Racket == RacketKind.Speakeasy && (supplied.Contains(b.Id) || Beer(b, gang, supplied)));
+    }
 
     /// <summary>Where a line's shipment is headed: the first speakeasy it supplies. Nothing ships to an outfit without one.</summary>
     public Business? DropOf(SupplyLine line)

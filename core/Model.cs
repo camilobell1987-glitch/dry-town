@@ -12,7 +12,7 @@ public enum Weapon { None, Pistol, Shotgun, TommyGun }
 /// <summary>What a man drives. A car gets him there faster and away when it goes wrong.</summary>
 public enum Car { None, ModelT, Packard, Cadillac }
 
-public enum RacketKind { None, Speakeasy, Numbers, LoanShark, Still, Bookie, GamblingDen, Counterfeit, Slots, Casino }
+public enum RacketKind { None, Speakeasy, Numbers, LoanShark, Still, Bookie, GamblingDen, Counterfeit, Slots, Casino, Brewery }
 
 public sealed class Hood
 {

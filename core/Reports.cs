@@ -209,7 +209,10 @@ public static partial class Reports
         var real = w.Supplied(gangId, thisWeek: false);
         int speakeasies = mine.Count(b => b.Racket == RacketKind.Speakeasy);
         sb.AppendLine($"Your liquor is {Content.Label(g.Cut)}: {Content.CutIncome(g.Cut):+0%;-0%;+0%} on every speakeasy and still.");
-        sb.AppendLine(speakeasies == 0 ? "You run no speakeasies." : $"{real.Count} of your {speakeasies} speakeasies pour real liquor ({Content.LineBonus:+0%} takings); the rest sell bathtub gin.");
+        int beer = w.OnTap(gangId, real).Count;
+        sb.AppendLine(speakeasies == 0 ? "You run no speakeasies." : $"{real.Count} of your {speakeasies} speakeasies pour real liquor ({Content.LineBonus:+0%} takings)" +
+            (beer > 0 ? $", {beer} pour beer from your brewery ({Content.BeerBonus:+0%})" : "") + "; the rest sell bathtub gin.");
+        if (w.BreweryOf(gangId) is { } brewery) sb.AppendLine($"Your brewery is at {brewery.Name} ({brewery.Id}). It keeps up to {Content.BreweryRoom} speakeasies in beer.");
         if (mine.Count > 0)
             sb.AppendLine($"Chance of a bad batch somewhere this week: {1 - mine.Aggregate(1.0, (p, b) => p * (1 - w.BadBatchChance(b, g, real))):P1}.");
         return sb.ToString();

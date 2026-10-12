@@ -31,7 +31,7 @@ public sealed class CommandShell
 
     public static readonly string Help =
         "gangs | hoods | turf | targets | log\n" +
-        "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit|slots|casino>\n" +
+        "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit|slots|casino|brewery>\n" +
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "crews [gang] (yours, or a rival's) | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
@@ -571,7 +571,7 @@ public sealed class CommandShell
                 var biz = W.Businesses.FirstOrDefault(b => b.Id == h.BusinessId);
                 if (biz == null) return CheckBiz(h.BusinessId);
                 if (!W.Prohibition) return "Since repeal, nobody's beer is worth stealing.";
-                if (!Simulation.CanHijack(W, W.Player, biz)) return "Only a rival's speakeasy or still gets beer trucks worth stopping.";
+                if (!Simulation.CanHijack(W, W.Player, biz)) return "Only a rival's speakeasy, still or brewery gets beer trucks worth stopping.";
                 return h.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
             }
             case WaylayOrder l:

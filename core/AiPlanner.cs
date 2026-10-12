@@ -74,7 +74,11 @@ public static partial class AiPlanner
             cash -= casino;
         else if (g.Heat < 50 && hoods.Count > 0)
         {
-            var site = turf
+            // An outfit with speakeasies on bathtub gin puts a brewery in a warehouse before anything else.
+            var site = (cash > Content.Rackets[RacketKind.Brewery].SetupCost * 2 + 400 && Thirsty(w, g) >= Content.AiBreweryThirst
+                    ? turf.Where(b => w.FreeBackRoom(b) && w.CannotOpenRacket(g, b, RacketKind.Brewery) == null).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault()
+                    : null)
+                ?? turf
                 .Where(b => w.FreeBackRoom(b) && b.IsOpen)
                 .OrderByDescending(b => b.Takings).ThenBy(b => b.Id)
                 .FirstOrDefault();
@@ -90,7 +94,9 @@ public static partial class AiPlanner
                         // A line with room to spare makes a speakeasy worth more.
                         + (r.Kind == RacketKind.Speakeasy && w.LinesOf(g.Id).Sum(l => l.Capacity) > w.Supplied(g.Id, thisWeek: false).Count ? (int)(r.WeeklyIncome * Content.LineBonus) : 0)
                         // So does the wire, for a bookie.
-                        + (r.Kind == RacketKind.Bookie && w.WireGangId == g.Id ? (int)(r.WeeklyIncome * Content.WireBonus) : 0))
+                        + (r.Kind == RacketKind.Bookie && w.WireGangId == g.Id ? (int)(r.WeeklyIncome * Content.WireBonus) : 0)
+                        // And a brewery for the speakeasies it would keep in beer.
+                        + (r.Kind == RacketKind.Brewery ? (int)(Content.Rackets[RacketKind.Speakeasy].WeeklyIncome * Content.BeerBonus) * Thirsty(w, g) : 0))
                     .FirstOrDefault();
                 if (racket != null)
                 {
@@ -183,6 +189,13 @@ public static partial class AiPlanner
     /// to get away in, then heavier guns for the hard men, and armour for a rich boss.
     /// </summary>
     private static bool TopDog(World w, Gang g) => w.TopDog(g);
+
+    /// <summary>The speakeasies a brewery would put beer in: those on bathtub gin, up to what one brews for.</summary>
+    private static int Thirsty(World w, Gang g)
+    {
+        var supplied = w.Supplied(g.Id, thisWeek: false);
+        return Math.Min(Content.BreweryRoom, w.TurfOf(g.Id).Count(b => b.Racket == RacketKind.Speakeasy && b.IsOpen && !supplied.Contains(b.Id)));
+    }
 
     /// <summary>
     /// Once the safe holds more dirty money than is comfortable, buy the best place on the books
