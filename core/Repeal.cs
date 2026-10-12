@@ -81,6 +81,7 @@ public sealed partial class World
         if (!b.IsOpen) return "It's shut.";
         if (info.NeedsProhibition && !Prohibition) return "Since repeal, anyone can sell a drink.";
         if (info.AfterRepeal && Prohibition) return "Not while Prohibition lasts.";
+        if (kind == RacketKind.Brewery && BreweryOf(gang.Id) is { } brewery && brewery.Id != b.Id) return $"{gang.Name} brews at {brewery.Name} already.";
         if (kind == RacketKind.Casino)
         {
             if (b.Racket == RacketKind.Casino) return "It's a casino already.";

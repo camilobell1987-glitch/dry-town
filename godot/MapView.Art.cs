@@ -903,6 +903,11 @@ public partial class MapView
                 }
                 C.DrawCircle(c, h * 0.25f, new Color("e8b84a"));
                 break;
+            case RacketKind.Brewery: // a barrel with its hoops
+                C.DrawRect(new Rect2(c.X - h * 0.6f, c.Y - h * 0.8f, h * 1.2f, h * 1.6f), new Color("9a6a3a"));
+                C.DrawRect(new Rect2(c.X - h * 0.7f, c.Y - h * 0.45f, h * 1.4f, h * 0.18f), new Color("3a3a3a"));
+                C.DrawRect(new Rect2(c.X - h * 0.7f, c.Y + h * 0.27f, h * 1.4f, h * 0.18f), new Color("3a3a3a"));
+                break;
             case RacketKind.Counterfeit: // a green banknote
                 C.DrawRect(new Rect2(c.X - h * 0.9f, c.Y - h * 0.5f, h * 1.8f, h * 1.0f), new Color("6aa46a"));
                 C.DrawCircle(c, h * 0.3f, new Color("2a5a2a"));

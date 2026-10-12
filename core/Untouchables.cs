@@ -24,7 +24,7 @@ public static partial class Content
     /// <summary>How strong the conspiracy case is. Weaker than most federal cases: the squad's evidence is about the stills, not the boss.</summary>
     public const double SquadCase = 0.75;
 
-    public static bool IsLiquor(RacketKind r) => r is RacketKind.Still or RacketKind.Speakeasy;
+    public static bool IsLiquor(RacketKind r) => r is RacketKind.Still or RacketKind.Speakeasy or RacketKind.Brewery;
 }
 
 /// <summary>Where the squad stands: who it's after and how much it has on him.</summary>
@@ -52,11 +52,12 @@ public sealed partial class World
     /// <summary>The outfit the squad is after, if it's still standing.</summary>
     public Gang? SquadTarget => SquadInTown && Untouchables.TargetGangId >= 0 && GangById(Untouchables.TargetGangId) is { Alive: true } g ? g : null;
 
-    /// <summary>The gang's stills and speakeasies.</summary>
+    /// <summary>The gang's stills, speakeasies and brewery.</summary>
     public IEnumerable<Business> LiquorOf(int gangId) => TurfOf(gangId).Where(b => Content.IsLiquor(b.Racket));
 
     /// <summary>How big a bootlegger the squad thinks the gang is.</summary>
-    public int Bootlegging(Gang g) => LiquorOf(g.Id).Count() + LinesOf(g.Id).Count() * 2 + BoatsOf(g.Id).Count();
+    public int Bootlegging(Gang g) =>
+        LiquorOf(g.Id).Sum(b => b.Racket == RacketKind.Brewery ? Content.BreweryBootlegging : 1) + LinesOf(g.Id).Count() * 2 + BoatsOf(g.Id).Count();
 
     public double SquadChance(Gang g) => SquadTarget?.Id != g.Id || !LiquorOf(g.Id).Any() ? 0 : Content.SquadRaid + g.Heat * Content.SquadRaidPerHeat;
 
@@ -125,22 +126,23 @@ public sealed partial class Simulation
             w.Log(EventKind.Untouchables, pick.Id, $"The Untouchables are going after {w.HoodById(pick.BossHoodId).Name} of {pick.Name}, the biggest bootlegger in the city.");
     }
 
-    /// <summary>A raid on one of the bootlegger's stills or speakeasies.</summary>
+    /// <summary>A raid on one of the bootlegger's stills or speakeasies, or on his brewery, which the squad goes for first.</summary>
     private void SquadRaid(Gang g)
     {
         var w = World;
         var s = w.Untouchables;
         var places = w.LiquorOf(g.Id).OrderBy(b => b.Id).ToList();
-        var b = w.Rng.Pick(places);
-        string what = b.Racket == RacketKind.Still ? "still" : "speakeasy";
+        var b = places.FirstOrDefault(p => p.Racket == RacketKind.Brewery) is { } brewery && w.Rng.Chance(Content.SquadBrewery) ? brewery : w.Rng.Pick(places);
+        string what = Content.Rackets[b.Racket].Label;
+        if (what.StartsWith("back-room ")) what = what["back-room ".Length..];
         var man = b.HandlerHoodId >= 0 ? w.Hoods.FirstOrDefault(h => h.Id == b.HandlerHoodId && h.GangId == g.Id) : null;
         if (w.Rng.Chance(w.Warning(b)))
         {
             w.Log(EventKind.Untouchables, g.Id, $"The Untouchables raided {b.Name}, but {man!.Name} of {g.Name} got word in time, and there was nothing in the back room when they came.");
             return;
         }
+        s.Evidence += b.Racket == RacketKind.Brewery ? Content.BreweryEvidence : 1;
         b.Racket = RacketKind.None;
-        s.Evidence++;
         s.LastRaidWeek = w.Week;
         w.Log(EventKind.Untouchables, g.Id, $"The Untouchables smashed {g.Name}'s {what} at {b.Name}, with the papers watching.");
         if (man is { IsAvailable: true } && w.Rng.Chance(Content.SquadArrest)) Jail(man, w.Rng.Range(26, 52), "with running liquor", federal: true);

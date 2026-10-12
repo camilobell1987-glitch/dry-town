@@ -22,7 +22,7 @@ public static partial class Reports
             foreach (var b in w.LiquorOf(gangId).OrderBy(b => b.Id))
             {
                 var man = b.HandlerHoodId >= 0 ? w.Hoods.FirstOrDefault(h => h.Id == b.HandlerHoodId) : null;
-                sb.AppendLine($"  {b.Id,4} {Trim(b.Name, 28),-28} {(b.Racket == RacketKind.Still ? "still" : "speakeasy"),-9} {(man == null ? "nobody handling it" : $"{man.Name}, {w.Warning(b):P0} he gets word in time")}");
+                sb.AppendLine($"  {b.Id,4} {Trim(b.Name, 28),-28} {(b.Racket switch { RacketKind.Still => "still", RacketKind.Brewery => "brewery", _ => "speakeasy" }),-9} {(man == null ? "nobody handling it" : $"{man.Name}, {w.Warning(b):P0} he gets word in time")}");
             }
         }
         sb.AppendLine($"Each January the squad goes after the biggest, loudest bootlegger with at least {Content.SquadRackets} stills and speakeasies, a supply line counting as two. A stealthy man handling a place may get word before a raid.");

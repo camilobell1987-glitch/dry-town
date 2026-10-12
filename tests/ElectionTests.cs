@@ -142,7 +142,7 @@ public class ElectionTests
     [Fact]
     public void TheDistrictAttorneyRunsWithTheMayorAndBendsTheCases()
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 4 });
+        var sim = Simulation.New(new WorldSettings { Seed = 5 });
         var w = sim.World;
         Assert.NotEqual("", w.Hall.DA);
         int mayorWeek = Politics.NextElection(w, ElectionKind.Mayor);

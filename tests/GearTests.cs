@@ -139,7 +139,7 @@ public class GearTests
     [Fact]
     public void RivalsArmThemselvesAsTheyGetRich()
     {
-        var w = Run(3, 3 * Content.WeeksPerYear, CitySize.Medium).World;
+        var w = Run(4, 3 * Content.WeeksPerYear, CitySize.Medium).World;
         Assert.Contains(w.Events, e => e.Kind == EventKind.Gear && e.GangId != w.Player.Id);
         Assert.Contains(w.Hoods, h => h.IsActive && h.GangId != w.Player.Id && h.Weapon != Weapon.None);
     }

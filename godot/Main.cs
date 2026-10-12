@@ -1106,6 +1106,7 @@ public partial class Main : Control
         if (Arg("--repeal") is string repeal) SetUpRepeal(repeal);
         if (Flag("--untouchables")) SetUpUntouchables();
         if (Flag("--rumrow")) SetUpRumRow();
+        if (Flag("--brewery")) SetUpBrewery();
         if (Flag("--reputation"))
         {
             // A boss the papers have started writing about, with a soup kitchen.

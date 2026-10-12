@@ -53,10 +53,10 @@ public sealed partial class Simulation
     public static double SilenceChance(Hood hood, StreetPerson witness) =>
         Math.Clamp(0.4 + (hood.Intimidation - witness.Nerve) * 0.08, 0.1, 0.95);
 
-    /// <summary>Businesses whose beer trucks can be stopped: rival speakeasies and stills, while Prohibition lasts.</summary>
+    /// <summary>Businesses whose beer trucks can be stopped: rival speakeasies, stills and breweries, while Prohibition lasts.</summary>
     public static bool CanHijack(World w, Gang gang, Business biz) =>
         w.Prohibition && biz.IsOpen && biz.IsProtected && biz.ProtectorGangId != gang.Id
-        && biz.Racket is RacketKind.Speakeasy or RacketKind.Still;
+        && biz.Racket is RacketKind.Speakeasy or RacketKind.Still or RacketKind.Brewery;
 
     // ---- Crimes -------------------------------------------------------------
 

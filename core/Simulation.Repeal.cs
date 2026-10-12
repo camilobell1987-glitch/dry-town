@@ -8,6 +8,8 @@ public sealed partial class Simulation
     {
         var w = World;
         foreach (var b in w.Businesses.Where(b => b.Racket == RacketKind.Still)) b.Racket = RacketKind.None;
+        foreach (var b in w.Businesses.Where(b => b.Racket == RacketKind.Brewery && b.IsProtected).OrderBy(b => b.Id))
+            w.Log(EventKind.Era, b.ProtectorGangId, $"{w.GangById(b.ProtectorGangId).Name}'s brewery at {b.Name} took out a licence. Its beer is legal now, and so is the money.");
         string room = w.WireBusinessId >= 0 ? $" Whoever runs {w.BusinessById(w.WireBusinessId).Name} will take a cut of every bookie in the city." : "";
         w.Log(EventKind.Era, -1, $"The back-room stills go cold. Slot machines are the new money, and the racing wire has come to town.{room}");
     }
