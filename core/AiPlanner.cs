@@ -45,6 +45,10 @@ public static partial class AiPlanner
         cash -= PlanBooze(w, g, turf, cash, orders);
         cash -= PlanCourts(w, g, turf, cash, orders);
 
+        // A soup kitchen in the Depression, while the money's there.
+        bool soup = g.SoupKitchen ? cash >= Content.AiSoupClose : w.Depression && cash >= Content.AiSoupCash;
+        if (soup != g.SoupKitchen) orders.Add(new SoupOrder(g.Id, soup));
+
         // An aging boss with money to spare brings his family into the business.
         if (w.HoodById(g.BossHoodId).Age(w.Week) >= 45 && cash > Content.FamilyCost * 5 && Simulation.CanBringInFamily(w, g))
         {

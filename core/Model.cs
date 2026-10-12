@@ -181,6 +181,17 @@ public sealed class Gang
     /// <summary>The week the gang last had reason to think someone in it was talking.</summary>
     public int TalkWeek { get; set; } = -1000;
 
+    /// <summary>The boss's name on the street and in the papers: how much he is feared and how much he is admired, 0 to 100.</summary>
+    public double Fear { get; set; }
+    public double Respect { get; set; }
+
+    /// <summary>The boss the name belongs to, and how far into the papers it has got (0 unknown, 1 a name, 2 a household name).</summary>
+    public int NameBossId { get; set; } = -1;
+    public int NameTier { get; set; }
+
+    /// <summary>Whether the outfit runs a soup kitchen in the boss's name.</summary>
+    public bool SoupKitchen { get; set; }
+
     /// <summary>How far the gang stretches the liquor it sells: more money, and more chance of a bad batch.</summary>
     public Cut Cut { get; set; }
 }
@@ -360,6 +371,8 @@ public enum EventKind
     Inside,
     /// <summary>Men skipping town, lying low and coming home.</summary>
     Lam,
+    /// <summary>A boss's name in the papers, and soup kitchens.</summary>
+    Name,
     /// <summary>The Prohibition Bureau's squad: who it's after, its raids, and the grand jury.</summary>
     Untouchables,
 }

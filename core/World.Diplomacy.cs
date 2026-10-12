@@ -63,6 +63,7 @@ public sealed partial class World
     {
         Pacts.Remove(pact);
         breaker.BrokeWordWeek = Week;
+        Renown(breaker, respect: -Content.RespectBrokenWord);
         AddGrudge(partner.Id, breaker.Id, Content.GrudgeBetrayed);
         foreach (var other in LivingGangs)
             if (other.Id != breaker.Id && other.Id != partner.Id) AddGrudge(other.Id, breaker.Id, Content.GrudgeWitnessed);

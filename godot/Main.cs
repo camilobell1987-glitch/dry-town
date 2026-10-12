@@ -647,6 +647,7 @@ public partial class Main : Control
         var boss = W.HoodById(p.BossHoodId);
         AddLabel(_crewsPanel, "The family", Palette.Player, 17);
         int age = boss.Age(W.Week);
+        NameSection(boss);
         if (W.RunsFromInside(p))
         {
             InsideSection(boss);
@@ -1104,6 +1105,15 @@ public partial class Main : Control
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
         if (Arg("--repeal") is string repeal) SetUpRepeal(repeal);
         if (Flag("--untouchables")) SetUpUntouchables();
+        if (Flag("--reputation"))
+        {
+            // A boss the papers have started writing about, with a soup kitchen.
+            W.Player.Fear = 46;
+            W.Player.Respect = 22;
+            W.Player.Cash = Math.Max(W.Player.Cash, 5000);
+            W.Player.SoupKitchen = true;
+            RefreshAll();
+        }
         if (Arg("--midweek") is string hour)
         {
             // Play the week to this hour, save it to slot 3 and load it back, to show a week picked up partway.

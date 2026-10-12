@@ -114,7 +114,7 @@ public sealed partial class Simulation
         var s = w.Untouchables;
         var pick = w.LivingGangs.Select(g => (g, size: w.Bootlegging(g)))
             .Where(x => x.size >= Content.SquadRackets)
-            .OrderByDescending(x => x.size * (x.g.Heat + 20)).ThenBy(x => x.g.Id).Select(x => x.g).FirstOrDefault();
+            .OrderByDescending(x => x.size * (x.g.Heat + 20) * World.NameDraw(x.g)).ThenBy(x => x.g.Id).Select(x => x.g).FirstOrDefault();
         int was = s.TargetGangId;
         s.NamedWeek = w.Week;
         s.TargetGangId = pick?.Id ?? -1;

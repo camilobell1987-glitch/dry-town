@@ -61,6 +61,9 @@ public sealed partial class Simulation
         double odds = c.Strength - Content.Lawyers[w.GangById(hood.GangId).Lawyer].Cut * (c.Prepared ? 1 : 0.5);
         if (c.JudgePaid) odds -= Content.JudgeCut;
         if (c.JuryFixed) odds -= Content.JuryCut;
+        // Jurors know the name, and some of them are afraid of it.
+        var g = w.GangById(hood.GangId);
+        odds -= g.Fear * Content.FearJury + g.Respect * Content.RespectJury;
         return Math.Clamp(odds, 0.05, 0.95);
     }
 
@@ -80,6 +83,7 @@ public sealed partial class Simulation
             hood.Loyalty = Math.Min(100, hood.Loyalty + 5);
             Book(hood, RapKind.Acquitted, $"Acquitted {c.Charge}.");
             w.Log(EventKind.Trial, gang.Id, $"A jury acquitted {hood.Name} of {gang.Name}, charged {c.Charge}. He walked out of court a free man.");
+            w.Renown(gang, respect: hood.Id == gang.BossHoodId ? Content.RespectBossAcquittal : Content.RespectAcquittal);
             return;
         }
         if (c.Life)

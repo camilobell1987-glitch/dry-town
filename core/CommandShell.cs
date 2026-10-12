@@ -35,6 +35,7 @@ public sealed class CommandShell
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "crews [gang] (yours, or a rival's) | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
+        "name (what the city thinks of each boss) | soup [on|off] (a soup kitchen in the boss's name, $" + Content.SoupKitchenWeekly + " a week)\n" +
         "inside [on|off] (whether a jailed boss runs it from his cell) | heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
         "neighbourhoods (whose people live where) | wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
         "stand <hood> <ward> (run him for alderman) | polls <hood> <ward> (lean on voters, last " + Content.PollsWeeks + " weeks) | results (the last vote)\n" +
@@ -174,6 +175,15 @@ public sealed class CommandShell
                     if (p.Length > 1) W.Player.RunFromInside = p[1].ToLowerInvariant() == "on";
                     return Reports.Inside(W, Me);
                 case "family": return Queue(new RecruitOrder(Me, Family: true));
+                case "name": return Reports.Names(W, Me);
+                case "soup":
+                    if (p.Length > 1)
+                    {
+                        bool on = p[1].ToLowerInvariant() == "on";
+                        if (on && W.CannotRunSoupKitchen(W.Player) is { } why) return why + "\n";
+                        W.Player.SoupKitchen = on;
+                    }
+                    return Reports.Names(W, Me);
                 case "crew": return CrewCommand(p);
                 case "send": return CrewOrder(int.Parse(p[1]), int.Parse(p[2]), guard: false);
                 case "post": return CrewOrder(int.Parse(p[1]), int.Parse(p[2]), guard: true);

@@ -54,6 +54,7 @@ int Soak()
     long asks = 0, asksPassed = 0, breaches = 0, playerBreaches = 0, seatsAtEnd = 0, warsAfter = 0, bossHitsAfter = 0, aliveAtSitdown = 0, aliveAfterSitdown = 0;
     long insideStarts = 0, walkedOut = 0, coups = 0, guardsQuit = 0, moved = 0, successions = 0, playerInside = 0;
     long bails = 0, jumps = 0, foundAway = 0, pickedUp = 0, cameHome = 0, showedUp = 0;
+    long namesMade = 0, householdNames = 0, soupAtEnd = 0, bossesAtEnd = 0; double fearAtEnd = 0, respectAtEnd = 0, playerFear = 0, playerRespect = 0; int playerAliveAtEnd = 0;
     long squadWeeks = 0, squadNamed = 0, squadNamedPlayer = 0, squadSmashed = 0, squadEmpty = 0, squadArrests = 0, indictments = 0, indictedAway = 0, indictedPlayer = 0;
     long playerNamed = 0, playerArrests = 0, wireMoves = 0, enemiesNamed = 0, gmenArrests = 0, bossesTaken = 0, casinosAtEnd = 0, slotsAtEnd = 0, wireHeld = 0, aliveAtRepeal = 0, aliveAfterRepeal = 0;
     long cityEvents = 0, running = 0, ownMenWon = 0, pollsWorked = 0, pollsCaught = 0, reformDAs = 0, ownSeatsAtEnd = 0;
@@ -156,6 +157,16 @@ int Soak()
         cameHome += ev.Count(e => e.Kind == EventKind.Lam && e.Text.Contains(" is back in town"));
         foundAway += ev.Count(e => e.Kind == EventKind.HoodJailed && e.Text.Contains(" was found out of town and brought back"));
         pickedUp += ev.Count(e => e.Kind == EventKind.HoodJailed && e.Text.StartsWith("Police picked up ") && e.Text.Contains(" on the warrant in his case."));
+        namesMade += ev.Count(e => e.Kind == EventKind.Name && e.Text.StartsWith("The papers have started writing about "));
+        householdNames += ev.Count(e => e.Kind == EventKind.Name && e.Text.StartsWith("Everybody in the city knows the name "));
+        foreach (var g in sim.World.LivingGangs)
+        {
+            bossesAtEnd++;
+            fearAtEnd += g.Fear;
+            respectAtEnd += g.Respect;
+            if (g.SoupKitchen) soupAtEnd++;
+        }
+        if (sim.World.Player.Alive) { playerAliveAtEnd++; playerFear += sim.World.Player.Fear; playerRespect += sim.World.Player.Respect; }
         int squadFrom = (Content.UntouchablesYear - Content.StartYear) * Content.WeeksPerYear;
         squadWeeks += Math.Max(0, Math.Min(sim.World.Week, (Content.RepealYear - Content.StartYear) * Content.WeeksPerYear) - squadFrom);
         squadNamed += ev.Count(e => e.Kind == EventKind.Untouchables && e.Text.StartsWith("The Untouchables are going after "));
@@ -209,6 +220,7 @@ int Soak()
     double squadYears = Math.Max(1, squadWeeks) / (double)Content.WeeksPerYear;
     if (squadWeeks > 0)
         Console.WriteLine($"The Untouchables, per city-year with the squad in town ({squadYears / seeds:0.0} a city): outfits gone after {squadNamed / squadYears:0.00} ({squadNamedPlayer} times the player's), places smashed {squadSmashed / squadYears:0.00}, raids that came up empty {squadEmpty / squadYears:0.00}, men taken {squadArrests / squadYears:0.00}, bosses indicted {indictments / squadYears:0.00} ({indictedPlayer} times the player's; out of town {indictedAway}).");
+    Console.WriteLine($"Reputation: names in the papers {namesMade / cy:0.00} per city-year, household names {householdNames / cy:0.00}; at the end, bosses' fear {fearAtEnd / Math.Max(1, bossesAtEnd):0} and respect {respectAtEnd / Math.Max(1, bossesAtEnd):0} on average (the player's {playerFear / Math.Max(1, playerAliveAtEnd):0} and {playerRespect / Math.Max(1, playerAliveAtEnd):0}), soup kitchens {soupAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Running it from inside, per city-year: bosses who kept the chair from a cell {insideStarts / cy:0.00} ({playerInside} times the player's), walked back into it {walkedOut / cy:0.00}, lost it to the street boss {coups / cy:0.00}, to the guards' fee {guardsQuit / cy:0.00}, to a transfer {moved / cy:0.00}; ordinary successions {successions / cy:0.00}.");
     double sy = seeds * Math.Max(0, years - (Content.CommissionYear - Content.StartYear) - (Content.CommissionWeek - 1) / (double)Content.WeeksPerYear);
     if (sy > 0)
