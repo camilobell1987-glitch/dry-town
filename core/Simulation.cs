@@ -139,6 +139,7 @@ public sealed partial class Simulation
                 case BailOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.PostBail(gang, man); break;
                 case LamOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.SkipTown(gang, man); break;
                 case HomeOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.ComeHome(gang, man); break;
+                case SoupOrder o when !o.On || w.CannotRunSoupKitchen(gang) == null: gang.SoupKitchen = o.On; break;
                 case JudgeOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.DefendantId) is { } man: w.PayJudge(gang, man); break;
                 case HuntOrder o: Hunt(gang, o); break;
                 case SeenToOrder o: SeeTo(gang, o); break;
@@ -256,6 +257,7 @@ public sealed partial class Simulation
         Feds();
         Untouchables();
         Gmen();
+        Reputation();
         Sit();
         CityNews();
         Loyalty();
@@ -294,7 +296,7 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or BailOrder or LamOrder or HomeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder or StrikeOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or BailOrder or SoupOrder or LamOrder or HomeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder or StrikeOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
@@ -355,7 +357,8 @@ public sealed partial class Simulation
     public static double ExtortChance(World w, Gang gang, Hood hood, Business biz, int backup = 0) =>
         Math.Clamp(0.35 + (hood.Intimidation - biz.Toughness) * 0.08 - Math.Max(0, w.BlocksFromHq(gang, biz) - 2) * 0.04
             + Math.Min(backup, Crew.MaxMembers) * 0.06 + Content.Guns[hood.Weapon].Extort
-            + (w.Wards.Count == 0 ? 0 : w.AtHome(hood, biz) ? Content.HomeShakedown : -Content.StrangerShakedown), 0.05, 0.95);
+            + (w.Wards.Count == 0 ? 0 : w.AtHome(hood, biz) ? Content.HomeShakedown : -Content.StrangerShakedown)
+            + gang.Fear * Content.FearShakedown, 0.05, 0.95);
 
     private void Extort(Gang gang, ExtortOrder o)
     {
@@ -430,6 +433,7 @@ public sealed partial class Simulation
                 ? $"{gang.Name} seized {biz.Name} and its {Content.Rackets[biz.Racket].Label} from {rival.Name}."
                 : $"{gang.Name} muscled {rival.Name} out of {biz.Name}.";
             w.Log(EventKind.Takeover, gang.Id, text);
+            w.Renown(gang, fear: Content.FearTakeover);
             hood.Deeds.Takeovers++;
             int casualty = -1;
             // A Thompson gun on the job leaves fewer men standing.
@@ -519,6 +523,9 @@ public sealed partial class Simulation
         gang.Cash -= Content.RecruitCost;
         World.Ledger(gang.Id).Spending += Content.RecruitCost;
         var hood = World.NewHood(gang.Id, bossQuality: false);
+        // A known name brings men in already loyal to it, and a feared one draws harder men.
+        hood.Loyalty = Math.Min(100, hood.Loyalty + (int)(gang.Respect * Content.RespectRecruitLoyalty));
+        if (gang.Fear >= Content.FearedRecruit) hood.Intimidation = Math.Min(10, hood.Intimidation + 1);
         World.Log(EventKind.Recruited, gang.Id, $"{gang.Name} took on {hood.Name}.");
     }
 

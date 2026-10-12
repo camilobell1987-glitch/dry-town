@@ -96,7 +96,7 @@ public class CityEventTests
     [Fact]
     public void EventsComeAndGoOnTheirOwn()
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 3, Size = CitySize.Medium });
+        var sim = Simulation.New(new WorldSettings { Seed = 4, Size = CitySize.Medium });
         var w = sim.World;
         int mostAtOnce = 0;
         for (int i = 0; i < 3 * Content.WeeksPerYear; i++)

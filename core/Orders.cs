@@ -27,6 +27,7 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(LawyerOrder), "lawyer")]
 [JsonDerivedType(typeof(JudgeOrder), "judge")]
 [JsonDerivedType(typeof(BailOrder), "bail")]
+[JsonDerivedType(typeof(SoupOrder), "soup")]
 [JsonDerivedType(typeof(LamOrder), "lam")]
 [JsonDerivedType(typeof(HomeOrder), "home")]
 [JsonDerivedType(typeof(StandOrder), "stand")]
@@ -132,6 +133,9 @@ public sealed record LawyerOrder(int GangId, Lawyer Lawyer) : Order(GangId);
 
 /// <summary>Pay off the judge in the case against one of the gang's men.</summary>
 public sealed record JudgeOrder(int GangId, int DefendantId) : Order(GangId);
+
+/// <summary>Open or close a soup kitchen in the boss's name.</summary>
+public sealed record SoupOrder(int GangId, bool On) : Order(GangId);
 
 /// <summary>Put up a man's bail, so he's out until his trial.</summary>
 public sealed record BailOrder(int GangId, int HoodId) : Order(GangId);

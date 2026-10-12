@@ -107,6 +107,7 @@ public sealed partial class World
         gang.Cash -= price;
         Ledger(gang.Id).Spending += price;
         man.LookedAfter = true;
+        Renown(gang, respect: Content.RespectCare);
         man.Loyalty = Math.Min(100, man.Loyalty + Content.FamilyLoyalty);
         Log(EventKind.Whisper, gang.Id, $"{gang.Name} sent ${price:N0} to {man.Name}'s family while he's inside.");
         return price;

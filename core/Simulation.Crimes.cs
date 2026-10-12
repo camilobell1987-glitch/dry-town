@@ -85,6 +85,7 @@ public sealed partial class Simulation
             w.Hall.Outrage = Math.Min(100, w.Hall.Outrage + 2);
             string text = $"{biz.Name} burned down{lost}. {rival.Name} lost a good earner, and people say {gang.Name} lit the match.";
             w.Log(EventKind.Arson, gang.Id, text);
+            w.Renown(gang, fear: Content.FearArson);
             w.Act(new ScriptAction(ActionKind.Arson, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Success, text, rival.Id));
             MaybeWitness(gang, hood, lot, $"{hood.Name} running from the fire at {biz.Name}", 0.3);
             return;
@@ -147,6 +148,7 @@ public sealed partial class Simulation
                 ? $"{hood.Name} gunned down {target.Name}, boss of {rival.Name}."
                 : $"{hood.Name} of {gang.Name} gunned down {target.Name} of {rival.Name}.";
             w.Log(EventKind.Hit, gang.Id, text);
+            w.Renown(gang, fear: boss ? Content.FearBossHit : Content.FearHit);
             w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Hit, gang.Id, hood.Id, gang.HqLotId, where, -1, ActionResult.Won, text,
                 rival.Id, target.Id, target.Id)));
             MaybeWitness(gang, hood, w.Map.LotAt(where), $"{hood.Name} shoot {target.Name}", 0.35);

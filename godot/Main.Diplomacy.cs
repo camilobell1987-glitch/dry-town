@@ -49,7 +49,7 @@ public partial class Main
             var boss = W.HoodById(g.BossHoodId);
             int wards = W.Wards.Count(x => x.OwnerGangId == g.Id);
             string[] cols = { g.IsPlayer ? $"{g.Name} (you)" : g.Name, $"{W.TurfOf(g.Id).Count()}", $"{W.HoodsOf(g.Id).Count()}", $"${g.Cash:N0}", g.IsPlayer ? "" : Short(g) };
-            string tip = $"{g.Name}, run by {boss.Name}. Heat {g.Heat}." + (wards > 0 ? $"\nAldermen on the payroll: {string.Join(", ", W.Wards.Where(x => x.OwnerGangId == g.Id).Select(x => x.Name))}" : "")
+            string tip = $"{g.Name}, run by {boss.Name}, {World.NameOf(g)}. Heat {g.Heat}." + (wards > 0 ? $"\nAldermen on the payroll: {string.Join(", ", W.Wards.Where(x => x.OwnerGangId == g.Id).Select(x => x.Name))}" : "")
                 + (W.Hall.FriendGangId == g.Id ? $"\nMayor {W.Hall.Mayor} owes them" : "")
                 + (g.IsPlayer ? "" : $"\n{Capital(Reports.Standing(W, W.Player, g))}");
             for (int i = 0; i < cols.Length; i++) { it.SetText(i, cols[i]); it.SetTooltipText(i, tip); }
