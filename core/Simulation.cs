@@ -254,6 +254,7 @@ public sealed partial class Simulation
         // After the city's temper has cooled for the week, so the war's share of it stays.
         Wars();
         Feds();
+        Untouchables();
         Gmen();
         Sit();
         CityNews();

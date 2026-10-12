@@ -360,6 +360,8 @@ public enum EventKind
     Inside,
     /// <summary>Men skipping town, lying low and coming home.</summary>
     Lam,
+    /// <summary>The Prohibition Bureau's squad: who it's after, its raids, and the grand jury.</summary>
+    Untouchables,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

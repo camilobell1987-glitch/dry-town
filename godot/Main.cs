@@ -227,6 +227,7 @@ public partial class Main : Control
 
         sb.Append(InThePapers());
         sb.Append(PublicEnemySection());
+        sb.Append(SquadSection());
         sb.Append($"[color={C(Palette.InkQuiet)}]HEADLINES[/color]\n");
         foreach (var e in W.Events.Where(e => e.Week == week && (Reports.IsHeadline(e) || e.Kind == EventKind.Whisper && e.GangId == p.Id)).OrderBy(e => e.Tick))
         {
@@ -354,6 +355,7 @@ public partial class Main : Control
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {RacketLabel(b)}", Palette.Bad);
         BoozeLine(b);
         RepealLine(b);
+        SquadLine(b);
         UnionLine(b);
         if (!b.IsOpen) AddLabel(_businessPanel, W.Week - b.BurnedWeek <= 8 ? $"Burned out. Rebuilding for {b.ShutWeeks} more weeks." : $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
 
@@ -1101,6 +1103,7 @@ public partial class Main : Control
         if (weeks > 0 && IsInstanceValid(_briefing)) _briefing!.Hide();
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
         if (Arg("--repeal") is string repeal) SetUpRepeal(repeal);
+        if (Flag("--untouchables")) SetUpUntouchables();
         if (Arg("--midweek") is string hour)
         {
             // Play the week to this hour, save it to slot 3 and load it back, to show a week picked up partway.

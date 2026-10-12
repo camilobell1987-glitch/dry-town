@@ -54,6 +54,7 @@ int Soak()
     long asks = 0, asksPassed = 0, breaches = 0, playerBreaches = 0, seatsAtEnd = 0, warsAfter = 0, bossHitsAfter = 0, aliveAtSitdown = 0, aliveAfterSitdown = 0;
     long insideStarts = 0, walkedOut = 0, coups = 0, guardsQuit = 0, moved = 0, successions = 0, playerInside = 0;
     long bails = 0, jumps = 0, foundAway = 0, pickedUp = 0, cameHome = 0, showedUp = 0;
+    long squadWeeks = 0, squadNamed = 0, squadNamedPlayer = 0, squadSmashed = 0, squadEmpty = 0, squadArrests = 0, indictments = 0, indictedAway = 0, indictedPlayer = 0;
     long playerNamed = 0, playerArrests = 0, wireMoves = 0, enemiesNamed = 0, gmenArrests = 0, bossesTaken = 0, casinosAtEnd = 0, slotsAtEnd = 0, wireHeld = 0, aliveAtRepeal = 0, aliveAfterRepeal = 0;
     long cityEvents = 0, running = 0, ownMenWon = 0, pollsWorked = 0, pollsCaught = 0, reformDAs = 0, ownSeatsAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
@@ -155,6 +156,16 @@ int Soak()
         cameHome += ev.Count(e => e.Kind == EventKind.Lam && e.Text.Contains(" is back in town"));
         foundAway += ev.Count(e => e.Kind == EventKind.HoodJailed && e.Text.Contains(" was found out of town and brought back"));
         pickedUp += ev.Count(e => e.Kind == EventKind.HoodJailed && e.Text.StartsWith("Police picked up ") && e.Text.Contains(" on the warrant in his case."));
+        int squadFrom = (Content.UntouchablesYear - Content.StartYear) * Content.WeeksPerYear;
+        squadWeeks += Math.Max(0, Math.Min(sim.World.Week, (Content.RepealYear - Content.StartYear) * Content.WeeksPerYear) - squadFrom);
+        squadNamed += ev.Count(e => e.Kind == EventKind.Untouchables && e.Text.StartsWith("The Untouchables are going after "));
+        squadNamedPlayer += ev.Count(e => e.Kind == EventKind.Untouchables && e.GangId == sim.World.Player.Id && e.Text.StartsWith("The Untouchables are going after "));
+        squadSmashed += ev.Count(e => e.Kind == EventKind.Untouchables && e.Text.StartsWith("The Untouchables smashed "));
+        squadEmpty += ev.Count(e => e.Kind == EventKind.Untouchables && e.Text.Contains(" got word in time"));
+        squadArrests += ev.Count(e => e.Kind == EventKind.HoodJailed && e.Text.Contains(" with running liquor"));
+        indictments += ev.Count(e => e.Kind == EventKind.Untouchables && e.Text.StartsWith("A federal grand jury indicted "));
+        indictedPlayer += ev.Count(e => e.Kind == EventKind.Untouchables && e.GangId == sim.World.Player.Id && e.Text.StartsWith("A federal grand jury indicted "));
+        indictedAway += ev.Count(e => e.Kind == EventKind.Lam && e.Text.Contains("there's a federal warrant out for him now"));
         int sitdown = sim.World.CommissionStartWeek;
         asks += ev.Count(e => e.Kind == EventKind.Commission && e.Text.StartsWith("The Commission voted "));
         asksPassed += ev.Count(e => e.Kind == EventKind.Commission && e.Text.StartsWith("The Commission voted ") && e.Text.Contains(" to let "));
@@ -195,6 +206,9 @@ int Soak()
     Console.WriteLine($"Rum-running per city-year: lines bought {linesBought / cy:0.00}, shipments stopped {shipmentsStopped / cy:0.00}, lines changing hands after one {linesSwitched / cy:0.00}, bad batches {badBatches / cy:0.00}; lines held at the end: {linesHeld}/{linesTotal}.");
     Console.WriteLine($"Rats per city-year: {string.Join(", ", RatLines.Select(r => $"{r.Label} {ratCounts.GetValueOrDefault(r.Label) / cy:0.00}"))}.");
     Console.WriteLine($"On the lam, per city-year: bails posted {bails / cy:0.00} (showed up for trial {showedUp / cy:0.00}), bail jumped {jumps / cy:0.00}, found out of town {foundAway / cy:0.00}, came home {cameHome / cy:0.00}, picked up at home on the warrant {pickedUp / cy:0.00}.");
+    double squadYears = Math.Max(1, squadWeeks) / (double)Content.WeeksPerYear;
+    if (squadWeeks > 0)
+        Console.WriteLine($"The Untouchables, per city-year with the squad in town ({squadYears / seeds:0.0} a city): outfits gone after {squadNamed / squadYears:0.00} ({squadNamedPlayer} times the player's), places smashed {squadSmashed / squadYears:0.00}, raids that came up empty {squadEmpty / squadYears:0.00}, men taken {squadArrests / squadYears:0.00}, bosses indicted {indictments / squadYears:0.00} ({indictedPlayer} times the player's; out of town {indictedAway}).");
     Console.WriteLine($"Running it from inside, per city-year: bosses who kept the chair from a cell {insideStarts / cy:0.00} ({playerInside} times the player's), walked back into it {walkedOut / cy:0.00}, lost it to the street boss {coups / cy:0.00}, to the guards' fee {guardsQuit / cy:0.00}, to a transfer {moved / cy:0.00}; ordinary successions {successions / cy:0.00}.");
     double sy = seeds * Math.Max(0, years - (Content.CommissionYear - Content.StartYear) - (Content.CommissionWeek - 1) / (double)Content.WeeksPerYear);
     if (sy > 0)

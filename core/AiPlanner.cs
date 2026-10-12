@@ -230,6 +230,7 @@ public static partial class AiPlanner
     /// <summary>
     /// The boss or heir held on a case the jury will likely convict is bailed out if the money's there, and runs if
     /// he faces a long stretch. A man out of town comes home once his case has gone cold, or after a while lying low.
+    /// The boss also lies low when the Untouchables are one raid from a grand jury.
     /// </summary>
     private static long PlanLam(World w, Gang g, long cash, List<Order> orders)
     {
@@ -248,8 +249,13 @@ public static partial class AiPlanner
             if (man.Case!.Sentence >= Content.AiRunSentence && Simulation.ConvictionChance(w, man) >= Content.AiRunOdds && cash - spent >= fee * 12)
                 orders.Add(new LamOrder(g.Id, man.Id));
         }
+        // A boss the Untouchables are about to take before a grand jury leaves town first, and stays gone until they have.
+        var boss = w.HoodById(g.BossHoodId);
+        bool hunted = w.SquadTarget?.Id == g.Id && w.Untouchables.Evidence >= Content.SquadIndictment - 1;
+        if (hunted && boss.Case == null && w.CannotSkipTown(g, boss) == null && cash - spent >= Content.BossHideoutWeekly * 12)
+            orders.Add(new LamOrder(g.Id, boss.Id));
         foreach (var man in w.OutOfTown(g.Id))
-            if (man.Case is { } c ? c.Strength <= Content.AiHomeCase : w.Week - man.AwaySinceWeek >= 8)
+            if (man.Case is { } c ? c.Strength <= Content.AiHomeCase : w.Week - man.AwaySinceWeek >= 8 && !(hunted && man.Id == boss.Id))
                 orders.Add(new HomeOrder(g.Id, man.Id));
         return spent;
     }
