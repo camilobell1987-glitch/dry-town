@@ -302,6 +302,7 @@ public static partial class Reports
         {
             string state = h.State == HoodState.Jailed ? (h.Case != null ? $"trial in {h.JailWeeks}w" : $"jailed {h.JailWeeks}w")
                 : h.State == HoodState.Lam ? (World.IsWanted(h) ? "on the lam" : "lying low")
+                : h.State == HoodState.Held ? "kidnapped"
                 : h.Bail > 0 ? $"bail, {h.JailWeeks}w" : World.IsWanted(h) ? "wanted"
                 : h.Id == gang.BossHoodId ? "boss" : h.Id == gang.HeirHoodId ? "heir" : "free";
             sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {Content.Label(h.Origin),-7} {h.Age(w.Week),3} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state,-10} {Gear(h)}");

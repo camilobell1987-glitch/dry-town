@@ -180,6 +180,18 @@ public sealed partial class World
         Offers.Remove(offer);
         var from = GangById(offer.FromGangId);
         if (!from.Alive) return $"{from.Name} is finished.";
+        if (offer.Kind == OfferKind.Ransom)
+        {
+            var held = Hostages.FirstOrDefault(h => h.HoodId == offer.HoodId);
+            if (held == null) return "He isn't being held any more.";
+            if (!accept)
+            {
+                if (!lapsed) Offers.Add(offer);
+                return lapsed ? "" : $"You haven't paid. {from.Name} has until week {held.DueWeek % Content.WeeksPerYear + 1} to decide what to do with {HoodById(held.HoodId).Name}.";
+            }
+            if (CannotPayRansom(Player, held) is { } broke) { Offers.Add(offer); return broke; }
+            return PayRansom(Player, held);
+        }
         if (!accept)
         {
             if (offer.Kind == OfferKind.Marriage)
@@ -230,6 +242,7 @@ public sealed partial class World
         {
             OfferKind.Demand => $"{from.Name} wants ${o.Tribute} a week from you to leave you alone.",
             OfferKind.Alliance => $"{from.Name} proposes an alliance against the bigger outfits.",
+            OfferKind.Ransom => $"{from.Name} has {HoodById(o.HoodId).Name} and wants ${o.Tribute:N0} to give him back. If it isn't paid by week {o.ExpiresWeek % Content.WeeksPerYear + 1}, he's a dead man.",
             OfferKind.Marriage => $"{HoodById(from.BossHoodId).Name} of {from.Name} proposes that {Groom(from)?.Name ?? "his son"} marry your boss's daughter. Family is an alliance that doesn't run out.",
             _ => o.Tribute > 0 ? $"{from.Name} offers you ${o.Tribute} a week for a truce." : $"{from.Name} proposes a truce.",
         };
@@ -242,5 +255,6 @@ public sealed partial class World
         Marriages.RemoveAll(m => m.Involves(gang.Id));
         Grudges.RemoveAll(g => g.From == gang.Id || g.To == gang.Id);
         Offers.RemoveAll(o => o.FromGangId == gang.Id);
+        foreach (var h in Hostages.Where(h => h.HeldByGangId == gang.Id).ToList()) Free(h);
     }
 }

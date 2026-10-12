@@ -2,7 +2,7 @@ namespace DryTown.Core;
 
 /// <summary>Inside means he has been planted in another outfit and is working there under false colours.</summary>
 /// <summary>Lam is out of town: hiding from a warrant, or lying low.</summary>
-public enum HoodState { Free, Jailed, Dead, Gone, Inside, Lam }
+public enum HoodState { Free, Jailed, Dead, Gone, Inside, Lam, Held }
 
 public enum BusinessKind { Grocer, Diner, Barber, Tailor, Garage, Laundry, Hotel, Pharmacy, PoolHall, Warehouse }
 
@@ -91,7 +91,7 @@ public sealed class Hood
     public bool IsAvailable => State == HoodState.Free;
 
     /// <summary>Still one of the outfit's men: free, in a cell, or out of town.</summary>
-    public bool IsActive => State is HoodState.Free or HoodState.Jailed or HoodState.Lam;
+    public bool IsActive => State is HoodState.Free or HoodState.Jailed or HoodState.Lam or HoodState.Held;
 
     /// <summary>What he brings to a fight: his own menace and muscle, and what he's carrying.</summary>
     public int Strength => Intimidation + Muscle + Content.Guns[Weapon].Firepower;
@@ -232,7 +232,7 @@ public sealed class Grudge
     public int Amount { get; set; }
 }
 
-public enum OfferKind { Truce, Alliance, Demand, Marriage }
+public enum OfferKind { Truce, Alliance, Demand, Marriage, Ransom }
 
 /// <summary>A proposal a rival has put to the player, waiting on an answer.</summary>
 public sealed class Offer
@@ -244,6 +244,9 @@ public sealed class Offer
     /// <summary>For a truce, what they offer to pay each week; for a demand, what they want from you.</summary>
     public int Tribute { get; set; }
     public int ExpiresWeek { get; set; }
+
+    /// <summary>For a ransom, the man they're holding.</summary>
+    public int HoodId { get; set; } = -1;
 }
 
 public enum Lawyer { None, Storefront, Mouthpiece }
@@ -380,6 +383,8 @@ public enum EventKind
     Untouchables,
     /// <summary>Fixed fights and races.</summary>
     Fix,
+    /// <summary>Men snatched, ransoms paid, and what happens to the ones nobody pays for.</summary>
+    Kidnap,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

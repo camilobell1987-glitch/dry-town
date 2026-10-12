@@ -147,6 +147,11 @@ public partial class Main
                 ? $"Lieutenant, with {crew.MemberIds.Count} men under him. If he goes, the best of them takes over the crew."
                 : $"In {W.HoodById(crew.LieutenantHoodId).Name}'s crew.", Palette.InkQuiet, wrap: true);
         RapSheet(panel, target);
+        if (target.GangId == Me && W.HostageOf(target) is { } taken)
+        {
+            AddLabel(panel, $"{W.GangById(taken.HeldByGangId).Name} is holding him, and wants ${taken.Ransom:N0} by week {taken.DueWeek % Content.WeeksPerYear + 1}. Pay it on the Gangs tab, or he's killed.", Palette.Bad, wrap: true);
+            return;
+        }
         if (target.GangId == Me)
         {
             AddLabel(panel, "One of yours. Give him work from a business, a bank or someone on the street.", Palette.InkQuiet, wrap: true);
@@ -154,9 +159,15 @@ public partial class Main
             return;
         }
         if (target.Weapon != Weapon.None || target.Car != Car.None) AddLabel(panel, GearLine(target), Palette.InkQuiet, wrap: true);
+        if (W.HostageOf(target) is { } held && held.HeldByGangId == Me)
+        {
+            AddLabel(panel, $"You're holding him. {gang.Name} has until week {held.DueWeek % Content.WeeksPerYear + 1} to pay ${held.Ransom:N0}, or he's killed.", Palette.Player, wrap: true);
+            AddButton(panel, "Let him go", () => { Say(W.LetGo(W.Player, held)); RefreshAll(); });
+            return;
+        }
         if (!target.IsAvailable) { AddLabel(panel, "He's out of reach.", Palette.InkQuiet); return; }
         if (boss && Simulation.IsGuardedBoss(W, target)) AddLabel(panel, "A boss keeps soldiers round him. He's much harder to get to.", Palette.InkQuiet, wrap: true);
-        ShowQueued(panel, o => o is HitOrder h && h.TargetHoodId == target.Id);
+        ShowQueued(panel, o => o is HitOrder h && h.TargetHoodId == target.Id || o is KidnapOrder k && k.TargetHoodId == target.Id);
         if (!CanGiveOrders(panel) || AlreadyGiven(o => o is HitOrder h && h.TargetHoodId == target.Id)) return;
 
         AddLabel(panel, "Put out a hit. Killing a man in the street brings heat, and someone may see it. If it goes wrong your man may not come back.", Palette.Ink, wrap: true);
@@ -170,6 +181,23 @@ public partial class Main
         CrewPicker(panel, "Send the crew", team => $"{Simulation.HitChance(W, team[0], team.Skip(1), target):P0} chance",
             (lead, backup) => new HitOrder(Me, lead, target.Id, backup), byStealth: true);
         if (hoods.Count == 0 && !W.CrewsOf(Me).Any()) AddLabel(panel, "All your men are busy.", Palette.InkQuiet);
+        KidnapActions(panel, target, hoods);
+    }
+
+    /// <summary>Snatch him instead, and make his outfit pay to get him back.</summary>
+    private void KidnapActions(VBoxContainer panel, Hood target, List<Hood> hoods)
+    {
+        if (AlreadyGiven(o => o is KidnapOrder k && k.TargetHoodId == target.Id)) return;
+        panel.AddChild(new HSeparator());
+        if (W.CannotKidnap(W.Player, target) is { } no) { AddLabel(panel, no, Palette.InkQuiet, 13, wrap: true); return; }
+        AddLabel(panel, $"Snatch him and hold him for ransom: ${W.RansomFor(target):N0}, paid within {Content.RansomWeeks} weeks or he's killed. Taking a man alive is harder than shooting him.", Palette.Ink, wrap: true);
+        if (hoods.Count > 0)
+        {
+            var who = HoodPicker(hoods, h => $"{Simulation.KidnapChance(W, h, Array.Empty<Hood>(), target):P0} chance");
+            AddButton(panel, "Snatch him", () => Give(new KidnapOrder(Me, who.GetSelectedId(), target.Id)));
+        }
+        CrewPicker(panel, "Send the crew to snatch him", team => $"{Simulation.KidnapChance(W, team[0], team.Skip(1), target):P0} chance",
+            (lead, backup) => new KidnapOrder(Me, lead, target.Id, backup), byStealth: true);
     }
 
     /// <summary>What the man has done, and what the police have on him: the last few lines of it.</summary>

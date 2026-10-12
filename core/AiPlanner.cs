@@ -124,6 +124,7 @@ public static partial class AiPlanner
         PlanPolls(w, g, turf, hoods, orders);
         PlanUnions(w, g, hoods, orders);
         cash -= PlanFix(w, g, hoods, cash, orders);
+        PlanKidnap(w, g, hoods, orders);
         PlanCrimes(w, g, turf, hoods, cash, orders);
 
         // Score each target as about ten weeks of income, less the expected cost of losing the man.
@@ -190,6 +191,25 @@ public static partial class AiPlanner
     /// to get away in, then heavier guns for the hard men, and armour for a rich boss.
     /// </summary>
     private static bool TopDog(World w, Gang g) => w.TopDog(g);
+
+    /// <summary>
+    /// Now and then an aggressive outfit snatches a man from a rival it hates or is at war with, one with money to pay for him:
+    /// the heir or one of the boss's family if it can, otherwise the weakest of his men. Never while it holds the most of the city.
+    /// </summary>
+    private static void PlanKidnap(World w, Gang g, List<Hood> hoods, List<Order> orders)
+    {
+        if (hoods.Count < 3 || g.Aggression < 0.4 || w.TopDog(g) || w.HeldBy(g.Id).Any() || !w.Rng.Chance(Content.AiKidnap)) return;
+        var mark = w.LivingGangs
+            .Where(r => r.Id != g.Id && !w.AtPeace(g.Id, r.Id) && r.Cash >= Content.AiKidnapCash && (w.AtWar(g.Id, r.Id) || w.GrudgeOf(g.Id, r.Id) >= Content.AiKidnapGrudge))
+            .SelectMany(r => w.AvailableHoodsOf(r.Id).Where(h => w.CannotKidnap(g, h) == null))
+            .OrderByDescending(w.RansomFor).ThenBy(h => h.Strength).ThenBy(h => h.Id).FirstOrDefault();
+        if (mark == null) return;
+        var lead = hoods.OrderByDescending(h => Simulation.KidnapChance(w, h, Array.Empty<Hood>(), mark)).ThenBy(h => h.Id).First();
+        hoods.Remove(lead);
+        var backup = hoods.Count >= 3 ? new[] { hoods[0].Id } : null;
+        if (backup != null) hoods.RemoveAt(0);
+        orders.Add(new KidnapOrder(g.Id, lead.Id, mark.Id, backup));
+    }
 
     /// <summary>
     /// Now and then an outfit with a bookie and money to spare sends its smartest free man to fix the card.

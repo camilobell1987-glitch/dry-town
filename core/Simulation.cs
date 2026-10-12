@@ -121,6 +121,7 @@ public sealed partial class Simulation
                 case PollsOrder o: WorkPolls(gang, o); break;
                 case ArsonOrder o: Arson(gang, o); break;
                 case HitOrder o: Hit(gang, o); break;
+                case KidnapOrder o: Kidnap(gang, o); break;
                 case RobberyOrder o: Robbery(gang, o); break;
                 case HijackOrder o: Hijack(gang, o); break;
                 case WaylayOrder o: Waylay(gang, o); break;
@@ -192,6 +193,7 @@ public sealed partial class Simulation
             WaylayOrder l when w.LineById(l.LineId) is { } line && w.DropOf(line) is { } drop => drop.LotId,
             UnionOrder u when w.LocalById(u.LocalId) is { LotId: >= 0 } local => local.LotId,
             HitOrder h => HauntOf(w, w.HoodById(h.TargetHoodId)),
+            KidnapOrder k => HauntOf(w, w.HoodById(k.TargetHoodId)),
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
             JuryOrder => w.PrecinctNear(w.Map.LotAt(hq)).Id,
@@ -219,6 +221,7 @@ public sealed partial class Simulation
         RacketOrder r => new[] { r.HoodId },
         ArsonOrder a => new[] { a.HoodId },
         HitOrder h => h.Team,
+        KidnapOrder k => k.Team,
         RobberyOrder r => r.Team,
         HijackOrder h => h.Team,
         WaylayOrder l => l.Team,

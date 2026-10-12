@@ -86,18 +86,21 @@ public class FixingTests
     [Fact]
     public void AManWhoCantBuyHimMayBeTurnedIn()
     {
-        var (sim, w, me, _) = Start();
+        var (_, w, me, _) = Start();
         var man = w.AvailableHoodsOf(me.Id).First(h => h.Id != me.BossHoodId);
         man.Brains = man.Intimidation = 0;
-        for (int i = 0; i < 200 && man.IsAvailable; i++)
+        Assert.Equal(0.4, World.FixChance(man), 6);
+        string said = "";
+        bool talked = false;
+        for (int i = 0; i < 200 && !talked; i++)
         {
-            sim.AdvanceWeek(Mine(w, new FixOrder(me.Id, man.Id)));
-            w.Week = FightWeek;
+            w.Week += Content.WeeksPerYear;
             me.Cash = 20_000;
-            me.Heat = 0;
+            said = w.Fix(me, man, out talked);
         }
-        Assert.False(man.IsAvailable);
-        Assert.Contains(w.Events, e => e.Kind == EventKind.Fix && e.Text.StartsWith($"{man.Name} of {me.Name} offered to fix ") && e.Text.EndsWith(" wouldn't hear of it and went to the police."));
+        Assert.True(talked);
+        Assert.Equal($"{man.Name} of {me.Name} offered to fix {w.CardLabel()}, but {w.CardName()} wouldn't hear of it and went to the police.", said);
+        Assert.Equal(20_000, me.Cash);
     }
 
     [Fact]

@@ -109,7 +109,7 @@ public class DiplomacyTests
     [Fact]
     public void ATruceRunsOut()
     {
-        var (sim, w, me, them, _) = Start();
+        var (sim, w, me, them, _) = Start(5);
         w.Sign(me, them, PactKind.Truce);
         for (int i = 0; i < Content.TruceWeeks; i++) sim.AdvanceWeek();
         Assert.False(w.AtPeace(me.Id, them.Id));
