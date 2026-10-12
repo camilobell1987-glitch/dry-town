@@ -519,8 +519,12 @@ public partial class Main : Control
         {
             var it = _menTree.CreateItem(root);
             jobs.TryGetValue(h.Id, out var job);
-            string state = h.Id == W.Player.BossHoodId ? "Boss" : h.State == HoodState.Jailed ? (h.Case != null ? $"Trial {h.JailWeeks}w" : $"Jail {h.JailWeeks}w") : busy.Contains(h.Id) ? "Job" : "Free";
-            if (h.Id == W.Player.HeirHoodId) state = h.State == HoodState.Jailed ? state : W.RunsFromInside(W.Player) ? "Street" : "Heir";
+            string state = h.Id == W.Player.BossHoodId ? (h.State == HoodState.Lam ? "Boss, away" : "Boss")
+                : h.State == HoodState.Jailed ? (h.Case != null ? $"Trial {h.JailWeeks}w" : $"Jail {h.JailWeeks}w")
+                : h.State == HoodState.Lam ? (World.IsWanted(h) ? "On the lam" : "Away")
+                : h.Bail > 0 ? $"Bail {h.JailWeeks}w" : World.IsWanted(h) ? "Wanted"
+                : busy.Contains(h.Id) ? "Job" : "Free";
+            if (h.Id == W.Player.HeirHoodId) state = h.State == HoodState.Jailed || h.State == HoodState.Lam || h.Case != null ? state : W.RunsFromInside(W.Player) ? "Street" : "Heir";
             var crew = W.CrewOfHood(h.Id);
             string crewText = crew == null ? "" : crew.LieutenantHoodId == h.Id ? "Lt" : World.Surname(W.HoodById(crew.LieutenantHoodId).Name);
             string[] cols = { h.Name, $"{h.Age(W.Week)}", $"{h.Intimidation}", $"{h.Muscle}", $"{h.Brains}", $"{h.Stealth}", $"{h.Loyalty}", crewText, state };
@@ -530,7 +534,7 @@ public partial class Main : Control
             if (h.Loyalty < 30) it.SetCustomColor(6, Palette.Bad);
             if (h.Age(W.Week) >= 65) it.SetCustomColor(1, Palette.Bad);
             if (h.Family) it.SetCustomColor(0, Palette.Player);
-            if (h.State == HoodState.Jailed) it.SetCustomColor(8, Palette.Police);
+            if (h.State == HoodState.Jailed || World.IsWanted(h)) it.SetCustomColor(8, Palette.Police);
             else if (busy.Contains(h.Id)) it.SetCustomColor(8, Palette.Player);
         }
     }
@@ -1106,6 +1110,24 @@ public partial class Main : Control
             SaveGameTo(3);
             GD.Print(LoadGame(3) ? "Saved and loaded mid-week" : "Mid-week load failed");
         }
+        if (Flag("--lam"))
+        {
+            // One man out on bail who then skipped town, one lying low, and one home with a warrant out.
+            W.Player.Cash = Math.Max(W.Player.Cash, 8000);
+            var men = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).ToList();
+            _shell.Sim.Jail(men[0], 60, "with assault");
+            W.PostBail(W.Player, men[0]);
+            W.SkipTown(W.Player, men[0]);
+            W.ComeHome(W.Player, men[0]);
+            _shell.Sim.Jail(men[1], 80, "with the hold-up at the Union Trust", strength: 0.8);
+            W.PostBail(W.Player, men[1]);
+            W.SkipTown(W.Player, men[1]);
+            men[1].AwaySinceWeek -= 6;
+            men[1].Case!.Strength -= 0.06;
+            W.SkipTown(W.Player, men[2]);
+            _map.Select(hood: men[1].Id);
+            RefreshAll();
+        }
         if (Flag("--verdict"))
         {
             if (IsInstanceValid(_briefing)) _briefing!.Hide();
@@ -1354,6 +1376,11 @@ public partial class Main : Control
             if (Flag("--ballot") && _wardHeader != null && _hallPanel.GetParent()?.GetParent() is ScrollContainer hallScroll)
             {
                 hallScroll.ScrollVertical = (int)_wardHeader.Position.Y;
+                for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
+            if (Arg("--scroll-hall") is string hallDown && _hallPanel.GetParent()?.GetParent() is ScrollContainer hallScroll2)
+            {
+                hallScroll2.ScrollVertical = int.Parse(hallDown);
                 for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
             if (Arg("--scroll-talk") is string talkDown && _talkPanel.GetParent()?.GetParent() is ScrollContainer talkScroll)

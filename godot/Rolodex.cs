@@ -255,6 +255,8 @@ public partial class Rolodex : Control
 
         if (h.Id == gang.BossHoodId) Stamp(font, new Vector2(shot.End.X + 6, shot.End.Y - 20), "BOSS", RedRule.Darkened(0.1f));
         else if (h.State == HoodState.Jailed) Stamp(font, new Vector2(shot.End.X + 6, shot.End.Y - 20), "JAILED", Palette.Police.Darkened(0.25f));
+        else if (World.IsWanted(h)) Stamp(font, new Vector2(shot.End.X + 6, shot.End.Y - 20), "WANTED", Palette.Police.Darkened(0.25f));
+        else if (h.State == HoodState.Lam) Stamp(font, new Vector2(shot.End.X + 6, shot.End.Y - 20), "AWAY", TypeQuiet);
 
         // Skills: ten pips each.
         float sy = y + 150;
@@ -290,6 +292,10 @@ public partial class Rolodex : Control
         // What he's up to, and a note when he is trouble.
         string now = h is { State: HoodState.Jailed, Case: { } c } ? $"Held for trial in {h.JailWeeks} week{(h.JailWeeks == 1 ? "" : "s")}, charged {c.Charge}."
             : h.State == HoodState.Jailed ? $"In jail, {h.JailWeeks} more week{(h.JailWeeks == 1 ? "" : "s")}."
+            : h is { State: HoodState.Lam, Case: { } wanted } ? $"On the lam out of town, wanted, charged {wanted.Charge}."
+            : h.State == HoodState.Lam ? "Lying low out of town."
+            : h is { Bail: > 0, Case: { } bailed } ? $"Out on ${h.Bail:N0} bail. Trial in {h.JailWeeks} week{(h.JailWeeks == 1 ? "" : "s")}, charged {bailed.Charge}."
+            : World.IsWanted(h) ? "Home, with a warrant out for him. The police may pick him up any week."
             : JobOf(h.Id) is { } job ? job
             : h.Id == gang.BossHoodId ? "Running the outfit."
             : "Free for work.";

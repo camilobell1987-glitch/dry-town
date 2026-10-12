@@ -1,7 +1,8 @@
 namespace DryTown.Core;
 
 /// <summary>Inside means he has been planted in another outfit and is working there under false colours.</summary>
-public enum HoodState { Free, Jailed, Dead, Gone, Inside }
+/// <summary>Lam is out of town: hiding from a warrant, or lying low.</summary>
+public enum HoodState { Free, Jailed, Dead, Gone, Inside, Lam }
 
 public enum BusinessKind { Grocer, Diner, Barber, Tailor, Garage, Laundry, Hotel, Pharmacy, PoolHall, Warehouse }
 
@@ -81,8 +82,16 @@ public sealed class Hood
     /// <summary>Times a jury has convicted him. Each one makes the next sentence longer.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public int Convictions => Record.Count(r => r.Kind == RapKind.Convicted);
 
+    /// <summary>The bail his outfit put up for him, while he's out waiting on his trial; else 0.</summary>
+    public int Bail { get; set; }
+
+    /// <summary>The week he left town, while he's on the lam; else -1.</summary>
+    public int AwaySinceWeek { get; set; } = -1;
+
     public bool IsAvailable => State == HoodState.Free;
-    public bool IsActive => State is HoodState.Free or HoodState.Jailed;
+
+    /// <summary>Still one of the outfit's men: free, in a cell, or out of town.</summary>
+    public bool IsActive => State is HoodState.Free or HoodState.Jailed or HoodState.Lam;
 
     /// <summary>What he brings to a fight: his own menace and muscle, and what he's carrying.</summary>
     public int Strength => Intimidation + Muscle + Content.Guns[Weapon].Firepower;
@@ -277,6 +286,9 @@ public sealed class Case
 
     /// <summary>A fourth felony: under the habitual offender law, a conviction means life.</summary>
     public bool Life { get; set; }
+
+    /// <summary>He ran while out on bail: no bail again, and the jury hears about it if he's caught.</summary>
+    public bool JumpedBail { get; set; }
 }
 
 /// <summary>
@@ -346,6 +358,8 @@ public enum EventKind
     Commission,
     /// <summary>A boss running his outfit from a cell, and how it ends.</summary>
     Inside,
+    /// <summary>Men skipping town, lying low and coming home.</summary>
+    Lam,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

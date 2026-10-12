@@ -45,6 +45,7 @@ public sealed class CommandShell
         "booze (supply lines and your pour) | buyline <line> | waylay <hood> <line> [backup..] | cut <straight|watered|hard>\n" +
         "unions (the locals and the docks) | local <hood> <local> [backup..] (take it over) | strike <local> <biz|off>\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
+        "bail <hood> (out until his trial) | lam <hood> (skip town: jump bail, dodge a warrant or lie low) | home <hood> (come back to town)\n" +
         "sheet <hood> (any man's rap sheet) | news (what's going on in the city)\n" +
         "rats (who's talking, and your men inside) | care <hood> (look after a jailed man's family) | seeto <hood> <rat>\n" +
         "hunt <hood> (look for a rat) | plant <hood> <gang> (sign him on with a rival) | recall <hood> (bring him home)\n" +
@@ -154,6 +155,9 @@ public sealed class CommandShell
                     W.Retain(W.Player, Enum.Parse<Lawyer>(p[1], true));
                     return $"You now keep {Content.Lawyers[W.Player.Lawyer].Label}" + (W.Player.Lawyer == Lawyer.None ? ".\n" : $", ${Content.Lawyers[W.Player.Lawyer].Weekly} a week.\n");
                 case "judge": return PayJudge(int.Parse(p[1]));
+                case "bail": return Bail(int.Parse(p[1]));
+                case "lam": return Lam(int.Parse(p[1]));
+                case "home": return Home(int.Parse(p[1]));
                 case "jury": return Queue(new JuryOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "rats": return Reports.Rats(W, Me);
                 case "hunt": return Queue(new HuntOrder(Me, int.Parse(p[1])));
@@ -231,6 +235,28 @@ public sealed class CommandShell
         if (man == null) return "He isn't inside anyone. Type 'rats'.\n";
         W.Recall(W.Player, man);
         return $"{man.Name} is home.\n";
+    }
+
+    private string Bail(int hoodId)
+    {
+        if (W.Hoods.FirstOrDefault(h => h.Id == hoodId) is not { } man) return "No such man. Type 'cases'.\n";
+        if (W.CannotBail(W.Player, man) is string no) return no + "\n";
+        int bail = W.PostBail(W.Player, man);
+        return $"{man.Name} is out on ${bail:N0} bail. His trial is in {man.JailWeeks} week{(man.JailWeeks == 1 ? "" : "s")}; you get the money back if he shows up for it.\n";
+    }
+
+    private string Lam(int hoodId)
+    {
+        if (W.Hoods.FirstOrDefault(h => h.Id == hoodId) is not { } man) return "No such man. Type 'hoods'.\n";
+        if (W.CannotSkipTown(W.Player, man) is string no) return no + "\n";
+        W.SkipTown(W.Player, man);
+        return W.Events[^1].Text + $" Hiding him costs ${Content.HideoutFee(W.Player, man)} a week.\n";
+    }
+
+    private string Home(int hoodId)
+    {
+        if (W.Hoods.FirstOrDefault(h => h.Id == hoodId) is not { } man || !W.ComeHome(W.Player, man)) return "He isn't out of town. Type 'cases'.\n";
+        return W.Events[^1].Text + "\n";
     }
 
     private string PayJudge(int hoodId)

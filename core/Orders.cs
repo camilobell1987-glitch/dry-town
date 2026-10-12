@@ -26,6 +26,9 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(JuryOrder), "jury")]
 [JsonDerivedType(typeof(LawyerOrder), "lawyer")]
 [JsonDerivedType(typeof(JudgeOrder), "judge")]
+[JsonDerivedType(typeof(BailOrder), "bail")]
+[JsonDerivedType(typeof(LamOrder), "lam")]
+[JsonDerivedType(typeof(HomeOrder), "home")]
 [JsonDerivedType(typeof(StandOrder), "stand")]
 [JsonDerivedType(typeof(PollsOrder), "polls")]
 [JsonDerivedType(typeof(HuntOrder), "hunt")]
@@ -129,6 +132,15 @@ public sealed record LawyerOrder(int GangId, Lawyer Lawyer) : Order(GangId);
 
 /// <summary>Pay off the judge in the case against one of the gang's men.</summary>
 public sealed record JudgeOrder(int GangId, int DefendantId) : Order(GangId);
+
+/// <summary>Put up a man's bail, so he's out until his trial.</summary>
+public sealed record BailOrder(int GangId, int HoodId) : Order(GangId);
+
+/// <summary>Send a man out of town: jumping his bail if he's out on it, else lying low.</summary>
+public sealed record LamOrder(int GangId, int HoodId) : Order(GangId);
+
+/// <summary>Bring a man home from out of town.</summary>
+public sealed record HomeOrder(int GangId, int HoodId) : Order(GangId);
 
 /// <summary>Send a man to ask around the outfit for whoever is talking to the police, or working for someone else.</summary>
 public sealed record HuntOrder(int GangId, int HoodId) : Order(GangId);
