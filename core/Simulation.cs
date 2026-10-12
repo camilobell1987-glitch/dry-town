@@ -952,7 +952,13 @@ public sealed partial class Simulation
             w.Log(EventKind.Succession, gang.Id, named ? $"{heir.Name} takes over {gang.Name}, as {boss.Name} wanted." : $"{heir.Name} takes over {gang.Name}.");
 
             var rival = heirs.Skip(1).FirstOrDefault(h => h.Ambition > 70 && h.Loyalty < 55 && h.IsAvailable);
-            if (rival != null && w.LivingGangs.Count() < w.Settings.MaxGangs) Breakaway(gang, rival);
+            if (rival != null && w.LivingGangs.Count() < w.Settings.MaxGangs)
+            {
+                // Family by marriage stands behind the new boss, and nobody dares split from him.
+                if (w.InLawsOf(gang.Id).OrderBy(g => g.Id).FirstOrDefault() is { } family)
+                    w.Log(EventKind.Succession, gang.Id, $"{rival.Name} thought about striking out on his own, but {gang.Name}'s family in {family.Name} stood behind {heir.Name}.");
+                else Breakaway(gang, rival);
+            }
         }
     }
 
@@ -973,6 +979,15 @@ public sealed partial class Simulation
             gang.DissolvedWeek = w.Week;
             w.ReleaseHeadquarters(gang);
             Politics.Forget(w, gang);
+            // A boss with nothing left retires; his men go to the family by marriage, if there is one.
+            var family = w.TakeIn(gang, active.Where(h => h.Id != gang.BossHoodId).ToList());
+            if (family != null)
+            {
+                w.HoodById(gang.BossHoodId).State = w.HoodById(gang.BossHoodId).IsActive ? HoodState.Gone : w.HoodById(gang.BossHoodId).State;
+                w.Log(EventKind.GangDissolved, gang.Id, $"{gang.Name} is finished. What was left of it went to {family.Name}, its family by marriage.");
+                w.ForgetDiplomacy(gang);
+                continue;
+            }
             foreach (var h in active) h.State = HoodState.Gone;
             foreach (var biz in w.TurfOf(gang.Id).ToList())
             {

@@ -9,6 +9,7 @@ public sealed partial class Simulation
     private void Diplomacy()
     {
         var w = World;
+        w.KeepFamily();
         PayTribute();
 
         foreach (var g in w.Grudges.ToList()) w.AddGrudge(g.From, g.To, -Content.GrudgeFade);

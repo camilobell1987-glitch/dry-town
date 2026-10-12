@@ -251,6 +251,9 @@ public static partial class Reports
         foreach (var g in w.LivingGangs.Where(g => g.Id != gangId).OrderByDescending(w.Power))
             sb.AppendLine($"{g.Id,3} {Trim(g.Name, 28),-28} {w.Power(g),5:0} {w.GrudgeOf(g.Id, gangId),8} {w.GrudgeOf(gangId, g.Id),8}  {Standing(w, me, g)}");
         sb.AppendLine($"Your power: {w.Power(me):0}." + (w.Untrusted(me) ? " You broke your word this year: nobody will sign with you." : ""));
+        foreach (var m in w.Marriages.Where(m => !m.Involves(gangId)))
+            sb.AppendLine($"  {w.GangById(m.GroomGangId).Name} and {w.GangById(m.BrideGangId).Name} are family: {w.HoodById(m.GroomHoodId).Name} married {m.Bride}.");
+        if (w.Groom(me) is { } groom) sb.AppendLine($"{groom.Name} is free to marry: 'marry <gang>' puts a match to an outfit you've kept the peace with for {Content.MatchPactWeeks} weeks (${Content.WeddingCost:N0} for the wedding).");
         foreach (var war in w.Wars.Where(x => !x.Involves(gangId)))
             sb.AppendLine($"  {w.GangById(war.A).Name} has been at war with {w.GangById(war.B).Name} for {w.Week - war.StartWeek} weeks.");
         if (w.WarOf(gangId) is { } mine)
@@ -265,6 +268,8 @@ public static partial class Reports
     {
         if (w.Wars.FirstOrDefault(x => x.Involves(me.Id) && x.Involves(other.Id)) is { } war)
             return $"at war for {w.Week - war.StartWeek} weeks, since {(war.A == me.Id ? "you" : "they")} went to the mattresses";
+        if (w.MarriageBetween(me.Id, other.Id) is { } m)
+            return $"family by marriage: {w.HoodById(m.GroomHoodId).Name} married {m.Bride}";
         var p = w.PactBetween(me.Id, other.Id);
         if (p == null) return w.GrudgeOf(other.Id, me.Id) > Content.GrudgeTooDeep ? "bad blood" : "no pact";
         int left = p.UntilWeek - w.Week;

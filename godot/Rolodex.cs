@@ -250,7 +250,7 @@ public partial class Rolodex : Control
             : crew.LieutenantHoodId == h.Id ? "Lieutenant"
             : $"{Surname(w.HoodById(crew.LieutenantHoodId).Name)} crew";
         Line(role, Type);
-        if (h.Family) Line("Family", Palette.Player.Darkened(0.35f));
+        if (h.Family) Line(w.MarriageOf(h) is { } wed ? $"Wed to {wed.Bride.Split(' ')[0]}" : "Family", Palette.Player.Darkened(0.35f));
         Line($"Since {1920 + h.JoinedWeek / Content.WeeksPerYear}", TypeQuiet);
 
         if (h.Id == gang.BossHoodId) Stamp(font, new Vector2(shot.End.X + 6, shot.End.Y - 20), "BOSS", RedRule.Darkened(0.1f));

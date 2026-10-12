@@ -144,7 +144,7 @@ public sealed partial class World
         foreach (var m in Members.ToList())
         {
             AddGrudge(m.Id, breaker.Id, Content.GrudgeBreach);
-            if (m.Id != victim.Id && PactBetween(m.Id, breaker.Id) is { } pact) Pacts.Remove(pact);
+            if (m.Id != victim.Id && MarriageBetween(m.Id, breaker.Id) == null && PactBetween(m.Id, breaker.Id) is { } pact) Pacts.Remove(pact);
         }
         Log(EventKind.Commission, breaker.Id, $"{breaker.Name} {what} without the Commission's say-so. The table has thrown them out for a year, and every outfit at it is free to go after them.");
     }
