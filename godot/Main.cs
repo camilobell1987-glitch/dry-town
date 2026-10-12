@@ -355,6 +355,7 @@ public partial class Main : Control
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {RacketLabel(b)}", Palette.Bad);
         BoozeLine(b);
         RepealLine(b);
+        ClubLine(b);
         SquadLine(b);
         UnionLine(b);
         if (!b.IsOpen) AddLabel(_businessPanel, W.Week - b.BurnedWeek <= 8 ? $"Burned out. Rebuilding for {b.ShutWeeks} more weeks." : $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
@@ -468,8 +469,9 @@ public partial class Main : Control
             AddLabel(_businessPanel, b.Racket == RacketKind.None ? "Open a racket in the back room" : $"Put the back room to better use than a {RacketLabel(b)}", Palette.Ink);
             var racketPick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
             foreach (var r in rackets)
-                racketPick.AddItem($"{r.Label} · costs ${r.SetupCost}, pays ~${r.WeeklyIncome}/week{(r.Kind == RacketKind.Casino ? " clean" : "")}, +{r.WeeklyHeat} heat" +
-                    (r.Kind == RacketKind.Counterfeit ? ", Treasury risk" : r.Kind == RacketKind.Casino && !Politics.Covered(W, W.Player, b) ? $" (+{Content.CasinoHeatUncovered} without the ward's alderman)" : ""), (int)r.Kind);
+                racketPick.AddItem($"{r.Label} · costs ${r.SetupCost}, pays ~${r.WeeklyIncome}/week{(r.Kind == RacketKind.Casino || r.Kind == RacketKind.Nightclub && !W.Prohibition ? " clean" : "")}, +{r.WeeklyHeat} heat" +
+                    (r.Kind == RacketKind.Counterfeit ? ", Treasury risk" : r.Kind == RacketKind.Casino && !Politics.Covered(W, W.Player, b) ? $" (+{Content.CasinoHeatUncovered} without the ward's alderman)"
+                    : r.Kind == RacketKind.Nightclub ? ", respect, pull at City Hall" : ""), (int)r.Kind);
             _businessPanel.AddChild(racketPick);
             var who = HoodPicker(hoods, h => $"brains {h.Brains}");
             AddButton(_businessPanel, "Open it", () => Queue(new RacketOrder(Me, who.GetSelectedId(), b.Id, (RacketKind)racketPick.GetSelectedId())));
@@ -1109,6 +1111,7 @@ public partial class Main : Control
         if (Flag("--brewery")) SetUpBrewery();
         if (Flag("--fixing")) SetUpFixing();
         if (Flag("--kidnapping")) SetUpKidnapping();
+        if (Flag("--nightclub")) SetUpNightclub();
         if (Flag("--reputation"))
         {
             // A boss the papers have started writing about, with a soup kitchen.

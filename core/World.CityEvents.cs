@@ -36,7 +36,7 @@ public sealed partial class World
             f *= (e.Kind, kind) switch
             {
                 (CityEventKind.HeatWave, RacketKind.Speakeasy or RacketKind.Still or RacketKind.Brewery) => 1.5,
-                (CityEventKind.Convention, RacketKind.GamblingDen or RacketKind.Bookie) => 1.5,
+                (CityEventKind.Convention, RacketKind.GamblingDen or RacketKind.Bookie or RacketKind.Nightclub) => 1.5,
                 (CityEventKind.TitleFight, RacketKind.GamblingDen or RacketKind.Bookie) => 3,
                 (CityEventKind.Depression, RacketKind.LoanShark) => 2,
                 (CityEventKind.Depression, RacketKind.Numbers) => 1.25,

@@ -186,7 +186,7 @@ public static partial class Reports
         if (fronts.Count == 0) sb.AppendLine("No fronts yet. Buy a business you protect with 'buy <biz>'.");
         foreach (var b in fronts)
             sb.AppendLine($"  {b.Id,3} {b.Name,-40} washes ${Content.LaunderCapacity(b)}/week, profit ${b.Takings * Content.FrontProfitPercent / 100}" +
-                (World.Working(b) ? "" : b.IsOpen ? " (not yours to watch now: idle)" : " (shut: idle)"));
+                (b.Racket == RacketKind.Nightclub ? ", your nightclub" : "") + (World.Working(b) ? "" : b.IsOpen ? " (not yours to watch now: idle)" : " (shut: idle)"));
         sb.AppendLine($"For sale to you (price = 25 weeks' takings; the bookkeeper keeps {Content.LaunderFeePercent}% of what he washes):");
         foreach (var b in w.TurfOf(gangId).Where(b => !b.IsFront && b.IsOpen).OrderByDescending(b => b.Takings).Take(8))
             sb.AppendLine($"  {b.Id,3} {b.Name,-40} ${Content.FrontPrice(b):N0}");
@@ -387,6 +387,7 @@ public static partial class Reports
         if (due is { } d) sb.AppendLine($"Election in {d.Week - w.Week + 1} weeks: {(d.Kind == ElectionKind.Mayor ? "mayor" : "aldermen")}.");
         else sb.AppendLine($"Next elections: aldermen week {Politics.NextElection(w, ElectionKind.Alderman) % Content.WeeksPerYear + 1} of {Content.StartYear + Politics.NextElection(w, ElectionKind.Alderman) / Content.WeeksPerYear}, " +
                            $"mayor {Content.StartYear + Politics.NextElection(w, ElectionKind.Mayor) / Content.WeeksPerYear}.");
+        if (w.ClubOf(gangId) is { } club) sb.AppendLine($"Your nightclub is at {club.Name} ({club.Id}). Aldermen come {Content.ClubPayoff:0%} cheaper to you, and your campaign money counts for {Content.ClubCampaign:0%} more.");
         sb.AppendLine($"{"Id",3} {"Ward",-16} {"People",-7} {"Alderman",-30} {"Owned by",-24} {"Yours",5} {"Price",6}");
         foreach (var ward in w.Wards)
         {

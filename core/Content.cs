@@ -121,6 +121,7 @@ public static partial class Content
         [RacketKind.Slots] = new(RacketKind.Slots, "row of slot machines", 300, 100, 1, false, AfterRepeal: true),
         [RacketKind.Casino] = new(RacketKind.Casino, "casino", 5000, 600, 1, false, AfterRepeal: true),
         [RacketKind.Brewery] = new(RacketKind.Brewery, "brewery", 3000, 200, 3, true),
+        [RacketKind.Nightclub] = new(RacketKind.Nightclub, "nightclub", 2500, 220, 1, false),
     };
 
     /// <summary>Weekly chance the Treasury finds each counterfeiting press a gang runs.</summary>
@@ -129,9 +130,9 @@ public static partial class Content
     /// <summary>Which racket a business can hide.</summary>
     public static RacketKind[] RacketsFor(BusinessKind kind) => kind switch
     {
-        BusinessKind.Hotel => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.GamblingDen, RacketKind.Slots, RacketKind.Casino },
+        BusinessKind.Hotel => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.GamblingDen, RacketKind.Slots, RacketKind.Casino, RacketKind.Nightclub },
         BusinessKind.PoolHall => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.GamblingDen, RacketKind.Slots },
-        BusinessKind.Diner => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.Slots },
+        BusinessKind.Diner => new[] { RacketKind.Speakeasy, RacketKind.Numbers, RacketKind.Bookie, RacketKind.Slots, RacketKind.Nightclub },
         BusinessKind.Warehouse => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.GamblingDen, RacketKind.Counterfeit, RacketKind.Brewery },
         BusinessKind.Garage or BusinessKind.Laundry => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.Counterfeit },
         BusinessKind.Barber => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Bookie, RacketKind.Slots },

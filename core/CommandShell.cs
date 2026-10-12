@@ -31,7 +31,7 @@ public sealed class CommandShell
 
     public static readonly string Help =
         "gangs | hoods | turf | targets | log\n" +
-        "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit|slots|casino|brewery>\n" +
+        "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit|slots|casino|brewery|nightclub>\n" +
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "crews [gang] (yours, or a rival's) | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +

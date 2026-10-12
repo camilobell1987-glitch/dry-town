@@ -107,6 +107,9 @@ public sealed partial class Simulation
                 }
             }
 
+            // The city's names come to an outfit's club to be seen, and the boss is seen with them.
+            if (w.ClubOf(g.Id) != null) w.Renown(g, respect: Content.ClubRespect);
+
             g.Fear *= Content.NameFade;
             g.Respect *= Content.NameFade;
             int tier = World.Tier(g);

@@ -74,9 +74,12 @@ public static partial class AiPlanner
             cash -= casino;
         else if (g.Heat < 50 && hoods.Count > 0)
         {
-            // An outfit with speakeasies on bathtub gin puts a brewery in a warehouse before anything else.
+            // An outfit with speakeasies on bathtub gin puts a brewery in a warehouse before anything else, and one with an empty back room in a hotel or diner of its own a club.
             var site = (cash > Content.Rackets[RacketKind.Brewery].SetupCost * 2 + 400 && Thirsty(w, g) >= Content.AiBreweryThirst
                     ? turf.Where(b => w.FreeBackRoom(b) && w.CannotOpenRacket(g, b, RacketKind.Brewery) == null).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault()
+                    : null)
+                ?? (cash > Content.Rackets[RacketKind.Nightclub].SetupCost * 2 + 400
+                    ? w.FrontsOf(g.Id).Where(b => w.FreeBackRoom(b) && w.CannotOpenRacket(g, b, RacketKind.Nightclub) == null).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault()
                     : null)
                 ?? turf
                 .Where(b => w.FreeBackRoom(b) && b.IsOpen)
@@ -96,7 +99,9 @@ public static partial class AiPlanner
                         // So does the wire, for a bookie.
                         + (r.Kind == RacketKind.Bookie && w.WireGangId == g.Id ? (int)(r.WeeklyIncome * Content.WireBonus) : 0)
                         // And a brewery for the speakeasies it would keep in beer.
-                        + (r.Kind == RacketKind.Brewery ? (int)(Content.Rackets[RacketKind.Speakeasy].WeeklyIncome * Content.BeerBonus) * Thirsty(w, g) : 0))
+                        + (r.Kind == RacketKind.Brewery ? (int)(Content.Rackets[RacketKind.Speakeasy].WeeklyIncome * Content.BeerBonus) * Thirsty(w, g) : 0)
+                        // And a club for the name it makes and the aldermen it brings.
+                        + (r.Kind == RacketKind.Nightclub ? Content.AiClubWorth : 0))
                     .FirstOrDefault();
                 if (racket != null)
                 {
