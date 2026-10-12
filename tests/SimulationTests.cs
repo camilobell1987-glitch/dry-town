@@ -317,7 +317,8 @@ public class Phase3Tests
         shell.Execute($"send {crew.Id} {biz.Id}");
         var order = Assert.IsType<ExtortOrder>(shell.Pending.Single());
         Assert.Equal(men.Select(h => h.Id).ToHashSet(), order.Team.ToHashSet());
-        shell.EndWeek();
+        // The rivals sit the week out, so nobody can take a man out of the crew before it goes.
+        sim.AdvanceWeek(w.LivingGangs.ToDictionary(g => g.Id, g => g.IsPlayer ? shell.Pending.ToList() : new List<Order>()));
         var action = w.Script.Single(s => s.HoodId == order.HoodId && s.Kind == ActionKind.Extort);
         Assert.Equal(2, action.Backup.Count);
     }

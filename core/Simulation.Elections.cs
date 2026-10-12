@@ -20,7 +20,7 @@ public sealed partial class Simulation
             w.Act(new ScriptAction(ActionKind.Polls, gang.Id, man.Id, gang.HqLotId, lot, -1, ActionResult.Arrested, text, CasualtyHoodId: man.Id));
             return;
         }
-        int votes = Content.PollsVotes(man);
+        int votes = Politics.PollsVotes(w, ward, man);
         var pot = race.Kind == ElectionKind.Mayor ? w.Hall.Polls : ward.Polls;
         pot[gang.Id] = pot.GetValueOrDefault(gang.Id) + votes;
         gang.Heat = Math.Min(100, gang.Heat + 3);

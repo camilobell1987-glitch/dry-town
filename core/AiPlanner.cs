@@ -396,7 +396,7 @@ public static partial class AiPlanner
             ? w.Wards.FirstOrDefault(x => x.Candidates.ContainsKey(g.Id)) ?? w.Wards.FirstOrDefault(x => x.OwnerGangId == g.Id && x.Campaign.ContainsKey(g.Id))
             : w.Hall.Campaign.ContainsKey(g.Id) ? w.Wards[turf.GroupBy(b => w.LotOf(b).WardId).OrderByDescending(x => x.Count()).ThenBy(x => x.Key).First().Key] : null;
         if (ward == null) return;
-        var man = hoods.Where(h => h.Id != g.BossHoodId && Politics.StandingIn(w, h) == null).OrderByDescending(h => h.Intimidation).ThenBy(h => h.Id).FirstOrDefault();
+        var man = hoods.Where(h => h.Id != g.BossHoodId && Politics.StandingIn(w, h) == null).OrderByDescending(h => Politics.PollsVotes(w, ward, h)).ThenBy(h => h.Id).FirstOrDefault();
         if (man == null) return;
         orders.Add(new PollsOrder(g.Id, man.Id, ward.Id));
         hoods.Remove(man);
@@ -431,7 +431,7 @@ public static partial class AiPlanner
                 && !(home[0].Ward.OwnMan && home[0].Ward.OwnerGangId == g.Id))
             {
                 var man = w.AvailableHoodsOf(g.Id).Where(h => h.Brains >= Content.CandidateBrains + 1 && Politics.CannotStand(w, g, h, home[0].Ward) == null)
-                    .OrderByDescending(h => h.Brains).ThenBy(h => h.Strength).ThenBy(h => h.Id).FirstOrDefault();
+                    .OrderByDescending(h => Politics.CandidateWeight(w, home[0].Ward, h)).ThenBy(h => h.Strength).ThenBy(h => h.Id).FirstOrDefault();
                 if (man != null)
                 {
                     orders.Add(new StandOrder(g.Id, man.Id, home[0].Ward.Id));

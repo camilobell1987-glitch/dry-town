@@ -177,16 +177,20 @@ public class RepealTests
     public void TakingTheBossClearsTheBureausList()
     {
         var (sim, w, me) = Start(week: RepealWeek + 5);
-        foreach (var h in w.AvailableHoodsOf(me.Id).Where(h => h.Id != me.BossHoodId).ToList()) h.State = HoodState.Jailed;
-        w.Repeal.PublicEnemyGangId = me.Id;
-        for (int i = 0; i < 300 && w.PublicEnemy == me; i++)
+        var boss = w.HoodById(me.BossHoodId);
+        foreach (var h in w.AvailableHoodsOf(me.Id).Where(h => h.Id != me.BossHoodId).ToList()) { h.State = HoodState.Jailed; h.JailWeeks = 1000; }
+        bool Taken() => w.Events.Any(e => e.Text.Contains("Public Enemy Number One himself"));
+        for (int i = 0; i < 300 && !Taken(); i++)
         {
+            // Only the boss is on the street for the G-men to pick up, and the precinct doesn't get there first.
+            if (boss.State == HoodState.Jailed) { boss.State = HoodState.Free; boss.JailWeeks = 0; boss.Case = null; }
+            w.Repeal.PublicEnemyGangId = me.Id;
             me.Heat = 100;
             sim.AdvanceWeek(Mine(w));
         }
+        Assert.True(Taken());
         Assert.Null(w.PublicEnemy);
-        Assert.Equal(HoodState.Jailed, w.HoodById(me.BossHoodId).State);
-        Assert.Contains(w.Events, e => e.Text.Contains("Public Enemy Number One himself"));
+        Assert.Equal(HoodState.Jailed, boss.State);
     }
 
     [Fact]

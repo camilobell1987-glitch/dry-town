@@ -241,6 +241,7 @@ public partial class Rolodex : Control
         float ty = y + 46;
         void Line(string text, Color c) { DrawString(font, new Vector2(tx, ty), text, HorizontalAlignment.Left, tw, 12, c); ty += 15; }
         Line($"Age {h.Age(w.Week)}", h.Age(w.Week) >= 65 ? Palette.Bad.Darkened(0.2f) : Type);
+        Line(Content.Label(h.Origin), Type);
         Line($"${h.Wage} a week", Type);
         var crew = w.CrewOfHood(h.Id);
         string role = h.Id == gang.BossHoodId ? "The boss"

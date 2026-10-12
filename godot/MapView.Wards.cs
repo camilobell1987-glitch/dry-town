@@ -69,7 +69,7 @@ public partial class MapView
             var ink = (ShowWards ? Palette.Ink : Palette.Ink with { A = 0.28f });
             var textSize = font.GetStringSize(name, HorizontalAlignment.Left, -1, size);
             if (ShowWards)
-                C.DrawRect(new Rect2(centre - new Vector2(textSize.X / 2 + 8, size + 4), new Vector2(textSize.X + 16, size * 2.6f + 8)), Palette.Panel with { A = 0.85f });
+                C.DrawRect(new Rect2(centre - new Vector2(textSize.X / 2 + 8, size + 4), new Vector2(textSize.X + 16, size * 3.4f + 8)), Palette.Panel with { A = 0.85f });
             C.DrawString(font, centre - new Vector2(textSize.X / 2, ShowWards ? 0 : -size * 0.35f), name, HorizontalAlignment.Left, -1, size, ink);
             if (ShowWards)
             {
@@ -77,6 +77,9 @@ public partial class MapView
                 string who = ward.Reformer ? $"{ward.Alderman}, reformer" : ward.OwnerGangId >= 0 ? $"{ward.Alderman}, {w.GangById(ward.OwnerGangId).Name}" : $"{ward.Alderman}, the party";
                 var ws = font.GetStringSize(who, HorizontalAlignment.Left, -1, small);
                 C.DrawString(font, centre + new Vector2(-ws.X / 2, size * 1.2f), who, HorizontalAlignment.Left, -1, small, colour.Lightened(0.25f));
+                string people = $"{Content.Label(w.Neighbourhood(ward))} neighbourhood";
+                var ps = font.GetStringSize(people, HorizontalAlignment.Left, -1, small);
+                C.DrawString(font, centre + new Vector2(-ps.X / 2, size * 2.1f), people, HorizontalAlignment.Left, -1, small, Palette.InkQuiet);
             }
         }
     }
