@@ -31,7 +31,7 @@ public sealed class CommandShell
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "crews [gang] (yours, or a rival's) | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
-        "heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
+        "inside [on|off] (whether a jailed boss runs it from his cell) | heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
         "neighbourhoods (whose people live where) | wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
         "stand <hood> <ward> (run him for alderman) | polls <hood> <ward> (lean on voters, last " + Content.PollsWeeks + " weeks) | results (the last vote)\n" +
         "street (people about) | hire <person> | paycop <person> | buystory <person> | silence <hood> <person>\n" +
@@ -140,6 +140,9 @@ public sealed class CommandShell
                 case "drive": return Buy(int.Parse(p[1]), car: Enum.Parse<Car>(p[2], true));
                 case "hand": return Hand(int.Parse(p[1]), int.Parse(p[2]), p[3].ToLowerInvariant() == "car");
                 case "heir": return NameHeir(int.Parse(p[1]));
+                case "inside":
+                    if (p.Length > 1) W.Player.RunFromInside = p[1].ToLowerInvariant() == "on";
+                    return Reports.Inside(W, Me);
                 case "family": return Queue(new RecruitOrder(Me, Family: true));
                 case "crew": return CrewCommand(p);
                 case "send": return CrewOrder(int.Parse(p[1]), int.Parse(p[2]), guard: false);

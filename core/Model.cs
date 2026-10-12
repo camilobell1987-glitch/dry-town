@@ -43,6 +43,9 @@ public sealed class Hood
     /// <summary>Where his people came from.</summary>
     public Ethnicity Origin { get; set; }
 
+    /// <summary>His last arrest was federal: if he's sent away, it's to a federal pen, where no word gets out.</summary>
+    public bool FederalTime { get; set; }
+
     public int Age(int week) => (week - BornWeek) / Content.WeeksPerYear;
 
     public Weapon Weapon { get; set; }
@@ -148,6 +151,12 @@ public sealed class Gang
 
     /// <summary>Who takes over when the boss dies or goes away for a long stretch, if he's still around and willing.</summary>
     public int HeirHoodId { get; set; } = -1;
+
+    /// <summary>Whether the boss keeps the chair from his cell if he's sent away for a long stretch. Only the player chooses; rivals decide when it happens.</summary>
+    public bool RunFromInside { get; set; } = true;
+
+    /// <summary>The week the boss started running the outfit from his cell, or -1 while he's on the street.</summary>
+    public int InsideSinceWeek { get; set; } = -1;
 
     /// <summary>The week the gang last brought a relative into the business.</summary>
     public int LastFamilyWeek { get; set; } = -1000;
@@ -335,6 +344,8 @@ public enum EventKind
     Gmen,
     /// <summary>The Commission: seats, votes, and outfits thrown out for breaking its rules.</summary>
     Commission,
+    /// <summary>A boss running his outfit from a cell, and how it ends.</summary>
+    Inside,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);

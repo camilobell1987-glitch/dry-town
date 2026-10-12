@@ -50,6 +50,7 @@ int Soak()
     long truces = 0, alliances = 0, tributes = 0, broken = 0, pactsAtEnd = 0;
     long lifers = 0, repeat = 0, convictedAtEnd = 0;
     long asks = 0, asksPassed = 0, breaches = 0, playerBreaches = 0, seatsAtEnd = 0, warsAfter = 0, bossHitsAfter = 0, aliveAtSitdown = 0, aliveAfterSitdown = 0;
+    long insideStarts = 0, walkedOut = 0, coups = 0, guardsQuit = 0, moved = 0, successions = 0, playerInside = 0;
     long playerNamed = 0, playerArrests = 0, wireMoves = 0, enemiesNamed = 0, gmenArrests = 0, bossesTaken = 0, casinosAtEnd = 0, slotsAtEnd = 0, wireHeld = 0, aliveAtRepeal = 0, aliveAfterRepeal = 0;
     long cityEvents = 0, running = 0, ownMenWon = 0, pollsWorked = 0, pollsCaught = 0, reformDAs = 0, ownSeatsAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
@@ -138,6 +139,13 @@ int Soak()
         casinosAtEnd += sim.World.Businesses.Count(b => b.Racket == RacketKind.Casino);
         slotsAtEnd += sim.World.Businesses.Count(b => b.Racket == RacketKind.Slots);
         if (sim.World.WireGangId >= 0) wireHeld++;
+        insideStarts += ev.Count(e => e.Kind == EventKind.Inside && e.Text.Contains(" from his cell. ") && e.Text.Contains(" minds the street for him"));
+        playerInside += ev.Count(e => e.Kind == EventKind.Inside && e.GangId == sim.World.Player.Id && e.Text.Contains(" from his cell. ") && e.Text.Contains(" minds the street for him"));
+        walkedOut += ev.Count(e => e.Kind == EventKind.Inside && e.Text.Contains(" walked out and took back the chair"));
+        coups += ev.Count(e => e.Kind == EventKind.Inside && e.Text.Contains(" stopped taking orders from a cell."));
+        guardsQuit += ev.Count(e => e.Kind == EventKind.Inside && e.Text.StartsWith("The guards stopped carrying "));
+        moved += ev.Count(e => e.Kind == EventKind.Inside && e.Text.Contains(" where no word gets out."));
+        successions += ev.Count(e => e.Kind == EventKind.Succession);
         int sitdown = sim.World.CommissionStartWeek;
         asks += ev.Count(e => e.Kind == EventKind.Commission && e.Text.StartsWith("The Commission voted "));
         asksPassed += ev.Count(e => e.Kind == EventKind.Commission && e.Text.StartsWith("The Commission voted ") && e.Text.Contains(" to let "));
@@ -177,6 +185,7 @@ int Soak()
     Console.WriteLine($"Wars per city-year: declared {warsDeclared / cy:0.00} ({warsOnPlayer / cy:0.00} on your gang), called off {warsCalledOff / cy:0.00}, ended in a pact {warsMadePeace / cy:0.00}, ended with one side finished {warsFinished / cy:0.00}; still going at the end: {warsAtEnd}/{seeds}.");
     Console.WriteLine($"Rum-running per city-year: lines bought {linesBought / cy:0.00}, shipments stopped {shipmentsStopped / cy:0.00}, lines changing hands after one {linesSwitched / cy:0.00}, bad batches {badBatches / cy:0.00}; lines held at the end: {linesHeld}/{linesTotal}.");
     Console.WriteLine($"Rats per city-year: {string.Join(", ", RatLines.Select(r => $"{r.Label} {ratCounts.GetValueOrDefault(r.Label) / cy:0.00}"))}.");
+    Console.WriteLine($"Running it from inside, per city-year: bosses who kept the chair from a cell {insideStarts / cy:0.00} ({playerInside} times the player's), walked back into it {walkedOut / cy:0.00}, lost it to the street boss {coups / cy:0.00}, to the guards' fee {guardsQuit / cy:0.00}, to a transfer {moved / cy:0.00}; ordinary successions {successions / cy:0.00}.");
     double sy = seeds * Math.Max(0, years - (Content.CommissionYear - Content.StartYear) - (Content.CommissionWeek - 1) / (double)Content.WeeksPerYear);
     if (sy > 0)
         Console.WriteLine($"After the Commission sits, per city-year: questions put to the table {asks / sy:0.00} ({asksPassed / sy:0.00} passed), rules broken {breaches / sy:0.00} ({playerBreaches} times by the player's gang), wars declared {warsAfter / sy:0.00}, bosses gunned down {bossHitsAfter / sy:0.00}; " +

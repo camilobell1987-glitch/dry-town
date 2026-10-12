@@ -12,6 +12,7 @@ public sealed partial class Simulation
     {
         var w = World;
         hood.State = HoodState.Jailed;
+        hood.FederalTime = federal;
         if (weeks <= Content.PettySentence)
         {
             hood.JailWeeks = weeks;

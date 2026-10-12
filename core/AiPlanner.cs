@@ -61,8 +61,9 @@ public static partial class AiPlanner
         }
 
         var hoods = w.AvailableHoodsOf(g.Id).ToList();
-        // The boss stays home once there are soldiers to send, and a man on the ballot keeps out of trouble.
-        if (hoods.Count >= 3) hoods.RemoveAll(h => h.Id == g.BossHoodId || Politics.StandingIn(w, h) != null);
+        // The boss stays home once there are soldiers to send, and so does the street boss minding things for him from a cell. A man on the ballot keeps out of trouble.
+        int streetBoss = w.StreetBoss(g)?.Id ?? -1;
+        if (hoods.Count >= 3) hoods.RemoveAll(h => h.Id == g.BossHoodId || h.Id == streetBoss || Politics.StandingIn(w, h) != null);
         hoods = hoods.OrderByDescending(h => h.Strength).ThenBy(h => h.Id).ToList();
 
         if (g.Heat < 50 && hoods.Count > 0 && PlanCasino(w, g, hoods, cash, orders) is var casino && casino > 0)

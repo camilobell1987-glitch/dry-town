@@ -245,7 +245,7 @@ public partial class Rolodex : Control
         Line($"${h.Wage} a week", Type);
         var crew = w.CrewOfHood(h.Id);
         string role = h.Id == gang.BossHoodId ? "The boss"
-            : h.Id == gang.HeirHoodId ? "Heir"
+            : h.Id == gang.HeirHoodId ? w.RunsFromInside(gang) ? "Street boss" : "Heir"
             : crew == null ? "No crew"
             : crew.LieutenantHoodId == h.Id ? "Lieutenant"
             : $"{Surname(w.HoodById(crew.LieutenantHoodId).Name)} crew";
