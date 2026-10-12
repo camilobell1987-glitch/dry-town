@@ -299,6 +299,7 @@ public sealed partial class Simulation
                         WaylayOrder l when w.LineById(l.LineId) is { } line && line.OwnerGangId == me => $"stop our shipment on {line.Name}",
                         UnionOrder u when w.LocalById(u.LocalId) is { } local && local.OwnerGangId == me => $"push us out of {local.Name}",
                         HitOrder h when w.HoodById(h.TargetHoodId).GangId == me => $"go after {w.HoodById(h.TargetHoodId).Name}",
+                        KidnapOrder k when w.HoodById(k.TargetHoodId).GangId == me => $"snatch {w.HoodById(k.TargetHoodId).Name}",
                         PlantOrder p when p.TargetGangId == me => $"plant {w.HoodById(p.HoodId).Name} on us",
                         _ => null,
                     };

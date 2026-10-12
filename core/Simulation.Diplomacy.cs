@@ -11,6 +11,7 @@ public sealed partial class Simulation
         var w = World;
         w.KeepFamily();
         PayTribute();
+        Hostages();
 
         foreach (var g in w.Grudges.ToList()) w.AddGrudge(g.From, g.To, -Content.GrudgeFade);
         foreach (var pact in w.Pacts.Where(p => p.UntilWeek <= w.Week + 1).ToList())

@@ -47,6 +47,7 @@ int Soak()
     long warsDeclared = 0, warsOnPlayer = 0, warsCalledOff = 0, warsMadePeace = 0, warsFinished = 0, warsAtEnd = 0;
     long weddings = 0, playerWeddings = 0, marriagesBroken = 0, takenIn = 0, stoodBehind = 0, marriagesAtEnd = 0;
     long breweryWeeks = 0, playerBreweryWeeks = 0, prohibitionWeeks = 0, breweriesSmashed = 0, breweriesLegal = 0, breweriesAtEnd = 0;
+    long snatches = 0, playerSnatches = 0, playerMenTaken = 0, ransomsPaid = 0, ransomsKilled = 0, ransomsLetGo = 0, ransomsEscaped = 0;
     long fixesTried = 0, fixesWon = 0, playerFixes = 0, fixesCalledOff = 0, fixersTurnedIn = 0, fixWinnings = 0;
     long boatsBought = 0, playerBoats = 0, landings = 0, sunk = 0, dumped = 0, seized = 0, outran = 0, boatsAtEnd = 0;
     long linesBought = 0, shipmentsStopped = 0, linesSwitched = 0, badBatches = 0, linesHeld = 0, linesTotal = 0;
@@ -151,6 +152,15 @@ int Soak()
         seized += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(", and seized her."));
         outran += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains("A Coast Guard cutter ran "));
         boatsAtEnd += sim.World.Boats.Count;
+        var kidnaps = ev.Where(e => e.Kind == EventKind.Kidnap).ToList();
+        string playerName = sim.World.Player.Name;
+        snatches += kidnaps.Count(e => e.Text.Contains(" off the street. "));
+        playerSnatches += kidnaps.Count(e => e.Text.Contains(" off the street. ") && e.GangId == sim.World.Player.Id);
+        playerMenTaken += kidnaps.Count(e => e.Text.Contains(" off the street. ") && e.Text.Contains($" of {playerName} off the street."));
+        ransomsPaid += kidnaps.Count(e => e.Text.EndsWith(" came home.") && e.Text.Contains(" paid "));
+        ransomsKilled += kidnaps.Count(e => e.Text.Contains(" found in the river."));
+        ransomsLetGo += kidnaps.Count(e => e.Text.Contains(" let him go anyway."));
+        ransomsEscaped += kidnaps.Count(e => e.Text.Contains(" got away from the men "));
         var fixes = ev.Where(e => e.Kind == EventKind.Fix).ToList();
         fixesTried += fixes.Count;
         fixesWon += fixes.Count(e => e.Text.Contains(" cleared $"));
@@ -258,6 +268,7 @@ int Soak()
         Console.WriteLine($"The Untouchables, per city-year with the squad in town ({squadYears / seeds:0.0} a city): outfits gone after {squadNamed / squadYears:0.00} ({squadNamedPlayer} times the player's), places smashed {squadSmashed / squadYears:0.00}, raids that came up empty {squadEmpty / squadYears:0.00}, men taken {squadArrests / squadYears:0.00}, bosses indicted {indictments / squadYears:0.00} ({indictedPlayer} times the player's; out of town {indictedAway}).");
     Console.WriteLine($"Marriages per city-year: weddings {weddings / cy:0.00} (the player's {playerWeddings / cy:0.00}), broken {marriagesBroken / cy:0.00}, outfits taken in by family {takenIn / cy:0.00}, splits stopped by in-laws {stoodBehind / cy:0.00}; marriages at the end {marriagesAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Breweries: running in an average Prohibition week {breweryWeeks / (double)Math.Max(1, prohibitionWeeks):0.00} a city (the player has one {playerBreweryWeeks / (double)Math.Max(1, prohibitionWeeks):0%} of the time); smashed by the Untouchables {breweriesSmashed / cy:0.00} per city-year, gone legal at repeal {breweriesLegal / (double)seeds:0.00} a city; breweries at the end {breweriesAtEnd / (double)seeds:0.0} a city.");
+    Console.WriteLine($"Kidnapping per city-year: men snatched {snatches / cy:0.00} (by the player {playerSnatches / cy:0.00}, of the player's {playerMenTaken / cy:0.00}), ransoms paid {ransomsPaid / cy:0.00}, killed when nobody paid {ransomsKilled / cy:0.00}, let go unpaid {ransomsLetGo / cy:0.00}, got away {ransomsEscaped / cy:0.00}.");
     Console.WriteLine($"Fixed fights and races per city-year: tried {fixesTried / cy:0.00}, paid off {fixesWon / cy:0.00} (the player's {playerFixes / cy:0.00}), bets called off {fixesCalledOff / cy:0.00}, fixer turned in {fixersTurnedIn / cy:0.00}; ${fixWinnings / (double)Math.Max(1, fixesWon):N0} cleared on a fix that paid.");
     Console.WriteLine($"Rum row per city-year: boats bought {boatsBought / cy:0.00} (the player's {playerBoats / cy:0.00}), loads landed {landings / cy:0.00}, sunk {sunk / cy:0.00}, cargo dumped in a storm {dumped / cy:0.00}, seized {seized / cy:0.00}, run off by a cutter {outran / cy:0.00}; boats at the end {boatsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Reputation: names in the papers {namesMade / cy:0.00} per city-year, household names {householdNames / cy:0.00}; at the end, bosses' fear {fearAtEnd / Math.Max(1, bossesAtEnd):0} and respect {respectAtEnd / Math.Max(1, bossesAtEnd):0} on average (the player's {playerFear / Math.Max(1, playerAliveAtEnd):0} and {playerRespect / Math.Max(1, playerAliveAtEnd):0}), soup kitchens {soupAtEnd / (double)seeds:0.0} a city.");

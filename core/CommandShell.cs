@@ -40,6 +40,7 @@ public sealed class CommandShell
         "neighbourhoods (whose people live where) | wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
         "stand <hood> <ward> (run him for alderman) | polls <hood> <ward> (lean on voters, last " + Content.PollsWeeks + " weeks) | results (the last vote)\n" +
         "street (people about) | hire <person> | paycop <person> | buystory <person> | silence <hood> <person>\n" +
+        "kidnap <hood> <target hood> [backup..] (hold him for ransom) | hostages | release <hood>\n" +
         "torch <hood> <biz> | hit <hood> <target hood> [backup..] | banks | rob <hood> <bank> [backup..] | hijack <hood> <biz> [backup..]\n" +
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
@@ -118,6 +119,13 @@ public sealed class CommandShell
                 case "fix": return Queue(new FixOrder(Me, int.Parse(p[1])));
                 case "torch": return Queue(new ArsonOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "hit": return Queue(new HitOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
+                case "kidnap": return Queue(new KidnapOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
+                case "hostages": return Reports.Hostages(W, Me);
+                case "release":
+                {
+                    var held = W.HeldBy(Me).FirstOrDefault(h => h.HoodId == int.Parse(p[1]));
+                    return held == null ? "You aren't holding him. Type 'hostages'.\n" : W.LetGo(W.Player, held) + "\n";
+                }
                 case "rob": return Queue(new RobberyOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "hijack": return Queue(new HijackOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "shops": return Reports.Shops(W, Me);
@@ -471,6 +479,7 @@ public sealed class CommandShell
             WaylayOrder l when W.LineById(l.LineId) is { } line => line.OwnerGangId,
             UnionOrder u when W.LocalById(u.LocalId) is { } local => local.OwnerGangId,
             HitOrder h when W.Hoods.FirstOrDefault(x => x.Id == h.TargetHoodId) is { } t => t.GangId,
+            KidnapOrder k when W.Hoods.FirstOrDefault(x => x.Id == k.TargetHoodId) is { } t => t.GangId,
             _ => -1,
         };
         return target >= 0 && W.AtPeace(Me, target) ? W.GangById(target) : null;
@@ -493,6 +502,7 @@ public sealed class CommandShell
         PollsOrder po when po.WardId >= 0 && po.WardId < W.Wards.Count => $"{HoodName(po.HoodId)} works the polls in {W.Wards[po.WardId].Name}",
         ArsonOrder a => $"{HoodName(a.HoodId)} sets fire to {BizName(a.BusinessId)}",
         HitOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "go" : "goes")} after {HoodName(h.TargetHoodId)}",
+        KidnapOrder k => $"{HoodName(k.HoodId)}{With(k.Backup)} {(Sim.WeekRunning ? "snatch" : "snatches")} {HoodName(k.TargetHoodId)}",
         RobberyOrder r => $"{HoodName(r.HoodId)}{With(r.Backup)} {(Sim.WeekRunning ? "hold" : "holds")} up {W.BankById(r.BankId)?.Name ?? "a bank"}",
         HijackOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "stop" : "stops")} the beer truck for {BizName(h.BusinessId)}",
         WaylayOrder l => $"{HoodName(l.HoodId)}{With(l.Backup)} {(Sim.WeekRunning ? "stop" : "stops")} the shipment on {W.LineById(l.LineId)?.Name ?? "a supply line"}",
@@ -567,6 +577,13 @@ public sealed class CommandShell
                 if (target == null || target.GangId == Me || !target.IsActive) return "Pick a man from another gang. Type 'gangs'.";
                 if (!target.IsAvailable) return $"{target.Name} is in jail, out of reach.";
                 return h.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
+            }
+            case KidnapOrder k:
+            {
+                var target = W.Hoods.FirstOrDefault(x => x.Id == k.TargetHoodId);
+                if (target == null || target.GangId == Me || !target.IsActive) return "Pick a man from another gang. Type 'gangs'.";
+                if (Already(o => o is KidnapOrder q && q.TargetHoodId == k.TargetHoodId)) return "Someone is already going for him.";
+                return W.CannotKidnap(W.Player, target) ?? k.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
             }
             case RobberyOrder r:
                 if (W.BankById(r.BankId) == null) return "There's no such bank. Type 'banks'.";

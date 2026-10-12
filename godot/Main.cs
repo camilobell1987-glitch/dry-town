@@ -1108,6 +1108,7 @@ public partial class Main : Control
         if (Flag("--rumrow")) SetUpRumRow();
         if (Flag("--brewery")) SetUpBrewery();
         if (Flag("--fixing")) SetUpFixing();
+        if (Flag("--kidnapping")) SetUpKidnapping();
         if (Flag("--reputation"))
         {
             // A boss the papers have started writing about, with a soup kitchen.
