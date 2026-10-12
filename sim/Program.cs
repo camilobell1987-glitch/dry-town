@@ -53,6 +53,7 @@ int Soak()
     long lifers = 0, repeat = 0, convictedAtEnd = 0;
     long asks = 0, asksPassed = 0, breaches = 0, playerBreaches = 0, seatsAtEnd = 0, warsAfter = 0, bossHitsAfter = 0, aliveAtSitdown = 0, aliveAfterSitdown = 0;
     long insideStarts = 0, walkedOut = 0, coups = 0, guardsQuit = 0, moved = 0, successions = 0, playerInside = 0;
+    long bails = 0, jumps = 0, foundAway = 0, pickedUp = 0, cameHome = 0, showedUp = 0;
     long playerNamed = 0, playerArrests = 0, wireMoves = 0, enemiesNamed = 0, gmenArrests = 0, bossesTaken = 0, casinosAtEnd = 0, slotsAtEnd = 0, wireHeld = 0, aliveAtRepeal = 0, aliveAfterRepeal = 0;
     long cityEvents = 0, running = 0, ownMenWon = 0, pollsWorked = 0, pollsCaught = 0, reformDAs = 0, ownSeatsAtEnd = 0;
     for (ulong s = seed; s < seed + (ulong)seeds; s++)
@@ -148,6 +149,12 @@ int Soak()
         guardsQuit += ev.Count(e => e.Kind == EventKind.Inside && e.Text.StartsWith("The guards stopped carrying "));
         moved += ev.Count(e => e.Kind == EventKind.Inside && e.Text.Contains(" where no word gets out."));
         successions += ev.Count(e => e.Kind == EventKind.Succession);
+        bails += ev.Count(e => e.Kind == EventKind.Trial && e.Text.Contains(" bail for ") && e.Text.Contains(" put up $"));
+        showedUp += ev.Count(e => e.Kind == EventKind.Trial && e.Text.Contains(" showed up for his trial"));
+        jumps += ev.Count(e => e.Kind == EventKind.Lam && e.Text.Contains(" jumped his $"));
+        cameHome += ev.Count(e => e.Kind == EventKind.Lam && e.Text.Contains(" is back in town"));
+        foundAway += ev.Count(e => e.Kind == EventKind.HoodJailed && e.Text.Contains(" was found out of town and brought back"));
+        pickedUp += ev.Count(e => e.Kind == EventKind.HoodJailed && e.Text.StartsWith("Police picked up ") && e.Text.Contains(" on the warrant in his case."));
         int sitdown = sim.World.CommissionStartWeek;
         asks += ev.Count(e => e.Kind == EventKind.Commission && e.Text.StartsWith("The Commission voted "));
         asksPassed += ev.Count(e => e.Kind == EventKind.Commission && e.Text.StartsWith("The Commission voted ") && e.Text.Contains(" to let "));
@@ -187,6 +194,7 @@ int Soak()
     Console.WriteLine($"Wars per city-year: declared {warsDeclared / cy:0.00} ({warsOnPlayer / cy:0.00} on your gang), called off {warsCalledOff / cy:0.00}, ended in a pact {warsMadePeace / cy:0.00}, ended with one side finished {warsFinished / cy:0.00}; still going at the end: {warsAtEnd}/{seeds}.");
     Console.WriteLine($"Rum-running per city-year: lines bought {linesBought / cy:0.00}, shipments stopped {shipmentsStopped / cy:0.00}, lines changing hands after one {linesSwitched / cy:0.00}, bad batches {badBatches / cy:0.00}; lines held at the end: {linesHeld}/{linesTotal}.");
     Console.WriteLine($"Rats per city-year: {string.Join(", ", RatLines.Select(r => $"{r.Label} {ratCounts.GetValueOrDefault(r.Label) / cy:0.00}"))}.");
+    Console.WriteLine($"On the lam, per city-year: bails posted {bails / cy:0.00} (showed up for trial {showedUp / cy:0.00}), bail jumped {jumps / cy:0.00}, found out of town {foundAway / cy:0.00}, came home {cameHome / cy:0.00}, picked up at home on the warrant {pickedUp / cy:0.00}.");
     Console.WriteLine($"Running it from inside, per city-year: bosses who kept the chair from a cell {insideStarts / cy:0.00} ({playerInside} times the player's), walked back into it {walkedOut / cy:0.00}, lost it to the street boss {coups / cy:0.00}, to the guards' fee {guardsQuit / cy:0.00}, to a transfer {moved / cy:0.00}; ordinary successions {successions / cy:0.00}.");
     double sy = seeds * Math.Max(0, years - (Content.CommissionYear - Content.StartYear) - (Content.CommissionWeek - 1) / (double)Content.WeeksPerYear);
     if (sy > 0)

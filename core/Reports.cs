@@ -103,8 +103,14 @@ public static partial class Reports
             var c = h.Case!;
             string help = (c.JudgePaid ? ", judge paid" : "") + (c.JuryFixed ? ", jury leaned on" : "");
             sb.AppendLine($"  {h.Id,4} {h.Name,-28} charged {c.Charge}; trial in {h.JailWeeks}w, faces {(c.Life ? "life" : $"{c.Sentence}w")}{(c.Federal ? " (federal)" : "")}; " +
-                $"{Simulation.ConvictionChance(w, h) * 100:0}% to convict{help}" + (c.Federal || c.JudgePaid ? "" : $"; the judge wants ${w.JudgePrice(h):N0}"));
+                $"{Simulation.ConvictionChance(w, h) * 100:0}% to convict{help}" + (c.Federal || c.JudgePaid ? "" : $"; the judge wants ${w.JudgePrice(h):N0}") +
+                (h.Bail > 0 ? $"; out on ${h.Bail:N0} bail" : w.CannotBail(g, h) is { } no && !no.StartsWith("The judge set") ? "" : $"; bail ${w.BailFor(h):N0}"));
         }
+        foreach (var h in w.OutOfTown(gangId))
+            sb.AppendLine($"  {h.Id,4} {h.Name,-28} out of town {w.Week - h.AwaySinceWeek}w, ${Content.HideoutFee(g, h)} a week" +
+                (h.Case is { } c ? $"; wanted, charged {c.Charge}; {Simulation.ConvictionChance(w, h) * 100:0}% to convict if he's caught" : "; lying low"));
+        foreach (var h in w.WantedAtHome(gangId))
+            sb.AppendLine($"  {h.Id,4} {h.Name,-28} home with a warrant out, charged {h.Case!.Charge}; {Content.WantedPickup(g) * 100:0}% a week the police pick him up");
         return sb.ToString();
     }
 
@@ -286,7 +292,10 @@ public static partial class Reports
         sb.AppendLine($"{"Id",4} {"Name",-30} {"People",-7} {"Age",3} {"Int",3} {"Mus",3} {"Brn",3} {"Stl",3} {"Loy",3} {"Wage",4}  {"State",-10} Carries / drives");
         foreach (var h in w.HoodsOf(gangId).OrderBy(h => h.Id))
         {
-            string state = h.State == HoodState.Jailed ? (h.Case != null ? $"trial in {h.JailWeeks}w" : $"jailed {h.JailWeeks}w") : h.Id == gang.BossHoodId ? "boss" : h.Id == gang.HeirHoodId ? "heir" : "free";
+            string state = h.State == HoodState.Jailed ? (h.Case != null ? $"trial in {h.JailWeeks}w" : $"jailed {h.JailWeeks}w")
+                : h.State == HoodState.Lam ? (World.IsWanted(h) ? "on the lam" : "lying low")
+                : h.Bail > 0 ? $"bail, {h.JailWeeks}w" : World.IsWanted(h) ? "wanted"
+                : h.Id == gang.BossHoodId ? "boss" : h.Id == gang.HeirHoodId ? "heir" : "free";
             sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {Content.Label(h.Origin),-7} {h.Age(w.Week),3} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state,-10} {Gear(h)}");
         }
         return sb.ToString();

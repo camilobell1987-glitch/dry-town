@@ -224,6 +224,33 @@ public static partial class AiPlanner
                 spent += price;
             }
         }
+        return spent + PlanLam(w, g, cash - spent, orders);
+    }
+
+    /// <summary>
+    /// The boss or heir held on a case the jury will likely convict is bailed out if the money's there, and runs if
+    /// he faces a long stretch. A man out of town comes home once his case has gone cold, or after a while lying low.
+    /// </summary>
+    private static long PlanLam(World w, Gang g, long cash, List<Order> orders)
+    {
+        long spent = 0;
+        bool Key(Hood h) => h.Id == g.BossHoodId || h.Id == g.HeirHoodId;
+        foreach (var man in w.OnTrial(g.Id).Where(Key))
+        {
+            int bail = w.BailFor(man);
+            if (w.CannotBail(g, man) != null || cash - spent < bail * 3 || Simulation.ConvictionChance(w, man) < Content.AiBailOdds) continue;
+            orders.Add(new BailOrder(g.Id, man.Id));
+            spent += bail;
+        }
+        foreach (var man in w.OnBail(g.Id).Where(Key))
+        {
+            int fee = Content.HideoutFee(g, man);
+            if (man.Case!.Sentence >= Content.AiRunSentence && Simulation.ConvictionChance(w, man) >= Content.AiRunOdds && cash - spent >= fee * 12)
+                orders.Add(new LamOrder(g.Id, man.Id));
+        }
+        foreach (var man in w.OutOfTown(g.Id))
+            if (man.Case is { } c ? c.Strength <= Content.AiHomeCase : w.Week - man.AwaySinceWeek >= 8)
+                orders.Add(new HomeOrder(g.Id, man.Id));
         return spent;
     }
 

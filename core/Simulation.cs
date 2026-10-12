@@ -136,6 +136,9 @@ public sealed partial class Simulation
                 case CarOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Drive(gang, man, o.Car); break;
                 case JuryOrder o: Jury(gang, o); break;
                 case LawyerOrder o: w.Retain(gang, o.Lawyer); break;
+                case BailOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.PostBail(gang, man); break;
+                case LamOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.SkipTown(gang, man); break;
+                case HomeOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.ComeHome(gang, man); break;
                 case JudgeOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.DefendantId) is { } man: w.PayJudge(gang, man); break;
                 case HuntOrder o: Hunt(gang, o); break;
                 case SeenToOrder o: SeeTo(gang, o); break;
@@ -244,6 +247,7 @@ public sealed partial class Simulation
         Diplomacy();
         w.Tick = Content.ReckoningTick;
         Police();
+        OnTheLam();
         Rats();
         Street();
         Politics.Step(w, w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.HoodKilled));
@@ -289,7 +293,7 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder or StrikeOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or BailOrder or LamOrder or HomeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder or StrikeOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),

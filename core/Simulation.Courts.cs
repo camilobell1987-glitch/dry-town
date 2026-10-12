@@ -11,8 +11,20 @@ public sealed partial class Simulation
     public void Jail(Hood hood, int weeks, string why, bool federal = false, double? strength = null)
     {
         var w = World;
+        // A man arrested again while out on bail or wanted loses his bail, and a new charge doesn't wipe out the one already waiting.
+        bool wasOut = hood.State != HoodState.Jailed, ran = World.IsWanted(hood) && hood.Case!.JumpedBail;
+        hood.Bail = 0;
+        hood.AwaySinceWeek = -1;
         hood.State = HoodState.Jailed;
         hood.FederalTime = federal;
+        if (wasOut && hood.Case is { } waiting && (weeks <= Content.PettySentence || Content.Sentence(weeks, hood.Convictions) <= waiting.Sentence))
+        {
+            hood.JailWeeks = Content.WeeksToTrial;
+            if (ran) waiting.Strength = Math.Min(0.95, waiting.Strength + Content.JumpedBailCase);
+            Book(hood, RapKind.Charged, $"Picked up {why}, with a case already waiting.");
+            w.Log(EventKind.HoodJailed, hood.GangId, $"{hood.Name} was picked up {why}, and is held for trial on the case already waiting for him.");
+            return;
+        }
         if (weeks <= Content.PettySentence)
         {
             hood.JailWeeks = weeks;
@@ -92,7 +104,7 @@ public sealed partial class Simulation
     {
         var w = World;
         var defendant = w.Hoods.FirstOrDefault(h => h.Id == o.DefendantId);
-        if (defendant is not { State: HoodState.Jailed, Case: { JuryFixed: false } } || defendant.GangId != gang.Id) return;
+        if (defendant is not { Case: { JuryFixed: false } } || !World.AwaitingTrial(defendant) || defendant.GangId != gang.Id) return;
         if (!TryUseHood(gang, o.HoodId, out var man)) return;
         int court = w.PrecinctNear(w.Map.LotAt(gang.HqLotId)).Id;
         bool ok = w.Rng.Chance(JuryChance(man));
