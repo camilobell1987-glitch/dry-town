@@ -44,6 +44,7 @@ public sealed class CommandShell
         "shops (guns and cars) | arm <hood> <pistol|shotgun|tommygun> | drive <hood> <modelt|packard|cadillac> | hand <from> <to> <gun|car>\n" +
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
         "booze (supply lines and your pour) | buyline <line> | waylay <hood> <line> [backup..] | cut <straight|watered|hard>\n" +
+        "boats (rum row) | buyboat | sail <boat> <canada|islands>\n" +
         "unions (the locals and the docks) | local <hood> <local> [backup..] (take it over) | strike <local> <biz|off>\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
         "bail <hood> (out until his trial) | lam <hood> (skip town: jump bail, dodge a warrant or lie low) | home <hood> (come back to town)\n" +
@@ -121,6 +122,11 @@ public sealed class CommandShell
                 case "buy": return BuyFront(int.Parse(p[1]));
                 case "booze": return Reports.Booze(W, Me);
                 case "buyline": return BuyLine(int.Parse(p[1]));
+                case "boats": return Reports.Boats(W, Me);
+                case "buyboat":
+                    if (W.CannotBuyBoat(W.Player) is string noBoat) return noBoat + "\n";
+                    return $"You bought {W.BuyBoat(W.Player)!.Name} for ${Content.BoatPrice:N0}. Type 'sail' to send her out.\n";
+                case "sail": return Sail(int.Parse(p[1]), Enum.Parse<Run>(p[2], true));
                 case "waylay": return Queue(new WaylayOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "cut":
                     W.SetCut(W.Player, Enum.Parse<Cut>(p[1], true));
@@ -312,6 +318,15 @@ public sealed class CommandShell
         return $"You hold {line.Name} now, for ${price:N0}. It keeps {line.Capacity} speakeasies in real liquor.\n";
     }
 
+    private string Sail(int boatId, Run run)
+    {
+        if (W.BoatById(boatId) is not { } boat || run == Run.None) return "There's no such boat or run. Type 'boats'.\n";
+        if (W.CannotSail(W.Player, boat, run) is string no) return no + "\n";
+        W.Sail(W.Player, boat, run);
+        var info = Content.Runs[run];
+        return $"{World.Capital(boat.Name)} sails for {info.Place}. She's due back with {info.Cases} cases in {info.Weeks} weeks.\n";
+    }
+
     private string Hand(int fromId, int toId, bool car)
     {
         if (CheckHood(fromId, allowJailed: true) is string bad) return bad + "\n";
@@ -478,6 +493,8 @@ public sealed class CommandShell
         WaylayOrder l => $"{HoodName(l.HoodId)}{With(l.Backup)} {(Sim.WeekRunning ? "stop" : "stops")} the shipment on {W.LineById(l.LineId)?.Name ?? "a supply line"}",
         LineOrder l => $"take over {W.LineById(l.LineId)?.Name ?? "a supply line"}",
         CutOrder c => $"serve the liquor {Content.Label(c.Cut)}",
+        BoatOrder => "buy a boat",
+        SailOrder so => $"send {W.BoatById(so.BoatId)?.Name ?? "a boat"} to {(so.Run == Run.None ? "sea" : Content.Runs[so.Run].Place)}",
         UnionOrder u => $"{HoodName(u.HoodId)}{With(u.Backup)} {(Sim.WeekRunning ? "go" : "goes")} down to the hall of {W.LocalById(u.LocalId)?.Name ?? "a union local"}",
         StrikeOrder s => $"call {W.LocalById(s.LocalId)?.Name ?? "a local"} out of {BizName(s.BusinessId)}",
         HireOrder h => $"sign on {PersonName(h.PersonId)} (${W.PersonById(h.PersonId)?.Fee ?? 0})",

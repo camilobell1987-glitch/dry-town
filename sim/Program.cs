@@ -45,6 +45,7 @@ int Soak()
     long rivalCrews = 0, crewedMen = 0, rivalMen = 0;
     long localsTaken = 0, localsSeized = 0, strikes = 0, strikesWon = 0, strikesWonFromRivals = 0, localsHeld = 0, localsTotal = 0, docksHeld = 0;
     long warsDeclared = 0, warsOnPlayer = 0, warsCalledOff = 0, warsMadePeace = 0, warsFinished = 0, warsAtEnd = 0;
+    long boatsBought = 0, playerBoats = 0, landings = 0, sunk = 0, dumped = 0, seized = 0, outran = 0, boatsAtEnd = 0;
     long linesBought = 0, shipmentsStopped = 0, linesSwitched = 0, badBatches = 0, linesHeld = 0, linesTotal = 0;
     long gearBought = 0, armedAtEnd = 0, menAtEnd = 0;
     long frontsBought = 0, taxCases = 0, cleanAtEnd = 0, cashAtEnd = 0;
@@ -132,6 +133,14 @@ int Soak()
         linesSwitched += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(" would rather deal with "));
         badBatches += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(" went blind "));
         linesHeld += sim.World.SupplyLines.Count(l => l.OwnerGangId >= 0);
+        boatsBought += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(" bought a fast boat, "));
+        playerBoats += ev.Count(e => e.Kind == EventKind.Booze && e.GangId == sim.World.Player.Id && e.Text.Contains(" bought a fast boat, "));
+        landings += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(" cases of ") && e.Text.Contains(" landed "));
+        sunk += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(" went down in "));
+        dumped += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(" put the cargo over the side"));
+        seized += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains(", and seized her."));
+        outran += ev.Count(e => e.Kind == EventKind.Booze && e.Text.Contains("A Coast Guard cutter ran "));
+        boatsAtEnd += sim.World.Boats.Count;
         linesTotal += sim.World.SupplyLines.Count;
         foreach (var (label, phrase) in RatLines)
             ratCounts[label] = ratCounts.GetValueOrDefault(label) + ev.Count(e => e.Kind is EventKind.Rat or EventKind.Whisper && e.Text.Contains(phrase));
@@ -220,6 +229,7 @@ int Soak()
     double squadYears = Math.Max(1, squadWeeks) / (double)Content.WeeksPerYear;
     if (squadWeeks > 0)
         Console.WriteLine($"The Untouchables, per city-year with the squad in town ({squadYears / seeds:0.0} a city): outfits gone after {squadNamed / squadYears:0.00} ({squadNamedPlayer} times the player's), places smashed {squadSmashed / squadYears:0.00}, raids that came up empty {squadEmpty / squadYears:0.00}, men taken {squadArrests / squadYears:0.00}, bosses indicted {indictments / squadYears:0.00} ({indictedPlayer} times the player's; out of town {indictedAway}).");
+    Console.WriteLine($"Rum row per city-year: boats bought {boatsBought / cy:0.00} (the player's {playerBoats / cy:0.00}), loads landed {landings / cy:0.00}, sunk {sunk / cy:0.00}, cargo dumped in a storm {dumped / cy:0.00}, seized {seized / cy:0.00}, run off by a cutter {outran / cy:0.00}; boats at the end {boatsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Reputation: names in the papers {namesMade / cy:0.00} per city-year, household names {householdNames / cy:0.00}; at the end, bosses' fear {fearAtEnd / Math.Max(1, bossesAtEnd):0} and respect {respectAtEnd / Math.Max(1, bossesAtEnd):0} on average (the player's {playerFear / Math.Max(1, playerAliveAtEnd):0} and {playerRespect / Math.Max(1, playerAliveAtEnd):0}), soup kitchens {soupAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Running it from inside, per city-year: bosses who kept the chair from a cell {insideStarts / cy:0.00} ({playerInside} times the player's), walked back into it {walkedOut / cy:0.00}, lost it to the street boss {coups / cy:0.00}, to the guards' fee {guardsQuit / cy:0.00}, to a transfer {moved / cy:0.00}; ordinary successions {successions / cy:0.00}.");
     double sy = seeds * Math.Max(0, years - (Content.CommissionYear - Content.StartYear) - (Content.CommissionWeek - 1) / (double)Content.WeeksPerYear);

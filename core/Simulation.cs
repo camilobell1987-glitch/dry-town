@@ -126,6 +126,8 @@ public sealed partial class Simulation
                 case WaylayOrder o: Waylay(gang, o); break;
                 case LineOrder o when w.LineById(o.LineId) is { } line: w.BuyLine(gang, line); break;
                 case CutOrder o: w.SetCut(gang, o.Cut); break;
+                case BoatOrder: w.BuyBoat(gang); break;
+                case SailOrder o when w.BoatById(o.BoatId) is { } boat: w.Sail(gang, boat, o.Run); break;
                 case UnionOrder o: TakeLocal(gang, o); break;
                 case StrikeOrder o when w.LocalById(o.LocalId) is { } local && o.BusinessId >= 0 && o.BusinessId < w.Businesses.Count: w.CallStrike(gang, local, w.BusinessById(o.BusinessId)); break;
                 case HireOrder o: Hire(gang, o); break;
@@ -296,7 +298,7 @@ public sealed partial class Simulation
         var rng = World.Rng;
         return order switch
         {
-            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or BailOrder or SoupOrder or LamOrder or HomeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder or StrikeOrder => 0,
+            SetRateOrder or ArmOrder or CarOrder or FrontOrder or LawyerOrder or JudgeOrder or BailOrder or SoupOrder or LamOrder or HomeOrder or RecallOrder or FamilyOrder or LineOrder or CutOrder or BoatOrder or SailOrder or StrikeOrder => 0,
             GuardOrder => 7 + rng.Range(0, 2),
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),

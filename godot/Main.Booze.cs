@@ -11,9 +11,11 @@ public partial class Main
     {
         if (!World.Liquor(b.Racket) || !b.IsProtected || !W.Prohibition || !b.IsOpen) return;
         var g = W.GangById(b.ProtectorGangId);
-        var line = b.Racket == RacketKind.Speakeasy && W.Supplied(g.Id, thisWeek: false).Contains(b.Id)
-            ? W.LinesOf(g.Id).First() : null;
-        string pour = b.Racket == RacketKind.Still ? "It makes its own rotgut" : line != null ? $"It pours real liquor off {(W.LinesOf(g.Id).Count() == 1 ? line.Name : $"{g.Name}'s supply lines")}" : "It sells bathtub gin";
+        bool real = b.Racket == RacketKind.Speakeasy && W.Supplied(g.Id, thisWeek: false).Contains(b.Id);
+        var lines = W.LinesOf(g.Id).ToList();
+        string from = lines.Count == 0 ? $"{g.Name}'s boats brought in"
+            : (lines.Count == 1 ? $"off {lines[0].Name}" : $"off {g.Name}'s supply lines") + (g.Cellar > 0 ? " and boats" : "");
+        string pour = b.Racket == RacketKind.Still ? "It makes its own rotgut" : real ? $"It pours real liquor {from}" : "It sells bathtub gin";
         if (g.Id == Me)
             AddLabel(_businessPanel, $"{pour}, {Content.Label(g.Cut)}. Chance of a bad batch this week: {W.BadBatchChance(b, g):P1}.", W.BadBatchChance(b, g) >= 0.01 ? Palette.Bad : Palette.InkQuiet, 13, wrap: true);
         else
@@ -57,6 +59,8 @@ public partial class Main
             buy.Disabled = problem != null;
         }
 
+        RumRowActions();
+
         AddLabel(_businessPanel, "How to pour it", Palette.Ink);
         var row = new HBoxContainer();
         foreach (var cut in Enum.GetValues<Cut>())
@@ -68,6 +72,53 @@ public partial class Main
         }
         _businessPanel.AddChild(row);
         AddLabel(_businessPanel, $"Your liquor is {Content.Label(p.Cut)}{(p.Cut == Cut.Straight ? "" : $", {Content.CutIncome(p.Cut):P0} more on every speakeasy and still")}.", p.Cut == Cut.Straight ? Palette.InkQuiet : Palette.Bad, 13, wrap: true);
+    }
+
+    /// <summary>The outfit's own boats: buy one, send the ones at the dock out, and what's in the warehouse.</summary>
+    private void RumRowActions()
+    {
+        var p = W.Player;
+        AddLabel(_businessPanel, "Your own boats", Palette.Ink);
+        int dry = Math.Max(0, W.TurfOf(Me).Count(x => x.Racket == RacketKind.Speakeasy && x.IsOpen) - W.LineRoom(Me, thisWeek: false));
+        AddLabel(_businessPanel, $"Your own boats bring liquor in where no supply line does. A speakeasy without a line pours a case a week from the warehouse, which holds {p.Cellar} of {Content.CellarCap} cases" +
+            (dry == 0 ? "." : $"; {dry} of yours {(dry == 1 ? "draws" : "draw")} on it.") + $" The Coast Guard catches {W.CoastGuardChance(p):0%} of landings" + (W.DocksGangId == Me ? ", fewer at your own docks." : "."),
+            Palette.InkQuiet, 13, wrap: true);
+        foreach (var boat in W.BoatsOf(Me).ToList())
+        {
+            if (boat.AtSea)
+            {
+                var away = Content.Runs[boat.Run];
+                int weeks = boat.BackWeek - W.Week + 1;
+                AddLabel(_businessPanel, $"{World.Capital(boat.Name)} is away to {away.Place}, due back {(weeks <= 1 ? "this Sunday" : $"in {weeks} weeks")}" +
+                    (boat.Cases == 0 ? ", her cargo dumped in a storm." : $" with {boat.Cases} cases of {away.Cargo}."), Palette.Player, 13, wrap: true);
+                continue;
+            }
+            var row = new HBoxContainer();
+            AddLabel(row, $"{World.Capital(boat.Name)}:", Palette.Player, 13);
+            foreach (var info in Content.Runs.Values)
+            {
+                var problem = W.CannotSail(p, boat, info.Run);
+                var sail = AddButton(row, $"{info.Place}, ${info.Cost}", () =>
+                {
+                    if (!W.Sail(W.Player, boat, info.Run)) return;
+                    Audio.Instance?.Play("cash", 0.6f);
+                    RefreshAll();
+                });
+                sail.Disabled = problem != null;
+                sail.TooltipText = problem ?? $"{info.Weeks} weeks there and back for {info.Cases} cases of {info.Cargo}. Storm chance {W.StormChance(info.Run):0.0%} a week" +
+                    (Content.InSeason(info.Run, W.WeekOfYear) ? $": it's the season for {info.Season}." : ".");
+            }
+            _businessPanel.AddChild(row);
+        }
+        var cannot = W.CannotBuyBoat(p);
+        var buy = AddButton(_businessPanel, cannot ?? $"Buy a fast boat, ${Content.BoatPrice:N0}", () =>
+        {
+            if (W.BuyBoat(W.Player) == null) return;
+            Audio.Instance?.Play("cash", 0.6f);
+            RefreshAll();
+        });
+        buy.Disabled = cannot != null;
+        buy.TooltipText = $"Up to {Content.MaxBoats} boats. St. Pierre is close but stormy in winter; Nassau brings back more but sails into the hurricanes from August to October.";
     }
 
     /// <summary>On a rival's speakeasy that pours real liquor: stop the shipment on its supply line.</summary>
