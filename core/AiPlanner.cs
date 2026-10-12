@@ -123,6 +123,7 @@ public static partial class AiPlanner
         cash -= PlanRats(w, g, hoods, cash, orders);
         PlanPolls(w, g, turf, hoods, orders);
         PlanUnions(w, g, hoods, orders);
+        cash -= PlanFix(w, g, hoods, cash, orders);
         PlanCrimes(w, g, turf, hoods, cash, orders);
 
         // Score each target as about ten weeks of income, less the expected cost of losing the man.
@@ -189,6 +190,20 @@ public static partial class AiPlanner
     /// to get away in, then heavier guns for the hard men, and armour for a rich boss.
     /// </summary>
     private static bool TopDog(World w, Gang g) => w.TopDog(g);
+
+    /// <summary>
+    /// Now and then an outfit with a bookie and money to spare sends its smartest free man to fix the card.
+    /// An outfit that already runs a third of the city leaves it alone. Returns what it set aside.
+    /// </summary>
+    private static long PlanFix(World w, Gang g, List<Hood> hoods, long cash, List<Order> orders)
+    {
+        int price = World.FixPrice(w.Card);
+        if (hoods.Count < 2 || w.TopDog(g) || g.Heat >= 60 || w.Bookies(g.Id) == 0 || cash < price * 3 || w.CannotFix(g) != null || !w.Rng.Chance(Content.AiFix)) return 0;
+        var man = hoods.OrderByDescending(World.FixChance).ThenBy(h => h.Id).First();
+        orders.Add(new FixOrder(g.Id, man.Id));
+        hoods.Remove(man);
+        return price;
+    }
 
     /// <summary>The speakeasies a brewery would put beer in: those on bathtub gin, up to what one brews for.</summary>
     private static int Thirsty(World w, Gang g)

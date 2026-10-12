@@ -45,6 +45,7 @@ public sealed class CommandShell
         "fronts (clean and dirty money) | buy <biz> (buy a business you protect, as a front)\n" +
         "booze (supply lines and your pour) | buyline <line> | waylay <hood> <line> [backup..] | cut <straight|watered|hard>\n" +
         "boats (rum row) | buyboat | sail <boat> <canada|islands>\n" +
+        "card (this week's fights or races) | fix <hood> (buy the fighter or the jockey)\n" +
         "unions (the locals and the docks) | local <hood> <local> [backup..] (take it over) | strike <local> <biz|off>\n" +
         "cases (men held for trial) | lawyer <none|storefront|mouthpiece> | judge <hood> (pay off his judge) | jury <hood> <defendant>\n" +
         "bail <hood> (out until his trial) | lam <hood> (skip town: jump bail, dodge a warrant or lie low) | home <hood> (come back to town)\n" +
@@ -113,6 +114,8 @@ public sealed class CommandShell
                 case "paycop": return Queue(new PayCopOrder(Me, int.Parse(p[1])));
                 case "buystory": return Queue(new BuyStoryOrder(Me, int.Parse(p[1])));
                 case "silence": return Queue(new SilenceOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "card": return Reports.Card(W, Me);
+                case "fix": return Queue(new FixOrder(Me, int.Parse(p[1])));
                 case "torch": return Queue(new ArsonOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "hit": return Queue(new HitOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "rob": return Queue(new RobberyOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
@@ -445,6 +448,7 @@ public sealed class CommandShell
             ArmOrder a => CheckHood(a.HoodId, allowJailed: true) ?? W.CannotArm(W.Player, W.HoodById(a.HoodId), a.Weapon),
             CarOrder c => CheckHood(c.HoodId, allowJailed: true) ?? W.CannotDrive(W.Player, W.HoodById(c.HoodId), c.Car),
             FrontOrder f => CheckBiz(f.BusinessId) ?? W.CannotBuyFront(W.Player, W.BusinessById(f.BusinessId)),
+            FixOrder f => Pending.Any(o => o is FixOrder) ? "Someone is already on his way to see him." : W.CannotFix(W.Player) ?? CheckHood(f.HoodId),
             JuryOrder j => W.Hoods.FirstOrDefault(h => h.Id == j.DefendantId) is not { Case: not null } d || d.GangId != Me ? "He isn't one of yours waiting on a trial. Type 'cases'."
                 : d.Case.JuryFixed || Pending.Any(o => o is JuryOrder q && q.DefendantId == j.DefendantId) ? "Someone is already seeing to that jury."
                 : CheckHood(j.HoodId),
@@ -502,6 +506,7 @@ public sealed class CommandShell
         PayCopOrder c => $"pay {PersonName(c.PersonId)} ${Content.CopPrice} to look away",
         BuyStoryOrder b => $"buy {PersonName(b.PersonId)}'s story (${Content.StoryPrice(W.Player.Heat)})",
         SilenceOrder s => $"{HoodName(s.HoodId)} has a word with {PersonName(s.PersonId)}",
+        FixOrder f => $"{HoodName(f.HoodId)} {(Sim.WeekRunning ? "fix" : "fixes")} {W.CardLabel()}",
         ArmOrder a => $"buy {HoodName(a.HoodId)} a {Content.Guns[a.Weapon].Label}",
         CarOrder c => $"buy {HoodName(c.HoodId)} a {Content.Cars[c.Car].Label}",
         JuryOrder j => $"{HoodName(j.HoodId)} leans on the jury in {HoodName(j.DefendantId)}'s case",

@@ -377,7 +377,7 @@ public partial class Main : Control
         // When you run the shop's local, the strike comes first.
         bool unionFirst = W.LocalOf(b)?.OwnerGangId == Me;
         if (unionFirst) UnionActions(b);
-        if (b.ProtectorGangId == Me) { BoozeActions(b); FrontOffer(b); OwnBusinessActions(b); }
+        if (b.ProtectorGangId == Me) { BoozeActions(b); FixActions(b); FrontOffer(b); OwnBusinessActions(b); }
         else if (b.IsOpen)
         {
             TargetActions(b);
@@ -1107,6 +1107,7 @@ public partial class Main : Control
         if (Flag("--untouchables")) SetUpUntouchables();
         if (Flag("--rumrow")) SetUpRumRow();
         if (Flag("--brewery")) SetUpBrewery();
+        if (Flag("--fixing")) SetUpFixing();
         if (Flag("--reputation"))
         {
             // A boss the papers have started writing about, with a soup kitchen.
