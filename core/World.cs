@@ -508,6 +508,7 @@ public sealed partial class World
         Events = Events,
         LastLedger = LastLedger,
         Pacts = Pacts,
+        Marriages = Marriages,
         Wars = Wars,
         Goal = Goal,
         Repeal = Repeal,
@@ -535,6 +536,7 @@ public sealed partial class World
         w.People.AddRange(d.People);
         w.Banks.AddRange(d.Banks);
         w.Pacts.AddRange(d.Pacts);
+        w.Marriages.AddRange(d.Marriages);
         w.Wars.AddRange(d.Wars);
         if (d.Goal != null) w.Goal = d.Goal;
         if (d.Repeal != null) w.Repeal = d.Repeal;

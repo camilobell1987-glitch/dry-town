@@ -6,7 +6,7 @@ public static partial class AiPlanner
     /// <summary>One round of talks for a gang. The player's gang never goes back on its word on its own.</summary>
     public static void Negotiate(World w, Gang g)
     {
-        if (PlanWar(w, g) || TearUp(w, g) || SeekTruce(w, g) || SeekAlliance(w, g)) return;
+        if (PlanWar(w, g) || TearUp(w, g) || SeekTruce(w, g) || SeekAlliance(w, g) || SeekMatch(w, g)) return;
         DemandTribute(w, g);
     }
 
@@ -46,7 +46,7 @@ public static partial class AiPlanner
     private static bool TearUp(World w, Gang g)
     {
         if (g.IsPlayer || g.Aggression <= 0.55) return false;
-        var pact = w.Pacts.Where(p => p.Involves(g.Id) && p.PayerId != p.Other(g.Id))
+        var pact = w.Pacts.Where(p => p.Involves(g.Id) && p.PayerId != p.Other(g.Id) && w.MarriageBetween(p.A, p.B) == null)
             .FirstOrDefault(p => w.Power(g) > 2 * w.Power(w.GangById(p.Other(g.Id))));
         if (pact == null || !w.Rng.Chance(0.25)) return false;
         w.Betray(g, w.GangById(pact.Other(g.Id)), pact);
@@ -90,6 +90,22 @@ public static partial class AiPlanner
             w.AddGrudge(g.Id, big.Id, 20);
             w.AddGrudge(partner.Id, big.Id, 20);
         }
+        return true;
+    }
+
+    /// <summary>
+    /// An outfit with money and a son to spare, that has kept the peace with another for half a year,
+    /// now and then asks for its boss's daughter. Family holds better than any pact.
+    /// </summary>
+    private static bool SeekMatch(World w, Gang g)
+    {
+        if (g.Cash < Content.AiMatchCash || w.Groom(g) == null) return false;
+        var partner = w.Pacts.Where(p => p.Involves(g.Id) && w.Week - p.SignedWeek >= Content.AiMatchPactWeeks && w.MarriageBetween(p.A, p.B) == null)
+            .Select(p => w.GangById(p.Other(g.Id))).Where(o => w.MatchRefusal(g, o) == null)
+            .OrderByDescending(o => w.Power(o)).ThenBy(o => o.Id).FirstOrDefault();
+        if (partner == null || !w.Rng.Chance(Content.AiMatch)) return false;
+        if (partner.IsPlayer) w.Put(g, OfferKind.Marriage);
+        else w.Wed(g, partner);
         return true;
     }
 

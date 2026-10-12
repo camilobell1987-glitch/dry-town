@@ -232,7 +232,7 @@ public sealed class Grudge
     public int Amount { get; set; }
 }
 
-public enum OfferKind { Truce, Alliance, Demand }
+public enum OfferKind { Truce, Alliance, Demand, Marriage }
 
 /// <summary>A proposal a rival has put to the player, waiting on an answer.</summary>
 public sealed class Offer

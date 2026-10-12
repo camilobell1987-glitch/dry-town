@@ -62,12 +62,17 @@ public sealed partial class World
     public void Betray(Gang breaker, Gang partner, Pact pact)
     {
         Pacts.Remove(pact);
+        var marriage = MarriageBetween(breaker.Id, partner.Id);
+        if (marriage != null) Marriages.Remove(marriage);
+        int times = marriage != null ? Content.MarriedBreak : 1;
         breaker.BrokeWordWeek = Week;
-        Renown(breaker, respect: -Content.RespectBrokenWord);
-        AddGrudge(partner.Id, breaker.Id, Content.GrudgeBetrayed);
+        Renown(breaker, respect: -Content.RespectBrokenWord * times);
+        AddGrudge(partner.Id, breaker.Id, Content.GrudgeBetrayed * times);
         foreach (var other in LivingGangs)
-            if (other.Id != breaker.Id && other.Id != partner.Id) AddGrudge(other.Id, breaker.Id, Content.GrudgeWitnessed);
-        Log(EventKind.Diplomacy, breaker.Id, $"{breaker.Name} broke the {Name(pact.Kind)} with {partner.Name}. Nobody will take their word for a year.");
+            if (other.Id != breaker.Id && other.Id != partner.Id) AddGrudge(other.Id, breaker.Id, Content.GrudgeWitnessed * times);
+        Log(EventKind.Diplomacy, breaker.Id, marriage != null
+            ? $"{breaker.Name} turned on {partner.Name}, their own family by marriage, and {marriage.Bride} went home to her father. Nobody will take their word for a year."
+            : $"{breaker.Name} broke the {Name(pact.Kind)} with {partner.Name}. Nobody will take their word for a year.");
     }
 
     /// <summary>
@@ -108,7 +113,7 @@ public sealed partial class World
     }
 
     /// <summary>Seal a pact, replacing any the two already had.</summary>
-    public Pact Sign(Gang a, Gang b, PactKind kind, int payerId = -1, int tribute = 0)
+    public Pact Sign(Gang a, Gang b, PactKind kind, int payerId = -1, int tribute = 0, string? text = null)
     {
         Pacts.RemoveAll(p => p.Involves(a.Id) && p.Involves(b.Id));
         Offers.RemoveAll(o => (a.IsPlayer && o.FromGangId == b.Id) || (b.IsPlayer && o.FromGangId == a.Id));
@@ -118,15 +123,16 @@ public sealed partial class World
             UntilWeek = Week + (kind == PactKind.Truce ? Content.TruceWeeks : Content.AllianceWeeks),
         };
         Pacts.Add(pact);
+        if (MarriageBetween(a.Id, b.Id) != null) Bind(pact);
         // Signing clears the air.
         AddGrudge(a.Id, b.Id, -GrudgeOf(a.Id, b.Id));
         AddGrudge(b.Id, a.Id, -GrudgeOf(b.Id, a.Id));
-        string text = kind == PactKind.Alliance
+        text ??= kind == PactKind.Alliance
             ? $"{a.Name} and {b.Name} are allies now: an attack on one is an attack on both."
             : payerId >= 0
                 ? $"{GangById(payerId).Name} will pay {GangById(pact.Other(payerId)).Name} ${tribute} a week to be left alone."
                 : $"{a.Name} and {b.Name} agreed a truce.";
-        Log(EventKind.Diplomacy, a.Id, text);
+        if (text.Length > 0) Log(EventKind.Diplomacy, a.Id, text);
         if (Wars.FirstOrDefault(x => x.Involves(a.Id) && x.Involves(b.Id)) is { } war)
             EndWar(war, $"The war between {a.Name} and {b.Name} is over, and the men are home from the mattresses.");
         return pact;
@@ -176,6 +182,11 @@ public sealed partial class World
         if (!from.Alive) return $"{from.Name} is finished.";
         if (!accept)
         {
+            if (offer.Kind == OfferKind.Marriage)
+            {
+                AddGrudge(from.Id, Player.Id, Content.GrudgeRefused / 2);
+                return $"You turned down {from.Name}'s match. They took it as an insult.";
+            }
             if (offer.Kind == OfferKind.Demand)
             {
                 AddGrudge(from.Id, Player.Id, Content.GrudgeRefused);
@@ -187,6 +198,10 @@ public sealed partial class World
         }
         switch (offer.Kind)
         {
+            case OfferKind.Marriage:
+                if (MatchRefusal(from, Player) is { } off) return $"The match is off: {off}";
+                var m = Wed(from, Player);
+                return $"{HoodById(m.GroomHoodId).Name} married {m.Bride}. You're family with {from.Name} now: allies for as long as the marriage lasts.";
             case OfferKind.Demand:
                 Sign(from, Player, PactKind.Truce, Player.Id, offer.Tribute);
                 return $"You'll pay {from.Name} ${offer.Tribute} a week, and they'll leave you alone.";
@@ -215,6 +230,7 @@ public sealed partial class World
         {
             OfferKind.Demand => $"{from.Name} wants ${o.Tribute} a week from you to leave you alone.",
             OfferKind.Alliance => $"{from.Name} proposes an alliance against the bigger outfits.",
+            OfferKind.Marriage => $"{HoodById(from.BossHoodId).Name} of {from.Name} proposes that {Groom(from)?.Name ?? "his son"} marry your boss's daughter. Family is an alliance that doesn't run out.",
             _ => o.Tribute > 0 ? $"{from.Name} offers you ${o.Tribute} a week for a truce." : $"{from.Name} proposes a truce.",
         };
     }
@@ -223,6 +239,7 @@ public sealed partial class World
     public void ForgetDiplomacy(Gang gang)
     {
         Pacts.RemoveAll(p => p.Involves(gang.Id));
+        Marriages.RemoveAll(m => m.Involves(gang.Id));
         Grudges.RemoveAll(g => g.From == gang.Id || g.To == gang.Id);
         Offers.RemoveAll(o => o.FromGangId == gang.Id);
     }

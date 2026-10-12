@@ -531,7 +531,7 @@ public partial class Main : Control
             string crewText = crew == null ? "" : crew.LieutenantHoodId == h.Id ? "Lt" : World.Surname(W.HoodById(crew.LieutenantHoodId).Name);
             string[] cols = { h.Name, $"{h.Age(W.Week)}", $"{h.Intimidation}", $"{h.Muscle}", $"{h.Brains}", $"{h.Stealth}", $"{h.Loyalty}", crewText, state };
             for (int i = 0; i < cols.Length; i++) it.SetText(i, cols[i]);
-            string tip = $"{h.Name}, {h.Age(W.Week)}, {Content.Label(h.Origin)}" + (h.Family ? ", family" : "") + $"\nIntimidation {h.Intimidation}, Muscle {h.Muscle}, Brains {h.Brains}, Stealth {h.Stealth}\nLoyalty {h.Loyalty}/100, ambition {h.Ambition}/100, wage ${h.Wage}/week\n{GearLine(h)}" + (job != null ? $"\nThis week: {job}" : "");
+            string tip = $"{h.Name}, {h.Age(W.Week)}, {Content.Label(h.Origin)}" + (h.Family ? ", family" : "") + (W.MarriageOf(h) is { } wed ? $", married to {wed.Bride} of {W.GangById(wed.Other(Me)).Name}" : "") + $"\nIntimidation {h.Intimidation}, Muscle {h.Muscle}, Brains {h.Brains}, Stealth {h.Stealth}\nLoyalty {h.Loyalty}/100, ambition {h.Ambition}/100, wage ${h.Wage}/week\n{GearLine(h)}" + (job != null ? $"\nThis week: {job}" : "");
             for (int i = 0; i < cols.Length; i++) it.SetTooltipText(i, tip);
             if (h.Loyalty < 30) it.SetCustomColor(6, Palette.Bad);
             if (h.Age(W.Week) >= 65) it.SetCustomColor(1, Palette.Bad);
@@ -1191,6 +1191,19 @@ public partial class Main : Control
             W.Put(rivals[1], OfferKind.Truce, Content.TributeAsk(W.Income(rivals[1])));
             _talkTo = rivals[0].Id;
             W.AddGrudge(rivals[0].Id, Me, 30 - W.GrudgeOf(rivals[0].Id, Me));
+        }
+        if (Flag("--marriage"))
+        {
+            // Your nephew married into the second biggest outfit, picked to talk to.
+            W.Pacts.RemoveAll(p => p.Involves(Me));
+            W.Offers.Clear();
+            var family = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(W.Power).ElementAt(1);
+            W.Player.Cash = Math.Max(W.Player.Cash, 8000);
+            var groom = W.Groom(W.Player) ?? W.NewRelative(W.Player);
+            W.Sign(W.Player, family, PactKind.Truce).SignedWeek = W.Week - Content.MatchPactWeeks;
+            W.ProposeMatch(W.Player, family);
+            _talkTo = family.Id;
+            RefreshAll();
         }
         if (Flag("--union"))
         {

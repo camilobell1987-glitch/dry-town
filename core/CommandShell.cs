@@ -51,7 +51,7 @@ public sealed class CommandShell
         "sheet <hood> (any man's rap sheet) | news (what's going on in the city)\n" +
         "rats (who's talking, and your men inside) | care <hood> (look after a jailed man's family) | seeto <hood> <rat>\n" +
         "hunt <hood> (look for a rat) | plant <hood> <gang> (sign him on with a rival) | recall <hood> (bring him home)\n" +
-        "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
+        "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | marry <gang> | accept <offer> | decline <offer>\n" +
         "war <gang> (go to the mattresses against them) | calloff (end a war you started)\n" +
         "commission (the table, after 1931) | ask <war|hit> <gang> (put it to a vote) | commission <leave|join>\n" +
         "squad (the Untouchables, 1927 to repeal) | wire (who runs the racing wire, after repeal) | gmen (the Bureau's Public Enemy Number One)\n" +
@@ -149,6 +149,7 @@ public sealed class CommandShell
                 case "ally": return Talk(p[1], g => W.Propose(W.Player, g, PactKind.Alliance));
                 case "demand": return Talk(p[1], g => W.Demand(W.Player, g, int.Parse(p[2])));
                 case "break": return Talk(p[1], g => W.Break(W.Player, g));
+                case "marry": return Talk(p[1], g => W.ProposeMatch(W.Player, g));
                 case "war": return Talk(p[1], g => W.Declare(W.Player, g));
                 case "commission":
                     if (p.Length > 1) return W.Walk(W.Player, p[1].ToLowerInvariant() == "leave") + "\n";

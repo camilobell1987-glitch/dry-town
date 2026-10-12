@@ -65,6 +65,7 @@ public partial class Main
     private string Short(Gang g)
     {
         if (W.AtWar(Me, g.Id)) return "war";
+        if (W.MarriageBetween(Me, g.Id) != null) return "family";
         var p = W.PactBetween(Me, g.Id);
         if (p == null) return W.GrudgeOf(g.Id, Me) > Content.GrudgeTooDeep ? "hate you" : W.GrudgeOf(g.Id, Me) > 20 ? "sore" : "";
         return p.Kind == PactKind.Alliance ? "ally" : p.PayerId == Me ? "you pay" : p.PayerId >= 0 ? "pays you" : "truce";
@@ -109,10 +110,16 @@ public partial class Main
         CrewsOf(them);
         WarActions(them);
 
-        if (W.PactBetween(Me, them.Id) is { } pact)
+        if (W.MarriageBetween(Me, them.Id) is { } wed)
+        {
+            AddLabel(_talkPanel, $"You're family: {W.HoodById(wed.GroomHoodId).Name} married {wed.Bride}. The alliance doesn't run out, they back your boss's heir against anyone who would split from him, and if one of you is ever finished, the other takes in what's left. Turning on family costs twice what breaking a pact does.", Palette.Good, 13, wrap: true);
+            AddButton(_talkPanel, "Turn on your family", () => Say(W.Break(me, them)));
+        }
+        else if (W.PactBetween(Me, them.Id) is { } pact)
         {
             AddButton(_talkPanel, $"Break the {World.Name(pact.Kind)}", () => Say(W.Break(me, them)));
             if (pact.Kind == PactKind.Truce && pact.PayerId < 0) AddButton(_talkPanel, "Propose an alliance", () => Say(W.Propose(me, them, PactKind.Alliance)));
+            MatchButton(them);
         }
         else
         {
@@ -127,6 +134,18 @@ public partial class Main
             AddButton(_talkPanel, $"Demand ${demand} a week to leave them alone", () => Say(W.Demand(me, them, demand)));
         }
         if (_answer.Length > 0) AddLabel(_talkPanel, _answer, Palette.Player, wrap: true);
+    }
+
+    /// <summary>Put a match to an outfit you're at peace with: your son or nephew, and their boss's daughter.</summary>
+    private void MatchButton(Gang them)
+    {
+        var groom = W.Groom(W.Player);
+        string? no = W.MatchRefusal(W.Player, them);
+        var button = AddButton(_talkPanel, groom == null || W.InLawsOf(Me).Any() ? "Propose a marriage" : $"Propose a marriage: {groom.Name} and {W.HoodById(them.BossHoodId).Name}'s daughter, ${Content.WeddingCost:N0}",
+            () => Say(W.ProposeMatch(W.Player, them)));
+        button.Disabled = no != null;
+        button.TooltipText = no ?? "Family is an alliance that doesn't run out. One family at a time.";
+        if (no != null) AddLabel(_talkPanel, no, Palette.InkQuiet, 13, wrap: true);
     }
 
     /// <summary>A rival's lieutenants and their crews. A man inside can say which lieutenants are sour on their boss.</summary>
