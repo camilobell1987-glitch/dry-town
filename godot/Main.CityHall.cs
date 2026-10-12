@@ -71,6 +71,7 @@ public partial class Main
             : ward.OwnerGangId >= 0 ? $"Alderman {ward.Alderman} takes {W.GangById(ward.OwnerGangId).Name}'s money."
             : $"Alderman {ward.Alderman} is a party man. Nobody has bought him yet.";
         AddLabel(_hallPanel, status, colour, wrap: true);
+        WardPeopleLine(ward);
         int yours = biz.Count(b => b.ProtectorGangId == Me);
         AddLabel(_hallPanel, $"{biz.Count} businesses, {yours} paying you." + (ward.OwnMan ? "" : $" His envelope is ${Politics.Retainer(W, ward)} a week."), Palette.InkQuiet, wrap: true);
 
@@ -109,7 +110,7 @@ public partial class Main
         {
             string owner = x.Reformer ? "reformer" : x.OwnerGangId == Me ? x.OwnMan ? "your own man" : "yours" : x.OwnerGangId >= 0 ? W.GangById(x.OwnerGangId).Name : "for sale";
             int mineHere = Politics.BusinessesIn(W, x).Count(b => b.ProtectorGangId == Me);
-            var b = AddButton(_hallPanel, $"{x.Name} · {x.Alderman} · {owner} · your shops {mineHere}", () => { _selectedWard = x.Id; RefreshCityHall(); });
+            var b = AddButton(_hallPanel, $"{x.Name} · {Content.Label(W.Neighbourhood(x))} · {x.Alderman} · {owner} · your shops {mineHere}", () => { _selectedWard = x.Id; RefreshCityHall(); });
             b.Alignment = HorizontalAlignment.Left;
             b.ClipText = true;
             b.AddThemeColorOverride("font_color", x.OwnerGangId >= 0 ? Palette.Gang(W, x.OwnerGangId) : x.Reformer ? Palette.Police : Palette.Ink);
@@ -135,7 +136,7 @@ public partial class Main
         }
         var row = new HBoxContainer();
         var who = new OptionButton { ClipText = true, FitToLongestItem = false, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
-        foreach (var h in men) who.AddItem($"{h.Name} · brains {h.Brains}", h.Id);
+        foreach (var h in men) who.AddItem($"{h.Name} · brains {h.Brains}{(h.Origin == W.Neighbourhood(ward) ? $" · {Content.Label(h.Origin)}, the ward's own" : "")}", h.Id);
         row.AddChild(who);
         AddButton(row, "Run him for alderman", () => { Give(new StandOrder(Me, who.GetSelectedId(), ward.Id)); RefreshCityHall(); });
         _hallPanel.AddChild(row);
@@ -150,7 +151,7 @@ public partial class Main
         if (men.Count == 0) return;
         // The picker gets a line of its own: each man's votes and his risk of being picked up are worth reading in full.
         var who = new OptionButton { ClipText = true, FitToLongestItem = false, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
-        foreach (var h in men) who.AddItem($"{h.Name} · {Content.PollsVotes(h)} votes, {Politics.PollsRisk(W, ward, h) * 100:0}% risk", h.Id);
+        foreach (var h in men) who.AddItem($"{h.Name} · {Politics.PollsVotes(W, ward, h)} votes, {Politics.PollsRisk(W, ward, h) * 100:0}% risk", h.Id);
         _hallPanel.AddChild(who);
         AddButton(_hallPanel, $"Work the polls in {ward.Name}", () => { Give(new PollsOrder(Me, who.GetSelectedId(), ward.Id)); RefreshCityHall(); });
         string forWhom = race == ElectionKind.Mayor ? "the machine's ticket" : "your man here";

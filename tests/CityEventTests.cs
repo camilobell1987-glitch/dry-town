@@ -22,6 +22,8 @@ public class CityEventTests
         Assert.True(w.Happening(CityEventKind.Depression));
         // A shop with no pickets outside.
         var biz = w.Businesses.First(b => w.StrikeAt(b) == null);
+        // A convention in town would lift the takings again.
+        w.CityEvents.RemoveAll(e => e.Kind == CityEventKind.Convention);
         Assert.Equal(0.8, w.TakingsFactor(biz), 6);
         Assert.Equal(2, w.RacketFactor(RacketKind.LoanShark), 6);
         Assert.Equal(1, w.RacketFactor(RacketKind.Speakeasy), 6);
@@ -33,10 +35,18 @@ public class CityEventTests
     {
         long Protection(bool hard)
         {
-            var sim = Simulation.New(new WorldSettings { Seed = 4, CityEventsEnabled = false });
-            if (hard) sim.World.CityEvents.Add(new CityEvent { Kind = CityEventKind.Depression, StartWeek = 0, UntilWeek = 100 });
-            sim.AdvanceWeek(playerAutopilot: true);
-            return sim.World.LastLedger[sim.World.Player.Id].Protection;
+            var sim = Simulation.New(new WorldSettings { Seed = 4, CityEventsEnabled = false, StartingGangs = 1 });
+            var w = sim.World;
+            if (hard) w.CityEvents.Add(new CityEvent { Kind = CityEventKind.Depression, StartWeek = 0, UntilWeek = 100 });
+            var man = w.AvailableHoodsOf(w.Player.Id).First(h => h.Id != w.Player.BossHoodId);
+            foreach (var b in w.Businesses.Where(b => b.IsOpen && !b.IsFront).Take(6))
+            {
+                b.ProtectorGangId = w.Player.Id;
+                b.HandlerHoodId = man.Id;
+                b.ProtectionRate = Content.DefaultRatePercent;
+            }
+            sim.AdvanceWeek(new Dictionary<int, List<Order>> { [w.Player.Id] = new() });
+            return w.LastLedger[w.Player.Id].Protection;
         }
         long good = Protection(false), bad = Protection(true);
         Assert.True(bad < good);

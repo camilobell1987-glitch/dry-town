@@ -92,6 +92,7 @@ public static partial class Content
         "the Levee", "Tannery Row", "Goat Hill", "the Flats", "Little Palermo", "Canal Bend",
         "Kerry Patch", "Dutch Hollow", "the Stockyards", "Gaslight Square", "Shantytown", "the Bottoms",
         "the Docks", "Brewery Hill", "Lamplight Row", "Old Town", "the Gold Coast", "Cinder Flats",
+        "Little Warsaw", "Maxwell Street", "Bridgeport", "Hester Street",
     };
 
     public static readonly string[] PoliticianFirstNames =

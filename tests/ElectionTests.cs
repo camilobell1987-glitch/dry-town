@@ -129,7 +129,7 @@ public class ElectionTests
         int heat = w.Player.Heat;
         sim.AdvanceWeek(new Dictionary<int, List<Order>> { [w.Player.Id] = shell.Pending.ToList() });
         int charged = men.Count(m => m.Case?.Charge == "with intimidating voters");
-        Assert.Equal(men.Where(m => m.Case == null).Sum(Content.PollsVotes), ward.Polls.GetValueOrDefault(w.Player.Id));
+        Assert.Equal(men.Where(m => m.Case == null).Sum(m => Politics.PollsVotes(w, ward, m)), ward.Polls.GetValueOrDefault(w.Player.Id));
         Assert.True(charged < men.Count || ward.Polls.Count == 0);
 
         // Reformers keep a closer eye on their polls.

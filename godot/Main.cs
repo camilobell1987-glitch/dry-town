@@ -349,6 +349,7 @@ public partial class Main : Control
         }
         else AddLabel(_businessPanel, "Pays nobody.", Palette.InkQuiet);
         if (!b.IsFront || b.OwnerGangId != b.ProtectorGangId) AddLabel(_businessPanel, $"Resentment {b.Resentment}/100" + (b.Resentment > 60 ? " · may talk to the police" : ""), b.Resentment > 60 ? Palette.Bad : Palette.InkQuiet);
+        NeighbourhoodLine(b);
         FrontLines(b);
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {RacketLabel(b)}", Palette.Bad);
         BoozeLine(b);
@@ -412,7 +413,7 @@ public partial class Main : Control
         if (hoods.Count > 0)
         {
             var pick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
-            foreach (var h in hoods) pick.AddItem($"{h.Name} · {Odds(h, Array.Empty<Hood>())}", h.Id);
+            foreach (var h in hoods) pick.AddItem($"{h.Name} · {Odds(h, Array.Empty<Hood>())}{(rival ? "" : Among(h, b))}", h.Id);
             _businessPanel.AddChild(pick);
             AddButton(_businessPanel, (rival ? "Send him to take it " : "Send him ") + verb, () => Give(new ExtortOrder(Me, pick.GetSelectedId(), b.Id)));
         }
@@ -524,7 +525,7 @@ public partial class Main : Control
             string crewText = crew == null ? "" : crew.LieutenantHoodId == h.Id ? "Lt" : World.Surname(W.HoodById(crew.LieutenantHoodId).Name);
             string[] cols = { h.Name, $"{h.Age(W.Week)}", $"{h.Intimidation}", $"{h.Muscle}", $"{h.Brains}", $"{h.Stealth}", $"{h.Loyalty}", crewText, state };
             for (int i = 0; i < cols.Length; i++) it.SetText(i, cols[i]);
-            string tip = $"{h.Name}, {h.Age(W.Week)}" + (h.Family ? ", family" : "") + $"\nIntimidation {h.Intimidation}, Muscle {h.Muscle}, Brains {h.Brains}, Stealth {h.Stealth}\nLoyalty {h.Loyalty}/100, ambition {h.Ambition}/100, wage ${h.Wage}/week\n{GearLine(h)}" + (job != null ? $"\nThis week: {job}" : "");
+            string tip = $"{h.Name}, {h.Age(W.Week)}, {Content.Label(h.Origin)}" + (h.Family ? ", family" : "") + $"\nIntimidation {h.Intimidation}, Muscle {h.Muscle}, Brains {h.Brains}, Stealth {h.Stealth}\nLoyalty {h.Loyalty}/100, ambition {h.Ambition}/100, wage ${h.Wage}/week\n{GearLine(h)}" + (job != null ? $"\nThis week: {job}" : "");
             for (int i = 0; i < cols.Length; i++) it.SetTooltipText(i, tip);
             if (h.Loyalty < 30) it.SetCustomColor(6, Palette.Bad);
             if (h.Age(W.Week) >= 65) it.SetCustomColor(1, Palette.Bad);

@@ -235,7 +235,7 @@ public sealed partial class World
             var lot = free[i];
             var kind = kinds[Rng.Range(0, kinds.Length - 1)];
             var (min, max) = Content.TakingsFor(kind);
-            string owner = Rng.Pick(Content.LastNames);
+            string owner = LastName(Neighbourhood(lot.WardId));
             lot.Use = LotUse.Business;
             lot.BusinessId = i;
             Businesses.Add(new Business
@@ -284,7 +284,8 @@ public sealed partial class World
     public StreetPerson NewPerson(PersonKind kind, Lot lot, int weeks, int gangId = -1, int hoodId = -1, string about = "")
     {
         bool drifter = kind == PersonKind.Drifter;
-        string first = Rng.Pick(Content.FirstNames), last = Rng.Pick(Content.LastNames);
+        var origin = Neighbourhood(lot.WardId);
+        string first = FirstName(origin), last = LastName(origin);
         string name = kind switch
         {
             PersonKind.BeatCop => $"Officer {last}",
@@ -298,6 +299,7 @@ public sealed partial class World
             Name = name,
             LotId = lot.Id,
             WardId = lot.WardId,
+            Origin = origin,
             Intimidation = drifter ? Rng.Range(2, 9) : 0,
             Muscle = drifter ? Rng.Range(2, 9) : 0,
             Brains = drifter ? Rng.Range(2, 9) : 0,
@@ -325,10 +327,11 @@ public sealed partial class World
             Muscle = p.Muscle,
             Brains = p.Brains,
             Stealth = p.Stealth,
-            Loyalty = Rng.Range(45, 85),
+            Loyalty = StartingLoyalty(gang.Id, p.Origin, Rng.Range(45, 85)),
             Ambition = Rng.Range(10, 90),
             JoinedWeek = Week,
             BornWeek = p.BornWeek,
+            Origin = p.Origin,
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
@@ -375,7 +378,7 @@ public sealed partial class World
 
         if (boss is null)
         {
-            boss = NewHood(gang.Id, bossQuality: true);
+            boss = NewHood(gang.Id, bossQuality: true, Neighbourhood(hq.WardId));
         }
         else
         {
@@ -394,12 +397,14 @@ public sealed partial class World
         return gang;
     }
 
-    public Hood NewHood(int gangId, bool bossQuality)
+    /// <summary>A new man for the outfit. Unless told otherwise, he comes from the boss's people or the outfit's neighbourhoods.</summary>
+    public Hood NewHood(int gangId, bool bossQuality, Ethnicity origin = Ethnicity.Unknown)
     {
+        if (origin == Ethnicity.Unknown) origin = RecruitOrigin(gangId);
         int lo = bossQuality ? 4 : 1, hi = bossQuality ? 9 : 8;
         int age = bossQuality ? Rng.Range(32, 50) : Rng.Range(18, 40);
-        string first = Rng.Pick(Content.FirstNames);
-        string last = Rng.Pick(Content.LastNames);
+        string first = FirstName(origin);
+        string last = LastName(origin);
         string name = Rng.Chance(0.3) ? $"{first} \"{Rng.Pick(Content.Nicknames)}\" {last}" : $"{first} {last}";
         var hood = new Hood
         {
@@ -410,9 +415,10 @@ public sealed partial class World
             Muscle = Rng.Range(lo, hi),
             Brains = Rng.Range(lo, hi),
             Stealth = Rng.Range(lo, hi),
-            Loyalty = bossQuality ? 100 : Rng.Range(40, 90),
+            Loyalty = bossQuality ? 100 : StartingLoyalty(gangId, origin, Rng.Range(40, 90)),
             Ambition = Rng.Range(10, 90),
             JoinedWeek = Week,
+            Origin = origin,
             BornWeek = Week - age * Content.WeeksPerYear - Rng.Range(0, Content.WeeksPerYear - 1),
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
@@ -424,7 +430,7 @@ public sealed partial class World
     public Hood NewRelative(Gang gang)
     {
         var boss = HoodById(gang.BossHoodId);
-        string first = Rng.Pick(Content.FirstNames);
+        string first = FirstName(boss.Origin);
         string relation = Rng.Chance(0.5) ? "son" : "nephew";
         var hood = new Hood
         {
@@ -436,6 +442,7 @@ public sealed partial class World
             Brains = Rng.Range(3, 7),
             Stealth = Rng.Range(2, 6),
             Loyalty = 95,
+            Origin = boss.Origin,
             Ambition = Rng.Range(20, 60),
             JoinedWeek = Week,
             BornWeek = Week - Rng.Range(17, 22) * Content.WeeksPerYear - Rng.Range(0, Content.WeeksPerYear - 1),
@@ -535,6 +542,7 @@ public sealed partial class World
         w.PlaceShops();
         w.PlaceLines();
         w.PlaceLocals();
+        w.GiveOrigins();
         return w;
     }
 

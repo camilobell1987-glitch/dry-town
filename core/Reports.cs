@@ -47,7 +47,7 @@ public static partial class Reports
             string ward = w.Wards.ElementAtOrDefault(p.WardId)?.Name ?? "";
             string line = p.Kind switch
             {
-                PersonKind.Drifter => $"drifter, Int {p.Intimidation} Mus {p.Muscle} Brn {p.Brains} Stl {p.Stealth}, asks ${p.Fee}, moves on in {p.WeeksLeft}w",
+                PersonKind.Drifter => $"{Content.Label(p.Origin)} drifter, Int {p.Intimidation} Mus {p.Muscle} Brn {p.Brains} Stl {p.Stealth}, asks ${p.Fee}, moves on in {p.WeeksLeft}w",
                 PersonKind.BeatCop => $"beat cop in {ward}" + (p.PaidByGangId >= 0 ? $", paid by {w.GangById(p.PaidByGangId).Name} this week" : ""),
                 PersonKind.Reporter => $"writing about {w.GangById(p.GangId).Name}, goes to print in {p.WeeksLeft}w" + (p.GangId == gangId ? $", would drop it for ${Content.StoryPrice(gang.Heat)}" : ""),
                 _ => $"saw {p.About}, testifies in {p.WeeksLeft}w, nerve {p.Nerve}",
@@ -259,12 +259,12 @@ public static partial class Reports
     public static string Gangs(World w)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"{"Gang",-28} {"Boss",-28} {"Turf",4} {"Men",4} {"Cash",8} {"Heat",4}");
+        sb.AppendLine($"{"Gang",-28} {"Boss",-28} {"People",-7} {"Turf",4} {"Men",4} {"Cash",8} {"Heat",4}");
         foreach (var g in w.LivingGangs.OrderByDescending(g => w.TurfOf(g.Id).Count()))
         {
             var boss = w.HoodById(g.BossHoodId);
             string name = g.IsPlayer ? $"{g.Name} (you)" : g.Name;
-            sb.AppendLine($"{Trim(name, 28),-28} {Trim(boss.Name, 28),-28} {w.TurfOf(g.Id).Count(),4} {w.HoodsOf(g.Id).Count(),4} {g.Cash,8} {g.Heat,4}");
+            sb.AppendLine($"{Trim(name, 28),-28} {Trim(boss.Name, 28),-28} {Content.Label(boss.Origin),-7} {w.TurfOf(g.Id).Count(),4} {w.HoodsOf(g.Id).Count(),4} {g.Cash,8} {g.Heat,4}");
         }
         return sb.ToString();
     }
@@ -273,11 +273,11 @@ public static partial class Reports
     {
         var sb = new StringBuilder();
         var gang = w.GangById(gangId);
-        sb.AppendLine($"{"Id",4} {"Name",-30} {"Age",3} {"Int",3} {"Mus",3} {"Brn",3} {"Stl",3} {"Loy",3} {"Wage",4}  {"State",-10} Carries / drives");
+        sb.AppendLine($"{"Id",4} {"Name",-30} {"People",-7} {"Age",3} {"Int",3} {"Mus",3} {"Brn",3} {"Stl",3} {"Loy",3} {"Wage",4}  {"State",-10} Carries / drives");
         foreach (var h in w.HoodsOf(gangId).OrderBy(h => h.Id))
         {
             string state = h.State == HoodState.Jailed ? (h.Case != null ? $"trial in {h.JailWeeks}w" : $"jailed {h.JailWeeks}w") : h.Id == gang.BossHoodId ? "boss" : h.Id == gang.HeirHoodId ? "heir" : "free";
-            sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {h.Age(w.Week),3} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state,-10} {Gear(h)}");
+            sb.AppendLine($"{h.Id,4} {Trim(h.Name, 30),-30} {Content.Label(h.Origin),-7} {h.Age(w.Week),3} {h.Intimidation,3} {h.Muscle,3} {h.Brains,3} {h.Stealth,3} {h.Loyalty,3} {h.Wage,4}  {state,-10} {Gear(h)}");
         }
         return sb.ToString();
     }
@@ -359,13 +359,13 @@ public static partial class Reports
         if (due is { } d) sb.AppendLine($"Election in {d.Week - w.Week + 1} weeks: {(d.Kind == ElectionKind.Mayor ? "mayor" : "aldermen")}.");
         else sb.AppendLine($"Next elections: aldermen week {Politics.NextElection(w, ElectionKind.Alderman) % Content.WeeksPerYear + 1} of {Content.StartYear + Politics.NextElection(w, ElectionKind.Alderman) / Content.WeeksPerYear}, " +
                            $"mayor {Content.StartYear + Politics.NextElection(w, ElectionKind.Mayor) / Content.WeeksPerYear}.");
-        sb.AppendLine($"{"Id",3} {"Ward",-16} {"Alderman",-30} {"Owned by",-24} {"Yours",5} {"Price",6}");
+        sb.AppendLine($"{"Id",3} {"Ward",-16} {"People",-7} {"Alderman",-30} {"Owned by",-24} {"Yours",5} {"Price",6}");
         foreach (var ward in w.Wards)
         {
             var biz = Politics.BusinessesIn(w, ward).ToList();
             string owner = ward.Reformer ? "nobody (reformer)" : ward.OwnerGangId >= 0 ? w.GangById(ward.OwnerGangId).Name + (ward.OwnMan ? " (own man)" : "") : "the party";
             string price = ward.Reformer || ward.OwnMan || ward.OwnerGangId == gangId ? "" : Politics.PayoffCost(w, ward, w.GangById(gangId)).ToString();
-            sb.AppendLine($"{ward.Id,3} {Trim(ward.Name, 16),-16} {Trim(ward.Alderman, 30),-30} {Trim(owner, 24),-24} {biz.Count(b => b.ProtectorGangId == gangId),2}/{biz.Count,-2} {price,6}");
+            sb.AppendLine($"{ward.Id,3} {Trim(ward.Name, 16),-16} {Content.Label(w.Neighbourhood(ward)),-7} {Trim(ward.Alderman, 30),-30} {Trim(owner, 24),-24} {biz.Count(b => b.ProtectorGangId == gangId),2}/{biz.Count,-2} {price,6}");
         }
         return sb.ToString();
     }

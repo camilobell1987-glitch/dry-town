@@ -40,6 +40,9 @@ public sealed class Hood
     /// <summary>Family of the boss who brought him in: they start green and loyal.</summary>
     public bool Family { get; set; }
 
+    /// <summary>Where his people came from.</summary>
+    public Ethnicity Origin { get; set; }
+
     public int Age(int week) => (week - BornWeek) / Content.WeeksPerYear;
 
     public Weapon Weapon { get; set; }
@@ -399,6 +402,9 @@ public sealed class StreetPerson
     /// <summary>Where he hangs about.</summary>
     public int LotId { get; set; }
     public int WardId { get; init; }
+
+    /// <summary>Where his people came from: usually the neighbourhood he's found in.</summary>
+    public Ethnicity Origin { get; set; }
 
     // A drifter's skills, 1 to 10, which he keeps if he's hired.
     public int Intimidation { get; init; }

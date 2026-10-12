@@ -62,7 +62,10 @@ public class Phase7Tests
         long cash = me.Cash;
         sim.AdvanceWeek(Only(me, rival, new HireOrder(me.Id, drifter.Id)));
         var hood = w.HoodsOf(me.Id).Single(h => h.Name == drifter.Name);
-        Assert.Equal((drifter.Intimidation, drifter.Muscle, drifter.Brains, drifter.Stealth), (hood.Intimidation, hood.Muscle, hood.Brains, hood.Stealth));
+        // He may have learned a thing or two in his first week.
+        Assert.InRange(hood.Intimidation + hood.Muscle + hood.Brains + hood.Stealth - (drifter.Intimidation + drifter.Muscle + drifter.Brains + drifter.Stealth), 0, 1);
+        Assert.True(hood.Intimidation >= drifter.Intimidation && hood.Muscle >= drifter.Muscle && hood.Brains >= drifter.Brains && hood.Stealth >= drifter.Stealth);
+        Assert.Equal(drifter.Origin, hood.Origin);
         Assert.DoesNotContain(drifter, w.People);
         Assert.True(me.Cash <= cash - drifter.Fee);
     }
@@ -90,7 +93,7 @@ public class Phase7Tests
     public void AHitKillsTheTargetOrCostsTheShooter()
     {
         int dead = 0;
-        for (ulong seed = 1; seed <= 20; seed++)
+        for (ulong seed = 1; seed <= 40; seed++)
         {
             var (sim, me, rival, _) = Duel(seed);
             var w = sim.World;
@@ -102,7 +105,7 @@ public class Phase7Tests
             Assert.Contains(w.Events, e => e.Kind == EventKind.Hit);
             if (target.State == HoodState.Dead) dead++;
         }
-        Assert.True(dead >= 14, $"only {dead}/20 hits came off");
+        Assert.True(dead >= 28, $"only {dead}/40 hits came off");
     }
 
     [Fact]

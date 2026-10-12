@@ -348,7 +348,8 @@ public sealed partial class Simulation
     /// </summary>
     public static double ExtortChance(World w, Gang gang, Hood hood, Business biz, int backup = 0) =>
         Math.Clamp(0.35 + (hood.Intimidation - biz.Toughness) * 0.08 - Math.Max(0, w.BlocksFromHq(gang, biz) - 2) * 0.04
-            + Math.Min(backup, Crew.MaxMembers) * 0.06 + Content.Guns[hood.Weapon].Extort, 0.05, 0.95);
+            + Math.Min(backup, Crew.MaxMembers) * 0.06 + Content.Guns[hood.Weapon].Extort
+            + (w.Wards.Count == 0 ? 0 : w.AtHome(hood, biz) ? Content.HomeShakedown : -Content.StrangerShakedown), 0.05, 0.95);
 
     private void Extort(Gang gang, ExtortOrder o)
     {
@@ -572,7 +573,9 @@ public sealed partial class Simulation
                     $"Collected ${pay} from {biz.Name}."));
             }
 
-            biz.Resentment = own ? 0 : Math.Clamp(biz.Resentment + (biz.ProtectionRate - 12) / 2 - 1, 0, 100);
+            // A shopkeeper minds less paying his own people.
+            int home = w.PeopleOf(gang) == w.Neighbourhood(biz) ? Content.HomeResentment : 0;
+            biz.Resentment = own ? 0 : Math.Clamp(biz.Resentment + (biz.ProtectionRate - 12) / 2 - 1 - home, 0, 100);
 
             // A casino is its owners' own business. Whoever takes the hotel from them gets the rooms, not the tables.
             if (biz.Racket == RacketKind.Casino && !World.Working(biz))

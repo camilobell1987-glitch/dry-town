@@ -109,8 +109,15 @@ public static class Politics
         var names = Content.WardNames.ToList();
         w.Rng.Shuffle(names);
         w.Wards.Clear();
+        // A name that belongs to one people's neighbourhood only goes to a ward of theirs.
+        var left = names.ToList();
         for (int i = 0; i < w.Map.WardCount; i++)
-            w.Wards.Add(new Ward { Id = i, Name = names[i % names.Count], Alderman = NewPolitician(w.Rng, false) });
+        {
+            var people = w.Neighbourhood(i);
+            string name = left.FirstOrDefault(n => !Content.WardNameOf.TryGetValue(n, out var e) || e == people) ?? names[i % names.Count];
+            left.Remove(name);
+            w.Wards.Add(new Ward { Id = i, Name = name, Alderman = NewPolitician(w.Rng, false) });
+        }
         w.Hall = new CityHall { Mayor = NewPolitician(w.Rng, false), DA = NewPolitician(w.Rng, false) };
     }
 
@@ -171,6 +178,14 @@ public static class Politics
     /// <summary>Where the ward votes: outside its busiest business.</summary>
     public static int PollingPlace(World w, Ward ward, int fallback) =>
         BusinessesIn(w, ward).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).Select(b => b.LotId).DefaultIfEmpty(fallback).First();
+
+    /// <summary>What a man on the ballot is worth: more in a ward of his own people.</summary>
+    public static int CandidateWeight(World w, Ward ward, Hood man) =>
+        Content.CandidateWeight(man) + (man.Origin == w.Neighbourhood(ward) ? Content.HomeCandidate : 0);
+
+    /// <summary>The votes a man at the polls turns out: more among his own people, who know him.</summary>
+    public static int PollsVotes(World w, Ward ward, Hood man) =>
+        (int)(Content.PollsVotes(man) * (man.Origin == w.Neighbourhood(ward) ? Content.HomePolls : 1));
 
     /// <summary>Chance a man leaning on voters gets picked up. Reformers watch their own polls, and a reform mayor's police watch everyone's.</summary>
     public static double PollsRisk(World w, Ward ward, Hood man) =>
@@ -304,7 +319,7 @@ public static class Politics
                 int turf = BusinessesIn(w, ward).Count(b => b.ProtectorGangId == g.Id);
                 double weight = money * 0.6 + polls + turf * 25
                     + (incumbent ? ward.OwnMan ? Content.OwnManIncumbency : 250 : 0)
-                    + (man != null ? Content.CandidateWeight(man) : 0);
+                    + (man != null ? CandidateWeight(w, ward, man) : 0);
                 string name = man?.Name ?? (incumbent ? ward.Alderman : NewPolitician(w.Rng, false));
                 string ticket = man != null || incumbent && ward.OwnMan ? $"{g.Name}'s own man" : $"{g.Name}'s money";
                 field.Add(new(g.Id, name, ticket, weight, man));
