@@ -912,8 +912,12 @@ public sealed partial class Simulation
         foreach (var gang in w.LivingGangs.ToList())
         {
             var boss = w.Hoods.First(h => h.Id == gang.BossHoodId);
-            bool longStretch = boss.State == HoodState.Jailed && boss.JailWeeks > 26;
-            if (boss.IsActive && !longStretch) continue;
+            if (w.RunsFromInside(gang) && boss.IsAvailable) { BackInTheChair(gang, boss); continue; }
+            bool inside = w.RunsFromInside(gang) && boss.State == HoodState.Jailed;
+            bool longStretch = boss.State == HoodState.Jailed && boss.JailWeeks > Content.LongStretch;
+            if (!inside) gang.InsideSinceWeek = -1;
+            if (boss.IsActive && !longStretch && !inside) continue;
+            if ((longStretch || inside) && FromInside(gang, boss)) continue;
             if (longStretch)
             {
                 // He'll come out a lieutenant, and not a happy one.

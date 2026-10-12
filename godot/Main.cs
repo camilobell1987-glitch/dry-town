@@ -291,7 +291,7 @@ public partial class Main : Control
         if (p.Alive)
         {
             var boss = W.HoodById(p.BossHoodId);
-            _date.Text += $" · {boss.Name}, {boss.Age(W.Week)}";
+            _date.Text += $" · {boss.Name}, {boss.Age(W.Week)}" + (W.RunsFromInside(p) ? ", inside" : "");
         }
         CashLabel(p);
         _heat.Text = $"Heat {p.Heat}";
@@ -520,7 +520,7 @@ public partial class Main : Control
             var it = _menTree.CreateItem(root);
             jobs.TryGetValue(h.Id, out var job);
             string state = h.Id == W.Player.BossHoodId ? "Boss" : h.State == HoodState.Jailed ? (h.Case != null ? $"Trial {h.JailWeeks}w" : $"Jail {h.JailWeeks}w") : busy.Contains(h.Id) ? "Job" : "Free";
-            if (h.Id == W.Player.HeirHoodId) state = h.State == HoodState.Jailed ? state : "Heir";
+            if (h.Id == W.Player.HeirHoodId) state = h.State == HoodState.Jailed ? state : W.RunsFromInside(W.Player) ? "Street" : "Heir";
             var crew = W.CrewOfHood(h.Id);
             string crewText = crew == null ? "" : crew.LieutenantHoodId == h.Id ? "Lt" : World.Surname(W.HoodById(crew.LieutenantHoodId).Name);
             string[] cols = { h.Name, $"{h.Age(W.Week)}", $"{h.Intimidation}", $"{h.Muscle}", $"{h.Brains}", $"{h.Stealth}", $"{h.Loyalty}", crewText, state };
@@ -641,6 +641,11 @@ public partial class Main : Control
         var boss = W.HoodById(p.BossHoodId);
         AddLabel(_crewsPanel, "The family", Palette.Player, 17);
         int age = boss.Age(W.Week);
+        if (W.RunsFromInside(p))
+        {
+            InsideSection(boss);
+            return;
+        }
         AddLabel(_crewsPanel, $"{boss.Name} runs the outfit. He is {age}" + (age >= 60 ? ", and not getting any younger." : "."), age >= 65 ? Palette.Bad : Palette.Ink, wrap: true);
         var heir = W.Hoods.FirstOrDefault(h => h.Id == p.HeirHoodId);
         AddLabel(_crewsPanel, heir != null
@@ -659,6 +664,8 @@ public partial class Main : Control
             name.TooltipText = "The most ambitious man passed over will take it badly";
             _crewsPanel.AddChild(row);
         }
+
+        InsidePlan(boss);
 
         if (!_map.Live)
         {
@@ -1045,6 +1052,18 @@ public partial class Main : Control
         if (weeks > 0 && IsInstanceValid(_briefing)) _briefing!.Hide();
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
         if (Arg("--repeal") is string repeal) SetUpRepeal(repeal);
+        if (Flag("--inside"))
+        {
+            // The boss goes away for a year and a half, and the week runs so he takes up the chair from his cell.
+            var boss = W.HoodById(W.Player.BossHoodId);
+            W.Player.Cash = Math.Max(W.Player.Cash, 5000);
+            _shell.Sim.Jail(boss, 78, "for running a disorderly house");
+            boss.Case = null;
+            boss.JailWeeks = 78;
+            _shell.Execute("auto");
+            _shell.EndWeek();
+            _news.Text = WeekReport(W.Week - 1);
+        }
         if (Arg("--fronts") is string fronts)
         {
             // Buy the richest places on your turf as fronts, then let a few weeks wash money through them.
