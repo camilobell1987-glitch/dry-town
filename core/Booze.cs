@@ -79,12 +79,12 @@ public sealed partial class World
     public static bool Liquor(RacketKind r) => r is RacketKind.Speakeasy or RacketKind.Still;
 
     /// <summary>
-    /// The gang's speakeasies its lines keep in real liquor, oldest first, as many as the lines carry.
-    /// A line whose shipment was stopped this week carries nothing.
+    /// The gang's speakeasies its lines and its warehouse keep in real liquor, oldest first, as many as
+    /// the lines carry and a case each from the warehouse. A line whose shipment was stopped this week carries nothing.
     /// </summary>
     public HashSet<int> Supplied(int gangId, bool thisWeek = true)
     {
-        int room = LinesOf(gangId).Where(l => !thisWeek || l.WaylaidWeek != Week).Sum(l => l.Capacity);
+        int room = LineRoom(gangId, thisWeek) + GangById(gangId).Cellar;
         return TurfOf(gangId).Where(b => b.Racket == RacketKind.Speakeasy && b.IsOpen).OrderBy(b => b.Id)
             .Take(room).Select(b => b.Id).ToHashSet();
     }

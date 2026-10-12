@@ -1105,6 +1105,7 @@ public partial class Main : Control
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
         if (Arg("--repeal") is string repeal) SetUpRepeal(repeal);
         if (Flag("--untouchables")) SetUpUntouchables();
+        if (Flag("--rumrow")) SetUpRumRow();
         if (Flag("--reputation"))
         {
             // A boss the papers have started writing about, with a soup kitchen.
@@ -1399,6 +1400,11 @@ public partial class Main : Control
             if (Arg("--scroll-talk") is string talkDown && _talkPanel.GetParent()?.GetParent() is ScrollContainer talkScroll)
             {
                 talkScroll.ScrollVertical = int.Parse(talkDown);
+                for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
+            if (Arg("--scroll-selected") is string selDown && _businessPanel.GetParent()?.GetParent() is ScrollContainer selScroll)
+            {
+                selScroll.ScrollVertical = int.Parse(selDown);
                 for (int i = 0; i < 2; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
             if (Arg("--scroll-men") is string down && _crewsPanel.GetParent()?.GetParent() is ScrollContainer menScroll)

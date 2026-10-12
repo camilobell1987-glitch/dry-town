@@ -490,6 +490,7 @@ public sealed partial class World
         People = People,
         Banks = Banks,
         SupplyLines = SupplyLines,
+        Boats = Boats,
         Locals = Locals,
         StreetNames = Map.StreetNames,
         AvenueNames = Map.AvenueNames,
@@ -545,6 +546,7 @@ public sealed partial class World
         foreach (var (kind, week) in d.CityEventLast) w.CityEventLast[kind] = week;
         // Cities saved before there were banks get them now.
         w.SupplyLines.AddRange(d.SupplyLines);
+        w.Boats.AddRange(d.Boats);
         w.Locals.AddRange(d.Locals);
         w.PlaceBanks();
         w.PlaceShops();

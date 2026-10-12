@@ -85,6 +85,7 @@ public sealed partial class Simulation
             w.Log(EventKind.Booze, -1, $"With {w.GangById(line.OwnerGangId).Name} gone, the suppliers on {line.Name} are looking for a new buyer.");
             line.OwnerGangId = -1;
         }
+        foreach (var boat in w.Boats.Where(b => !w.GangById(b.GangId).Alive).ToList()) w.Boats.Remove(boat);
         if (!w.Prohibition) return;
 
         foreach (var line in w.SupplyLines.Where(l => l.OwnerGangId >= 0))
@@ -95,6 +96,9 @@ public sealed partial class Simulation
             line.OwnerGangId = -1;
             line.IdleWeeks = 0;
         }
+
+        foreach (var gang in w.LivingGangs) DrinkCellar(gang);
+        RumRow();
 
         foreach (var gang in w.LivingGangs)
         {
@@ -119,5 +123,6 @@ public sealed partial class Simulation
         var w = World;
         foreach (var line in w.SupplyLines) line.OwnerGangId = -1;
         foreach (var gang in w.Gangs) gang.Cut = Cut.Straight;
+        SellBoats();
     }
 }

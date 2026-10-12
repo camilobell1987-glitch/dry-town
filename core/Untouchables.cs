@@ -6,7 +6,7 @@ public static partial class Content
     /// <summary>The year the Prohibition Bureau sends its squad to the city. It stays until repeal.</summary>
     public const int UntouchablesYear = 1927;
 
-    /// <summary>The squad doesn't bother with an outfit running fewer stills and speakeasies than this, counting each supply line as two.</summary>
+    /// <summary>The squad doesn't bother with an outfit running fewer stills and speakeasies than this, counting each supply line as two and each boat as one.</summary>
     public const int SquadRackets = 4;
 
     /// <summary>Weekly chance the squad raids one of its bootlegger's stills or speakeasies, and what each point of heat adds.</summary>
@@ -56,7 +56,7 @@ public sealed partial class World
     public IEnumerable<Business> LiquorOf(int gangId) => TurfOf(gangId).Where(b => Content.IsLiquor(b.Racket));
 
     /// <summary>How big a bootlegger the squad thinks the gang is.</summary>
-    public int Bootlegging(Gang g) => LiquorOf(g.Id).Count() + LinesOf(g.Id).Count() * 2;
+    public int Bootlegging(Gang g) => LiquorOf(g.Id).Count() + LinesOf(g.Id).Count() * 2 + BoatsOf(g.Id).Count();
 
     public double SquadChance(Gang g) => SquadTarget?.Id != g.Id || !LiquorOf(g.Id).Any() ? 0 : Content.SquadRaid + g.Heat * Content.SquadRaidPerHeat;
 

@@ -5,8 +5,8 @@ namespace DryTown.Core;
 /// <summary>Everything needed to carry on a city exactly where it was left: the world, the dice, and the orders on the desk.</summary>
 public sealed class SaveData
 {
-    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals. 9 added rap sheets. 10 added vote counts, candidates and the district attorney. 11 added city events. 12 added rats, informers and planted men. 13 added supply lines and cut liquor. 14 added wars. 15 added union locals and strikes. 16 added scenarios. 17 added the racing wire and the Bureau's public enemy. 18 added the Commission. 19 added where each man's people came from. 20 added bosses running their outfits from a cell. 21 added the campaign. 22 added saving partway through a week. 23 added bail and men on the lam. 24 added the Untouchables. 25 added the boss's name and soup kitchens.</summary>
-    public const int CurrentVersion = 25;
+    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals. 9 added rap sheets. 10 added vote counts, candidates and the district attorney. 11 added city events. 12 added rats, informers and planted men. 13 added supply lines and cut liquor. 14 added wars. 15 added union locals and strikes. 16 added scenarios. 17 added the racing wire and the Bureau's public enemy. 18 added the Commission. 19 added where each man's people came from. 20 added bosses running their outfits from a cell. 21 added the campaign. 22 added saving partway through a week. 23 added bail and men on the lam. 24 added the Untouchables. 25 added the boss's name and soup kitchens. 26 added boats on rum row.</summary>
+    public const int CurrentVersion = 26;
 
     public int Version { get; set; } = CurrentVersion;
     public DateTime SavedAt { get; set; }
@@ -36,6 +36,7 @@ public sealed class SaveData
     public List<StreetPerson> People { get; set; } = new();
     public List<Bank> Banks { get; set; } = new();
     public List<SupplyLine> SupplyLines { get; set; } = new();
+    public List<Boat> Boats { get; set; } = new();
     public List<UnionLocal> Locals { get; set; } = new();
     public List<GameEvent> Events { get; set; } = new();
     public Dictionary<int, WeekLedger> LastLedger { get; set; } = new();

@@ -192,6 +192,9 @@ public sealed class Gang
     /// <summary>Whether the outfit runs a soup kitchen in the boss's name.</summary>
     public bool SoupKitchen { get; set; }
 
+    /// <summary>Cases of liquor the gang's boats have brought in and its speakeasies haven't poured yet.</summary>
+    public int Cellar { get; set; }
+
     /// <summary>How far the gang stretches the liquor it sells: more money, and more chance of a bad batch.</summary>
     public Cut Cut { get; set; }
 }
