@@ -189,3 +189,6 @@ public sealed record BoatOrder(int GangId) : Order(GangId);
 
 /// <summary>Send one of the gang's boats up to St. Pierre or down to Nassau for a load.</summary>
 public sealed record SailOrder(int GangId, int BoatId, Run Run) : Order(GangId);
+
+/// <summary>Send a man to buy the fighter or the jockey on this week's card.</summary>
+public sealed record FixOrder(int GangId, int HoodId) : Order(GangId);

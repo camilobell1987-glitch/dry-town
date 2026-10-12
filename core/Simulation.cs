@@ -128,6 +128,7 @@ public sealed partial class Simulation
                 case CutOrder o: w.SetCut(gang, o.Cut); break;
                 case BoatOrder: w.BuyBoat(gang); break;
                 case SailOrder o when w.BoatById(o.BoatId) is { } boat: w.Sail(gang, boat, o.Run); break;
+                case FixOrder o: FixCard(gang, o); break;
                 case UnionOrder o: TakeLocal(gang, o); break;
                 case StrikeOrder o when w.LocalById(o.LocalId) is { } local && o.BusinessId >= 0 && o.BusinessId < w.Businesses.Count: w.CallStrike(gang, local, w.BusinessById(o.BusinessId)); break;
                 case HireOrder o: Hire(gang, o); break;
@@ -228,6 +229,7 @@ public sealed partial class Simulation
         HuntOrder h => new[] { h.HoodId },
         SeenToOrder s => new[] { s.HoodId },
         PlantOrder p => new[] { p.HoodId },
+        FixOrder f => new[] { f.HoodId },
         _ => Array.Empty<int>(),
     };
 

@@ -378,6 +378,8 @@ public enum EventKind
     Name,
     /// <summary>The Prohibition Bureau's squad: who it's after, its raids, and the grand jury.</summary>
     Untouchables,
+    /// <summary>Fixed fights and races.</summary>
+    Fix,
 }
 
 public sealed record GameEvent(int Week, EventKind Kind, int GangId, string Text, int Tick = 0);
