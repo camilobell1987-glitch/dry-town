@@ -52,6 +52,19 @@ public static class Scenarios
 
     public static int Deadline(ScenarioInfo info) => (info.DeadlineYear - Content.StartYear) * Content.WeeksPerYear;
 
+    /// <summary>The year this city's goal must be met by: the scenario's own, or its chapter's in a campaign.</summary>
+    public static int DeadlineYear(World w) =>
+        w.Settings.Campaign != null ? Campaign.Current(w).DeadlineYear : Info(w.Settings.Scenario).DeadlineYear;
+
+    public static int Deadline(World w) => (DeadlineYear(w) - Content.StartYear) * Content.WeeksPerYear;
+
+    /// <summary>The goal as it reads in this city, with its own deadline.</summary>
+    public static string Goal(World w)
+    {
+        var info = Info(w.Settings.Scenario);
+        return info.Goal.Replace(info.DeadlineYear.ToString(), DeadlineYear(w).ToString());
+    }
+
     /// <summary>The settings for a new game of this scenario.</summary>
     public static WorldSettings Settings(ScenarioKind kind, ulong seed)
     {
@@ -117,11 +130,17 @@ public static class Scenarios
                 // The Depression is two years in already, and lasts until repeal.
                 var hard = sim.Begin(CityEventKind.Depression);
                 w.CityEvents.Remove(hard);
-                w.CityEvents.Add(new CityEvent { Kind = hard.Kind, StartWeek = hard.StartWeek, UntilWeek = Deadline(Info(ScenarioKind.LastCall)), WardId = hard.WardId });
+                w.CityEvents.Add(new CityEvent { Kind = hard.Kind, StartWeek = hard.StartWeek, UntilWeek = Deadline(w), WardId = hard.WardId });
                 break;
             }
         }
-        w.Log(EventKind.Era, me.Id, $"{Info(w.Settings.Scenario).Title}. {Info(w.Settings.Scenario).Goal}");
+        if (w.Settings.Campaign is { } campaign)
+        {
+            // Word of the cities he won gets here before he does.
+            me.Cash += Campaign.WordAhead * campaign.Won;
+            if (Campaign.Bridge(campaign) is { Length: > 0 } bridge) w.Log(EventKind.Era, me.Id, bridge);
+        }
+        w.Log(EventKind.Era, me.Id, $"{Info(w.Settings.Scenario).Title}. {Goal(w)}");
     }
 
     /// <summary>Whether the goal is met right now.</summary>
@@ -163,12 +182,13 @@ public static class Scenarios
     {
         if (w.Settings.Scenario == ScenarioKind.None || w.Goal.Outcome != ScenarioOutcome.Playing) return;
         var info = Info(w.Settings.Scenario);
-        bool due = w.Week + 1 >= Deadline(info);
+        bool due = w.Week + 1 >= Deadline(w);
         if (!w.Player.Alive) { End(w, ScenarioOutcome.Lost, $"{info.Title} is lost: your outfit is finished."); return; }
         bool met = Met(w);
         bool atTheEnd = w.Settings.Scenario == ScenarioKind.SurviveTheCrusade;
         if (met && (!atTheEnd || due)) End(w, ScenarioOutcome.Won, $"{info.Title} is won in {Reports.Date(w)}. The city is yours to carry on in for as long as you like.");
-        else if (due) End(w, ScenarioOutcome.Lost, $"{info.Title} is lost: time ran out at the start of {info.DeadlineYear}. You can carry on in the city anyway.");
+        else if (due) End(w, ScenarioOutcome.Lost, $"{info.Title} is lost: time ran out at the start of {DeadlineYear(w)}. You can carry on in the city anyway.");
+        if (w.Goal.Outcome != ScenarioOutcome.Playing && Campaign.Verdict(w) is { } verdict) w.Log(EventKind.Era, w.Player.Id, verdict);
     }
 
     private static void End(World w, ScenarioOutcome outcome, string text)
@@ -226,8 +246,9 @@ public static class Scenarios
         {
             ScenarioOutcome.Won => $"Won in {Reports.Date(w, w.Goal.Week)}.",
             ScenarioOutcome.Lost => $"Lost in {Reports.Date(w, w.Goal.Week)}.",
-            _ => $"{Deadline(info) - w.Week} weeks left.",
+            _ => $"{Deadline(w) - w.Week} weeks left.",
         };
-        return $"{info.Title}: {info.Goal}\n{Progress(w)} {state}";
+        string campaign = w.Settings.Campaign is { } c ? $"Chapter {c.Chapter + 1} of {Campaign.Chapters.Length}. " : "";
+        return $"{campaign}{info.Title}: {Goal(w)}\n{Progress(w)} {state}";
     }
 }

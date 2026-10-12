@@ -758,6 +758,7 @@ public partial class Main : Control
     {
         if (id is >= 2 and <= 6) { _citySize = (CitySize)(id - 2); _scenario = ScenarioKind.None; NewGame(GD.Randi()); }
         else if (id >= ScenarioMenuId && id < ScenarioMenuId + Scenarios.All.Length) StartScenario((int)id - ScenarioMenuId);
+        else if (id is CampaignMenuId or NextChapterMenuId or RetryChapterMenuId) OnCampaignMenu(id);
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
         else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
     }
@@ -967,6 +968,7 @@ public partial class Main : Control
             _console.AddText($"\n> {text}\n");
             if (text.Trim() == "end") { EndWeek(); return; }
             _console.AddText(_shell.Execute(text) ?? "");
+            if (_shell.NextCity is { } next) { _nextCity = next.World.Settings; NewGame(next.World.Settings.Seed); }
             RefreshAll();
         };
         box.AddChild(_consoleInput);
@@ -1046,12 +1048,31 @@ public partial class Main : Control
 
         if (Arg("--size") is string size) _citySize = Enum.Parse<CitySize>(size, true);
         if (Arg("--scenario") is string scenario) _scenario = Enum.Parse<ScenarioKind>(scenario, true);
+        if (Arg("--campaign") is string chapter)
+        {
+            // A campaign at this chapter, every chapter before it won.
+            var settings = Campaign.Start(ulong.Parse(Arg("--seed") ?? "1"));
+            for (int i = 0; i < int.Parse(chapter); i++)
+            {
+                var before = Simulation.New(settings).World;
+                before.Goal.Outcome = ScenarioOutcome.Won;
+                settings = Campaign.Next(before, settings.Seed + 1);
+            }
+            _nextCity = settings;
+        }
         if (Arg("--seed") is string seed) NewGame(ulong.Parse(seed));
         if (Arg("--load") is string slot) GD.Print(LoadGame(int.Parse(slot)) ? $"Loaded {SlotPath(int.Parse(slot))}" : "Load failed");
         int weeks = int.Parse(Arg("--weeks") ?? "0");
         if (weeks > 0 && IsInstanceValid(_briefing)) _briefing!.Hide();
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
         if (Arg("--repeal") is string repeal) SetUpRepeal(repeal);
+        if (Flag("--verdict"))
+        {
+            if (IsInstanceValid(_briefing)) _briefing!.Hide();
+            W.Goal.Outcome = ScenarioOutcome.Won;
+            W.Goal.Week = _replayWeek = W.Week;
+            AnnounceVerdict();
+        }
         if (Flag("--inside"))
         {
             // The boss goes away for a year and a half, and the week runs so he takes up the chair from his cell.
