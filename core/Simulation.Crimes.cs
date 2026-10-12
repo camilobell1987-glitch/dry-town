@@ -131,6 +131,8 @@ public sealed partial class Simulation
         var backup = TakeBackup(gang, o.Backup);
         var backupIds = backup.Select(h => h.Id).ToList();
         var rival = w.GangById(target.GangId);
+        if (rival.BossHoodId == target.Id && w.BreaksRules(gang.Id, rival.Id, SanctionKind.Hit))
+            w.Breach(gang, rival, $"sent men after {target.Name}, boss of {rival.Name},");
         w.Hostile(gang, rival, rival.BossHoodId == target.Id ? Content.GrudgeBossHit : Content.GrudgeHit);
         int where = HauntOf(w, target);
 

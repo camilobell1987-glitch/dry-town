@@ -25,6 +25,12 @@ public static partial class AiPlanner
             .Where(r => w.CannotDeclare(g, r) == null && w.GrudgeOf(g.Id, r.Id) >= 60 && w.Power(g) >= w.Power(r) * 0.9 && !(r.IsPlayer && wary))
             .OrderByDescending(r => w.GrudgeOf(g.Id, r.Id)).ThenBy(r => r.Id).FirstOrDefault();
         if (enemy == null || g.Cash < w.HoodsOf(g.Id).Count() * Content.MattressCost * 8 || !w.Rng.Chance(0.5)) return false;
+        if (w.BreaksRules(g.Id, enemy.Id, SanctionKind.War))
+        {
+            // At the table, an outfit asks first. Only a hothead with murder in his heart goes ahead when the answer is no.
+            if (w.CannotAsk(g, enemy) == null && w.WouldPass(g, enemy)) w.Ask(g, enemy, SanctionKind.War);
+            else if (!(g.Aggression > Content.BreachAggression && w.GrudgeOf(g.Id, enemy.Id) >= Content.BreachGrudge && w.Rng.Chance(Content.BreachChance))) return false;
+        }
         w.Declare(g, enemy);
         return true;
     }

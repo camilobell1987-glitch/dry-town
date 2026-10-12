@@ -250,6 +250,7 @@ public sealed partial class Simulation
         Wars();
         Feds();
         Gmen();
+        Sit();
         CityNews();
         Loyalty();
         Aging();
