@@ -251,14 +251,6 @@ public class Phase3Tests
     }
 
     [Fact]
-    public void CantSaveMidWeek()
-    {
-        var sim = Run(3, 2);
-        sim.BeginWeek();
-        Assert.Throws<InvalidOperationException>(() => SaveGame.Write(sim, new List<Order>()));
-    }
-
-    [Fact]
     public void RunningAWeekHourByHourMatchesRunningItAtOnce()
     {
         var a = Run(5, 20);

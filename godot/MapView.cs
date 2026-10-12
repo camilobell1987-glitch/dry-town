@@ -172,6 +172,29 @@ public partial class MapView : Control
     /// <summary>Where men stand at a door. A door facing away from the viewer is hidden by its own building, so they wait out in the street.</summary>
     private static Vector2 Doorstep(Lot lot) => new(lot.X + 0.5f, lot.FrontY < lot.Y ? lot.Y - 0.72f : lot.Y + 1.1f);
 
+    /// <summary>
+    /// Pick up a week loaded partway through at the hour it got to. Whatever happened before then is
+    /// shown as done, without the sounds and ticker lines it made at the time.
+    /// </summary>
+    public void ResumeReplay(Simulation sim)
+    {
+        if (World == null) return;
+        _sim = sim;
+        _shown = new Dictionary<int, (int, RacketKind)>(sim.StartOfWeek);
+        Live = true;
+        Clock = World.Tick;
+        _actors = new List<Actor>();
+        _fired.Clear();
+        _burntNow.Clear();
+        _collectIndex = 0;
+        _quiet = true;
+        Step();
+        _quiet = false;
+    }
+
+    /// <summary>True while a resumed week catches up, so what already happened makes no noise.</summary>
+    private bool _quiet;
+
     public void EndReplay()
     {
         Live = false;
@@ -216,7 +239,7 @@ public partial class MapView : Control
                 };
             }
             if (a is { Kind: ActionKind.Arson, Result: ActionResult.Success }) _burntNow.Add(a.BusinessId);
-            ActionHappened?.Invoke(a);
+            if (!_quiet) ActionHappened?.Invoke(a);
         }
     }
 
@@ -828,12 +851,5 @@ public partial class MapView : Control
         return path[^1];
     }
 
-    public static string ClockText(float tick)
-    {
-        string[] days = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
-        int day = Mathf.Clamp((int)(tick / 24), 0, 6);
-        int hour = (int)tick % 24;
-        string h = hour == 0 ? "midnight" : hour == 12 ? "noon" : hour < 12 ? $"{hour} AM" : $"{hour - 12} PM";
-        return $"{days[day]}, {h}";
-    }
+    public static string ClockText(float tick) => Reports.Hour((int)tick);
 }
