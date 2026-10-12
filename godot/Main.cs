@@ -58,6 +58,7 @@ public partial class Main : Control
 
     private void NewGame(ulong seed)
     {
+        StopReplay();
         Palette.Reset();
         _shell = new CommandShell(Simulation.New(NewSettings(seed)));
         _map.World = W;
@@ -78,7 +79,6 @@ public partial class Main : Control
     {
         if (_map.Live || !W.Player.Alive) return;
         _bossAtStartOfWeek = W.Player.BossHoodId;
-        var snapshot = W.Businesses.ToDictionary(b => b.Id, b => (b.ProtectorGangId, b.Racket));
         _replayWeek = W.Week;
         _ticker.Clear();
         _shell.StartWeek();
@@ -86,7 +86,7 @@ public partial class Main : Control
         foreach (var e in W.Events.Where(e => e.Week == _replayWeek && e.Kind == EventKind.Whisper && e.GangId == Me && e.Text.StartsWith("Word from ")))
             AppendTicker(e.Tick, e.GangId, e.Text);
         SetLive(true);
-        _map.BeginReplay(snapshot, _shell.Sim);
+        _map.BeginReplay(new Dictionary<int, (int, RacketKind)>(_shell.Sim.StartOfWeek), _shell.Sim);
         _playing = true;
         Audio.Instance?.Play("horn", 0.35f);
         RefreshAll();
@@ -682,7 +682,8 @@ public partial class Main : Control
     public override void _Notification(int what)
     {
         // Quitting while planning keeps this week's orders for next time.
-        if (what == NotificationWMCloseRequest && _shell != null && !_map.Live && W.Player.Alive && OS.GetCmdlineUserArgs().Length == 0) SaveGameTo(0);
+        // Mid-week too: the autosave picks the week up at the hour it was left.
+        if (what == NotificationWMCloseRequest && _shell != null && W.Player.Alive && OS.GetCmdlineUserArgs().Length == 0) SaveGameTo(0);
     }
 
     private const int Slots = 3;
@@ -699,7 +700,6 @@ public partial class Main : Control
 
     private void SaveGameTo(int slot)
     {
-        if (_map.Live) return;
         DirAccess.MakeDirRecursiveAbsolute("user://saves");
         using var file = FileAccess.Open(SlotPath(slot), FileAccess.ModeFlags.Write);
         if (file == null) { GD.PushWarning($"Couldn't write {SlotPath(slot)}: {FileAccess.GetOpenError()}"); return; }
@@ -720,16 +720,39 @@ public partial class Main : Control
             GD.PushWarning($"Couldn't load {SlotPath(slot)}: {e.Message}");
             return false;
         }
-        _map.EndReplay();
+        StopReplay();
         _map.World = W;
         _map.Select();
         _selectedWard = W.HqOf(W.Player).WardId;
         _map.ResetView(W.HqOf(W.Player));
         _ticker.Clear();
-        _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]Back in {W.Map.StreetOf(W.HqOf(W.Player))} St. {Reports.Date(W)}. Click a business to give orders, then End week.[/color]\n");
         _news.Text = W.Week > 0 ? WeekReport(W.Week - 1) : "No reports yet.";
+        if (_shell.Sim.WeekRunning) ResumeWeek();
+        else _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]Back in {W.Map.StreetOf(W.HqOf(W.Player))} St. {Reports.Date(W)}. Click a business to give orders, then End week.[/color]\n");
         RefreshAll();
         return true;
+    }
+
+    /// <summary>Stop any week playing out on the map, as when another city is started or loaded.</summary>
+    private void StopReplay()
+    {
+        _map.EndReplay();
+        _playing = false;
+        SetLive(false);
+    }
+
+    /// <summary>A save made partway through a week: show what had happened so far, and wait on Play to carry on.</summary>
+    private void ResumeWeek()
+    {
+        _replayWeek = W.Week;
+        _bossAtStartOfWeek = W.Player.BossHoodId;
+        _ticker.AppendText($"[color=#{Palette.Hex(Palette.InkQuiet)}]Back in {W.Map.StreetOf(W.HqOf(W.Player))} St., {Reports.Date(W)}, {Reports.Hour(W.Tick)}. Press Play to carry on with the week.[/color]\n");
+        foreach (var a in W.Script.Where(a => a.Kind != ActionKind.Collect))
+            AppendTicker(a.Tick, a.Kind == ActionKind.Raid ? a.DefenderGangId : a.GangId, a.Text, a.DefenderGangId == Me);
+        SetLive(true);
+        _map.ResumeReplay(_shell.Sim);
+        _clock.Text = MapView.ClockText(_map.Clock);
+        _pause.Text = "Play";
     }
 
     private void FillGameMenu()
@@ -824,6 +847,7 @@ public partial class Main : Control
         top.AddChild(_endWeek);
         _gameMenu = new MenuButton { Text = "Game", Flat = false, TooltipText = "New city, save and load" };
         _gameMenu.GetPopup().AboutToPopup += FillGameMenu;
+        _gameMenu.GetPopup().AboutToPopup += PauseForMenu;
         _gameMenu.GetPopup().IdPressed += OnGameMenu;
         top.AddChild(_gameMenu);
         _soundButton = new Button { Text = "Sound", TooltipText = "Music and effects volume" };
@@ -923,7 +947,14 @@ public partial class Main : Control
         _endWeek.Disabled = live;
         if (live) _endWeek.Text = "Week in progress";
         _pause.Text = "Pause";
-        _gameMenu.Disabled = live;
+    }
+
+    /// <summary>The week stops while the Game menu is open, so a save catches it where you left it.</summary>
+    private void PauseForMenu()
+    {
+        if (!_playing) return;
+        _playing = false;
+        _pause.Text = "Play";
     }
 
     private VBoxContainer ScrollTab(string name)
@@ -1066,6 +1097,15 @@ public partial class Main : Control
         if (weeks > 0 && IsInstanceValid(_briefing)) _briefing!.Hide();
         for (int i = 0; i < weeks; i++) { _replayWeek = W.Week; _shell.Execute("auto"); _shell.EndWeek(); _news.Text = WeekReport(_replayWeek); }
         if (Arg("--repeal") is string repeal) SetUpRepeal(repeal);
+        if (Arg("--midweek") is string hour)
+        {
+            // Play the week to this hour, save it to slot 3 and load it back, to show a week picked up partway.
+            _shell.Execute("auto");
+            EndWeek();
+            _map.Advance(float.Parse(hour));
+            SaveGameTo(3);
+            GD.Print(LoadGame(3) ? "Saved and loaded mid-week" : "Mid-week load failed");
+        }
         if (Flag("--verdict"))
         {
             if (IsInstanceValid(_briefing)) _briefing!.Hide();

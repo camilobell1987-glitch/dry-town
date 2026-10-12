@@ -5,8 +5,8 @@ namespace DryTown.Core;
 /// <summary>Everything needed to carry on a city exactly where it was left: the world, the dice, and the orders on the desk.</summary>
 public sealed class SaveData
 {
-    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals. 9 added rap sheets. 10 added vote counts, candidates and the district attorney. 11 added city events. 12 added rats, informers and planted men. 13 added supply lines and cut liquor. 14 added wars. 15 added union locals and strikes. 16 added scenarios. 17 added the racing wire and the Bureau's public enemy. 18 added the Commission. 19 added where each man's people came from. 20 added bosses running their outfits from a cell. 21 added the campaign.</summary>
-    public const int CurrentVersion = 21;
+    /// <summary>2 added ages, heirs and family. 3 added city sizes, wards and City Hall. 4 added people on the street and banks. 5 added guns, cars and the shops that sell them. 6 added fronts and clean money. 7 added trials and lawyers. 8 added grudges, pacts and proposals. 9 added rap sheets. 10 added vote counts, candidates and the district attorney. 11 added city events. 12 added rats, informers and planted men. 13 added supply lines and cut liquor. 14 added wars. 15 added union locals and strikes. 16 added scenarios. 17 added the racing wire and the Bureau's public enemy. 18 added the Commission. 19 added where each man's people came from. 20 added bosses running their outfits from a cell. 21 added the campaign. 22 added saving partway through a week.</summary>
+    public const int CurrentVersion = 22;
 
     public int Version { get; set; } = CurrentVersion;
     public DateTime SavedAt { get; set; }
@@ -53,6 +53,9 @@ public sealed class SaveData
     public int DirectorQuietWeeks { get; set; }
 
     public List<Order> Pending { get; set; } = new();
+
+    /// <summary>The week as far as it got, when it was saved partway through; null when it was saved between weeks.</summary>
+    public WeekInProgress? InWeek { get; set; }
 }
 
 /// <summary>Writes and reads saved games as JSON. File handling is left to the front end.</summary>
@@ -62,10 +65,14 @@ public static class SaveGame
 
     public static string Write(Simulation sim, IEnumerable<Order> pending)
     {
-        if (sim.WeekRunning) throw new InvalidOperationException("Can't save in the middle of a week.");
         var data = sim.World.ToSave();
         data.SavedAt = DateTime.Now;
         data.Label = $"{sim.World.Player.Name}, {Reports.Date(sim.World)}";
+        if (sim.WeekRunning)
+        {
+            data.InWeek = sim.SaveWeek();
+            data.Label += $", {Reports.Hour(sim.World.Tick)}";
+        }
         (data.DirectorDominantWeeks, data.DirectorQuietWeeks) = sim.Director.State;
         data.Pending = pending.ToList();
         return JsonSerializer.Serialize(data, Options);
@@ -113,6 +120,7 @@ public static class SaveGame
     {
         var sim = new Simulation(World.FromSave(data));
         sim.Director.State = (data.DirectorDominantWeeks, data.DirectorQuietWeeks);
+        if (data.InWeek != null) sim.ResumeWeek(data.InWeek);
         return sim;
     }
 }

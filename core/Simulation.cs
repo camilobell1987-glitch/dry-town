@@ -56,6 +56,7 @@ public sealed partial class Simulation
     {
         if (WeekRunning) throw new InvalidOperationException("The week is already running.");
         var w = World;
+        NoteStartOfWeek();
         w.LastLedger.Clear();
         w.Script.Clear();
         w.Tick = 0;

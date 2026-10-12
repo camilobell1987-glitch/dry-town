@@ -21,7 +21,7 @@ The open city has no win screen and keeps running; five scenarios give you a goa
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). To play the game, install the **.NET edition** of Godot 4.7, open `godot/project.godot` and press Play. If your editor is a different 4.x version, it updates the version in `DryTown.csproj` when it opens the project.
 
 ```sh
-dotnet test tests                                                    # 229 tests
+dotnet test tests                                                    # 234 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
@@ -397,6 +397,10 @@ Pick an outfit on the **Gangs** tab to see its crews and what each would bring t
 ## Saving
 
 The game saves itself every Sunday and when you close the window. Next time you open it, you carry on where you left off. The **Game** menu has three save slots, loading, and a new city in any of the five sizes. Saves are JSON files in Godot's user folder, under `saves/`.
+
+You can save partway through a week too. The Game menu stays open while the week plays out, and opening it pauses the clock. Closing the window mid-week autosaves as well. A save made mid-week keeps every outfit's jobs still to come, the orders you gave during the week, and what has already happened on the street. Loading it puts the map back at the saved hour, with the week's events so far in the ticker, and waits for you to press Play. The week then finishes exactly as it would have without the save. The save slot's label shows the day and hour.
+
+![A week picked up on Wednesday afternoon](docs/screenshots/midweek.png)
 
 ## Sound
 

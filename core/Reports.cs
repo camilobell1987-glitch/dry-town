@@ -7,6 +7,16 @@ public static partial class Reports
 {
     public static string Date(World w) => $"Week {w.WeekOfYear}, {w.Year}";
 
+    /// <summary>The day and hour of the week, as in "Tuesday, 3 PM".</summary>
+    public static string Hour(int tick)
+    {
+        string[] days = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+        int day = Math.Clamp(tick / 24, 0, 6);
+        int hour = Math.Max(0, tick) % 24;
+        string h = hour == 0 ? "midnight" : hour == 12 ? "noon" : hour < 12 ? $"{hour} AM" : $"{hour - 12} PM";
+        return $"{days[day]}, {h}";
+    }
+
     public static string WeekSummary(World w, int week)
     {
         var sb = new StringBuilder();
