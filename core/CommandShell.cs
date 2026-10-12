@@ -11,6 +11,9 @@ public sealed class CommandShell
     public Simulation Sim { get; }
     public List<Order> Pending { get; private set; } = new();
 
+    /// <summary>The next city, once 'chapter next' or 'chapter again' asks for one. The front end moves the game there.</summary>
+    public Simulation? NextCity { get; private set; }
+
     public CommandShell(Simulation sim, IEnumerable<Order>? pending = null)
     {
         Sim = sim;
@@ -23,6 +26,7 @@ public sealed class CommandShell
     public string Prompt => $"[{Reports.Date(W)} | ${W.Player.Cash} | heat {W.Player.Heat} | {Pending.Count} orders]";
 
     public string Welcome => $"You run {W.Player.Name}. {Reports.Date(W)}. Type 'help' for commands.\n" +
+        (W.Settings.Campaign is { } c && Campaign.Bridge(c) is { Length: > 0 } bridge ? bridge + "\n" : "") +
         (W.Settings.Scenario == ScenarioKind.None ? "" : $"{Scenarios.Info(W.Settings.Scenario).Briefing}\n{Scenarios.Summary(W)}\n");
 
     public static readonly string Help =
@@ -48,8 +52,27 @@ public sealed class CommandShell
         "war <gang> (go to the mattresses against them) | calloff (end a war you started)\n" +
         "commission (the table, after 1931) | ask <war|hit> <gang> (put it to a vote) | commission <leave|join>\n" +
         "wire (who runs the racing wire, after repeal) | gmen (the Bureau's Public Enemy Number One)\n" +
-        "goal (the scenario's goal and how you stand)\n" +
+        "goal (the scenario's goal and how you stand) | chapter (the campaign so far) | chapter <next|again> (go on to the next city, or try this one again)\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
+
+    /// <summary>The campaign's record, or the next city: the next chapter, or this one again.</summary>
+    private string Chapter(string what)
+    {
+        if (W.Settings.Campaign == null) return "This city isn't part of a campaign.\n";
+        ulong seed = W.Settings.Seed * 31 + (ulong)W.Week + 1;
+        switch (what)
+        {
+            case "next":
+                if (Campaign.CannotGoOn(W) is { } why) return why + "\n";
+                NextCity = Simulation.New(Campaign.Next(W, seed));
+                return $"On to chapter {W.Settings.Campaign.Chapter + 2}.\n";
+            case "again":
+                NextCity = Simulation.New(Campaign.Retry(W, seed));
+                return $"Chapter {W.Settings.Campaign.Chapter + 1} again, in a new city.\n";
+            default:
+                return Campaign.Record(W) + "\n";
+        }
+    }
 
     /// <summary>Run one command. Returns the text to show, or null for "quit".</summary>
     public string? Execute(string line)
@@ -103,7 +126,9 @@ public sealed class CommandShell
                 case "unions": return Reports.Unions(W, Me);
                 case "wire": return Reports.Wire(W, Me);
                 case "gmen": return Reports.Gmen(W, Me);
-                case "goal": return W.Settings.Scenario == ScenarioKind.None ? "This is the open city: no goal but the one you set yourself.\n" : Scenarios.Summary(W) + "\n";
+                case "goal": return W.Settings.Scenario == ScenarioKind.None ? "This is the open city: no goal but the one you set yourself.\n"
+                    : Scenarios.Summary(W) + "\n" + (W.Settings.Campaign != null ? Campaign.Record(W) + "\n" : "");
+                case "chapter": return Chapter(p.Length > 1 ? p[1].ToLowerInvariant() : "");
                 case "local": return Queue(new UnionOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "strike": return Strike(int.Parse(p[1]), p[2]);
                 case "cases": return Reports.Cases(W, Me);

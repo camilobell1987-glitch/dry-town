@@ -2,8 +2,9 @@ using DryTown.Core;
 
 // Headless runner.
 //   dotnet run --project sim -- soak --seeds 5 --years 10
-//   dotnet run --project sim -- play --seed 42 [--scenario LastCall]
+//   dotnet run --project sim -- play --seed 42 [--scenario LastCall | --campaign]
 //   dotnet run --project sim -- scenarios --seeds 40
+//   dotnet run --project sim -- campaigns --seeds 40
 
 string mode = args.Length > 0 ? args[0] : "play";
 ulong seed = ulong.Parse(Arg("--seed", "1"));
@@ -18,6 +19,7 @@ return mode switch
     "soak" => Soak(),
     "play" => Play(),
     "scenarios" => ScenarioRuns(),
+    "campaigns" => CampaignRuns(),
     _ => Usage(),
 };
 
@@ -29,7 +31,7 @@ string Arg(string name, string fallback)
 
 int Usage()
 {
-    Console.WriteLine("usage: soak [--seed N] [--seeds N] [--years N] | play [--seed N] [--scenario name] | scenarios [--seed N] [--seeds N] [--scenario name]");
+    Console.WriteLine("usage: soak [--seed N] [--seeds N] [--years N] | play [--seed N] [--scenario name] | scenarios [--seed N] [--seeds N] [--scenario name] | campaigns [--seed N] [--seeds N]");
     return 2;
 }
 
@@ -221,9 +223,44 @@ int ScenarioRuns()
     return 0;
 }
 
+// Whole campaigns played on autopilot: each chapter until it's won or lost, then on to the next while the outfit stands.
+int CampaignRuns()
+{
+    var wonBy = new int[Campaign.Chapters.Length];
+    var reached = new int[Campaign.Chapters.Length];
+    var totals = new int[Campaign.Chapters.Length + 1];
+    int finishedAll = 0;
+    for (ulong s = seed; s < seed + (ulong)seeds; s++)
+    {
+        var sim = Simulation.New(Campaign.Start(s));
+        while (true)
+        {
+            var w = sim.World;
+            int chapter = w.Settings.Campaign!.Chapter;
+            reached[chapter]++;
+            while (w.Goal.Outcome == ScenarioOutcome.Playing) sim.AdvanceWeek(playerAutopilot: true);
+            if (w.Goal.Outcome == ScenarioOutcome.Won) wonBy[chapter]++;
+            if (Campaign.CannotGoOn(w) != null)
+            {
+                int won = w.Settings.Campaign.Won + (w.Goal.Outcome == ScenarioOutcome.Won ? 1 : 0);
+                totals[won]++;
+                if (chapter + 1 == Campaign.Chapters.Length) finishedAll++;
+                break;
+            }
+            sim = Simulation.New(Campaign.Next(w, s * 31 + (ulong)chapter));
+        }
+    }
+    for (int i = 0; i < Campaign.Chapters.Length; i++)
+        Console.WriteLine($"{i + 1}. {Scenarios.Info(Campaign.Chapters[i].Kind).Title}: reached in {reached[i]}/{seeds}, won {wonBy[i]}.");
+    Console.WriteLine($"Played to repeal in {finishedAll}/{seeds}. Chapters won: {string.Join(", ", totals.Select((n, i) => $"{i}: {n}"))}.");
+    return 0;
+}
+
 int Play()
 {
-    var shell = new CommandShell(Simulation.New(scenario != ScenarioKind.None ? Scenarios.Settings(scenario, seed) : new WorldSettings { Seed = seed, Size = size }));
+    var settings = args.Contains("--campaign") ? Campaign.Start(seed)
+        : scenario != ScenarioKind.None ? Scenarios.Settings(scenario, seed) : new WorldSettings { Seed = seed, Size = size };
+    var shell = new CommandShell(Simulation.New(settings));
     Console.Write(shell.Welcome);
     while (true)
     {
@@ -233,6 +270,11 @@ int Play()
         var output = shell.Execute(line);
         if (output == null) return 0;
         Console.Write(output);
+        if (shell.NextCity is { } next)
+        {
+            shell = new CommandShell(next);
+            Console.Write(shell.Welcome);
+        }
     }
 }
 

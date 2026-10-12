@@ -50,6 +50,9 @@ public sealed class WorldSettings
 
     /// <summary>The week the city starts in: 0 is January 1920.</summary>
     public int StartWeek { get; init; }
+
+    /// <summary>The campaign this city is a chapter of, or null.</summary>
+    public CampaignState? Campaign { get; init; }
 }
 
 /// <summary>The whole simulation state for one district. Pure data plus id lookups.</summary>
@@ -199,9 +202,12 @@ public sealed partial class World
         for (int i = 0; i < settings.StartingGangCount; i++)
         {
             bool player = i == 0;
-            world.FoundGang(player,
+            var carried = player && settings.Campaign?.Boss is { } b ? world.CarryBoss(b) : null;
+            var gang = world.FoundGang(player,
                 player ? settings.PlayerStartingCash : settings.StartingCash,
-                player ? settings.PlayerStartingHoods : settings.StartingHoods);
+                player ? settings.PlayerStartingHoods : settings.StartingHoods, carried);
+            // A campaign's outfit keeps its name from city to city.
+            if (player && settings.Campaign?.Outfit is { } name) gang.Name = name;
         }
         world.PlaceShops();
         world.PlaceLines();

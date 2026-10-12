@@ -439,10 +439,15 @@ public partial class Rolodex : Control
     private static readonly Color[] Suits = { new("3d3a40"), new("4a3f35"), new("2f3a45"), new("55504a"), new("3b4535"), new("5a3e3a") };
     private static readonly Color[] Ties = { new("8c2f2a"), new("2f5a8c"), new("c9a23f"), new("3f7a4f"), new("6a3f7a"), new("222222") };
 
-    /// <summary>A face made from his id and his numbers, so the same man always looks the same.</summary>
+    /// <summary>
+    /// A face made from his name and birthday, so the same man always looks the same, from one launch to the next
+    /// and from one city of a campaign to the next. (A string's own hash code changes every time the game starts.)
+    /// </summary>
     private void Portrait(Rect2 r, Hood h)
     {
-        uint seed = (uint)(h.Id * 2654435761u) ^ (uint)h.Name.GetHashCode();
+        uint seed = 2166136261u;
+        foreach (char ch in h.Name) seed = (seed ^ ch) * 16777619u;
+        seed ^= (uint)h.BornWeek * 2654435761u;
         int Pick(int n, int salt) => (int)(((seed >> (salt * 3)) ^ (seed * (uint)(salt + 7))) % (uint)n);
         int age = h.Age(World!.Week);
 
