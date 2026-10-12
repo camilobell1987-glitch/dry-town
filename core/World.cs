@@ -511,6 +511,7 @@ public sealed partial class World
         Goal = Goal,
         Repeal = Repeal,
         Commission = Commission,
+        Untouchables = Untouchables,
         Grudges = Grudges,
         Offers = Offers,
         CityEvents = CityEvents,
@@ -537,6 +538,7 @@ public sealed partial class World
         if (d.Goal != null) w.Goal = d.Goal;
         if (d.Repeal != null) w.Repeal = d.Repeal;
         if (d.Commission != null) w.Commission = d.Commission;
+        if (d.Untouchables != null) w.Untouchables = d.Untouchables;
         w.Grudges.AddRange(d.Grudges);
         w.Offers.AddRange(d.Offers);
         w.CityEvents.AddRange(d.CityEvents);

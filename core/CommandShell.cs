@@ -52,7 +52,7 @@ public sealed class CommandShell
         "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | accept <offer> | decline <offer>\n" +
         "war <gang> (go to the mattresses against them) | calloff (end a war you started)\n" +
         "commission (the table, after 1931) | ask <war|hit> <gang> (put it to a vote) | commission <leave|join>\n" +
-        "wire (who runs the racing wire, after repeal) | gmen (the Bureau's Public Enemy Number One)\n" +
+        "squad (the Untouchables, 1927 to repeal) | wire (who runs the racing wire, after repeal) | gmen (the Bureau's Public Enemy Number One)\n" +
         "goal (the scenario's goal and how you stand) | chapter (the campaign so far) | chapter <next|again> (go on to the next city, or try this one again)\n" +
         "auto (plan the week for me) | orders | clear | end (run the week)\n";
 
@@ -127,6 +127,7 @@ public sealed class CommandShell
                 case "unions": return Reports.Unions(W, Me);
                 case "wire": return Reports.Wire(W, Me);
                 case "gmen": return Reports.Gmen(W, Me);
+                case "squad": return Reports.Squad(W, Me);
                 case "goal": return W.Settings.Scenario == ScenarioKind.None ? "This is the open city: no goal but the one you set yourself.\n"
                     : Scenarios.Summary(W) + "\n" + (W.Settings.Campaign != null ? Campaign.Record(W) + "\n" : "");
                 case "chapter": return Chapter(p.Length > 1 ? p[1].ToLowerInvariant() : "");
