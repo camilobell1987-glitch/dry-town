@@ -23,8 +23,16 @@ public static partial class AiPlanner
         foreach (var o in w.Offers.ToList())
             w.Answer(o, o.Kind != OfferKind.Demand || w.Power(w.GangById(o.FromGangId)) > w.Power(me) * Content.TributeRatio);
         if (TalksThisWeek(w, me)) Negotiate(w, me);
+        // A wreath to any boss being buried, unless it's an outfit we're at war with or hate.
+        foreach (var f in w.Funerals.Where(f => w.Week < f.UntilWeek && f.GangId != me.Id).ToList())
+            if (WouldSendFlowers(w, me, w.GangById(f.GangId))) w.SendFlowers(me, w.GangById(f.GangId));
         return w.Events.Skip(before).Where(e => e.Kind == EventKind.Diplomacy).Select(e => e.Text).ToList();
     }
+
+    /// <summary>Whether an outfit sends a wreath to a funeral: not to one it's at war with or hates, and not if it can't spare the money.</summary>
+    public static bool WouldSendFlowers(World w, Gang from, Gang to) =>
+        to.Alive && w.CannotSendFlowers(from, to) == null && !w.AtWar(from.Id, to.Id)
+        && w.GrudgeOf(from.Id, to.Id) <= Content.GrudgeTooDeep && from.Cash >= Content.FlowersCost * 4;
 
     /// <summary>Whether this is the week the gang takes stock of its friends and enemies.</summary>
     public static bool TalksThisWeek(World w, Gang g) => (w.Week + g.Id) % 4 == 0;

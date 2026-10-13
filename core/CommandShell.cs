@@ -53,7 +53,7 @@ public sealed class CommandShell
         "sheet <hood> (any man's rap sheet) | news (what's going on in the city)\n" +
         "rats (who's talking, and your men inside) | care <hood> (look after a jailed man's family) | seeto <hood> <rat>\n" +
         "hunt <hood> (look for a rat) | plant <hood> <gang> (sign him on with a rival) | recall <hood> (bring him home)\n" +
-        "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | marry <gang> | accept <offer> | decline <offer>\n" +
+        "relations (grudges, pacts and offers) | truce <gang> [tribute] | ally <gang> | demand <gang> <dollars> | break <gang> | marry <gang> | flowers <gang> (to a boss's funeral) | accept <offer> | decline <offer>\n" +
         "war <gang> (go to the mattresses against them) | calloff (end a war you started)\n" +
         "commission (the table, after 1931) | ask <war|hit> <gang> (put it to a vote) | commission <leave|join>\n" +
         "squad (the Untouchables, 1927 to repeal) | wire (who runs the racing wire, after repeal) | gmen (the Bureau's Public Enemy Number One)\n" +
@@ -162,6 +162,7 @@ public sealed class CommandShell
                 case "demand": return Talk(p[1], g => W.Demand(W.Player, g, int.Parse(p[2])));
                 case "break": return Talk(p[1], g => W.Break(W.Player, g));
                 case "marry": return Talk(p[1], g => W.ProposeMatch(W.Player, g));
+                case "flowers": return Talk(p[1], g => W.SendFlowers(W.Player, g));
                 case "war": return Talk(p[1], g => W.Declare(W.Player, g));
                 case "commission":
                     if (p.Length > 1) return W.Walk(W.Player, p[1].ToLowerInvariant() == "leave") + "\n";
@@ -466,23 +467,14 @@ public sealed class CommandShell
         if (problem != null) return problem + "\n";
         Pending.Add(order);
         return $"Queued: {Describe(order)}\n" + (Breaks(order) is { } partner ? $"That breaks your {World.Name(W.PactBetween(Me, partner.Id)!.Kind)} with {partner.Name}.\n" : "")
+            + (W.VictimOf(order) is var victim && victim >= 0 && W.FuneralOf(victim) is { } funeral ? $"{W.GangById(victim).Name} are burying {funeral.Boss}. Moving on them now breaks the peace of the funeral.\n" : "")
             + (order is HitOrder hit && Reports.BreachWarning(W, Me, W.HoodById(hit.TargetHoodId)) is { } warning ? warning + "\n" : "");
     }
 
     /// <summary>The gang this order moves on, if the player has a pact with it.</summary>
     public Gang? Breaks(Order order)
     {
-        int target = order switch
-        {
-            ExtortOrder e when e.BusinessId >= 0 && e.BusinessId < W.Businesses.Count => W.Businesses[e.BusinessId].ProtectorGangId,
-            ArsonOrder a when a.BusinessId >= 0 && a.BusinessId < W.Businesses.Count => W.Businesses[a.BusinessId].ProtectorGangId,
-            HijackOrder h when h.BusinessId >= 0 && h.BusinessId < W.Businesses.Count => W.Businesses[h.BusinessId].ProtectorGangId,
-            WaylayOrder l when W.LineById(l.LineId) is { } line => line.OwnerGangId,
-            UnionOrder u when W.LocalById(u.LocalId) is { } local => local.OwnerGangId,
-            HitOrder h when W.Hoods.FirstOrDefault(x => x.Id == h.TargetHoodId) is { } t => t.GangId,
-            KidnapOrder k when W.Hoods.FirstOrDefault(x => x.Id == k.TargetHoodId) is { } t => t.GangId,
-            _ => -1,
-        };
+        int target = W.VictimOf(order);
         return target >= 0 && W.AtPeace(Me, target) ? W.GangById(target) : null;
     }
 

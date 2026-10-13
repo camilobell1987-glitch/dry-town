@@ -187,6 +187,8 @@ public static partial class AiPlanner
             orders.Add(new ExtortOrder(g.Id, hood.Id, best.Id, bestBackup.Count > 0 ? bestBackup.Select(b => b.Id).ToArray() : null));
         }
 
+        // Nobody moves on an outfit while it's burying its boss.
+        orders.RemoveAll(o => w.VictimOf(o) is var v && v >= 0 && v != g.Id && w.Mourning(v));
         return orders;
     }
 

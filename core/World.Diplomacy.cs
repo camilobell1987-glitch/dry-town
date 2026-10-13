@@ -49,9 +49,10 @@ public sealed partial class World
     /// One gang moved on another. The victim and its allies hold it against the attacker, and if the
     /// two had a pact, the attacker has just broken it.
     /// </summary>
-    public void Hostile(Gang attacker, Gang victim, int grudge)
+    public void Hostile(Gang attacker, Gang victim, int grudge, bool violent = true)
     {
         if (attacker.Id == victim.Id) return;
+        if (violent && FuneralOf(victim.Id) is { } funeral) BreakFuneral(attacker, victim, funeral);
         if (PactBetween(attacker.Id, victim.Id) is { } pact) Betray(attacker, victim, pact);
         AddGrudge(victim.Id, attacker.Id, grudge);
         foreach (var ally in AlliesOf(victim.Id).ToList())

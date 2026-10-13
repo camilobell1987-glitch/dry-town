@@ -104,7 +104,7 @@ public sealed partial class World
         if (CannotStrike(gang, local, b) is string no) return no;
         local.StrikeBusinessId = b.Id;
         local.StrikeWeek = Week;
-        if (b.IsProtected) Hostile(gang, GangById(b.ProtectorGangId), Content.GrudgeStrike);
+        if (b.IsProtected) Hostile(gang, GangById(b.ProtectorGangId), Content.GrudgeStrike, violent: false);
         Log(EventKind.Union, gang.Id, $"{Capital(local.Name)} walked out of {b.Name}. The pickets stay until the owner pays {gang.Name}.");
         return null;
     }
