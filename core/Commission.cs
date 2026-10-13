@@ -84,7 +84,7 @@ public sealed partial class World
     {
         if (!Commission.Sitting) return "There's no Commission yet.";
         if (!Seated(asker.Id)) return "You don't have a seat at the table.";
-        if (asker.Id == target.Id || !target.Alive) return "There's nobody to ask about.";
+        if (asker.Id == target.Id || !target.Alive || target.IsSmall) return "There's nobody to ask about.";
         if (!Seated(target.Id)) return $"{target.Name} has no seat. The rules don't protect them.";
         if (Commission.LastAsked.TryGetValue(asker.Id, out int last) && Week - last < Content.AskEvery)
             return $"You put a question to the table {Week - last} weeks ago. Wait {Content.AskEvery - (Week - last)} more.";

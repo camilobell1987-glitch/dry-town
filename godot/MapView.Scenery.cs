@@ -272,7 +272,7 @@ public partial class MapView
         var w = World!;
         foreach (var lot in w.Map.Lots)
         {
-            if (lot.Use is not (LotUse.Headquarters or LotUse.Precinct) || !view.HasPoint(new Vector2(lot.X, lot.Y))) continue;
+            if (lot.Use is not (LotUse.Headquarters or LotUse.Precinct) || !view.HasPoint(new Vector2(lot.X, lot.Y)) || CornerOf(lot) != null) continue;
             bool frontTop = lot.FrontY < lot.Y;
             float carY = lot.FrontY + 0.5f + (frontTop ? 0.24f : -0.24f);
             C = DynAt(carY);

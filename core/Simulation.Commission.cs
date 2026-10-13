@@ -19,7 +19,7 @@ public sealed partial class Simulation
         c.Seats.RemoveAll(id => !w.GangById(id).Alive);
         c.Sanctions.RemoveAll(s => s.UntilWeek <= w.Week || !w.GangById(s.Against).Alive || !w.GangById(s.By).Alive);
         foreach (var (id, until) in c.ShelvedUntil.Where(x => x.Value <= w.Week || !w.GangById(x.Key).Alive).ToList()) c.ShelvedUntil.Remove(id);
-        foreach (var g in w.LivingGangs.OrderBy(g => g.Id))
+        foreach (var g in w.Outfits.OrderBy(g => g.Id))
         {
             if (c.Seats.Contains(g.Id) || w.Shelved(g.Id) || g.IsPlayer && c.PlayerWalkedOut || w.TurfOf(g.Id).Count() < Content.CommissionTurf) continue;
             c.Seats.Add(g.Id);

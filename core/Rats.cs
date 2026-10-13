@@ -65,7 +65,7 @@ public sealed partial class World
     {
         if (man.GangId != gang.Id || !man.IsAvailable) return "He isn't free.";
         if (man.Id == gang.BossHoodId || man.Id == gang.HeirHoodId) return "The boss and his heir are too well known.";
-        if (!host.Alive || host.Id == gang.Id) return "There's no such outfit.";
+        if (!host.Alive || host.Id == gang.Id || host.IsSmall) return "There's no such outfit.";
         if (HasManInside(gang.Id, host.Id)) return "You already have a man inside.";
         return null;
     }

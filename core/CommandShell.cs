@@ -31,6 +31,7 @@ public sealed class CommandShell
 
     public static readonly string Help =
         "gangs | hoods | turf | targets | log\n" +
+        "small (the small gangs) | poach <their man> | absorb <hood> <gang> (buy the gang in) | wipeout <hood> <gang> [backup..]\n" +
         "extort <hood> <biz> | racket <hood> <biz> <speakeasy|still|numbers|loanshark|bookie|gamblingden|counterfeit|slots|casino|brewery|nightclub>\n" +
         "guard <hood> <biz> | recruit | bribe <dollars> | rate <biz> <percent>\n" +
         "crews [gang] (yours, or a rival's) | crew new <lieutenant> | crew add <crew> <hood> | crew drop <hood>\n" +
@@ -90,6 +91,10 @@ public sealed class CommandShell
             {
                 case "help": return Help;
                 case "gangs": return Reports.Gangs(W);
+                case "small": return Reports.SmallGangs(W, Me);
+                case "poach": return Queue(new PoachOrder(Me, int.Parse(p[1])));
+                case "absorb": return Queue(new AbsorbOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
+                case "wipeout": return Queue(new WipeOutOrder(Me, int.Parse(p[1]), int.Parse(p[2]), Rest(p, 3)));
                 case "hoods": return Reports.Hoods(W, Me);
                 case "turf": return Reports.Businesses(W, b => b.ProtectorGangId == Me);
                 case "targets": return Reports.Businesses(W, b => b.ProtectorGangId != Me);
@@ -495,6 +500,9 @@ public sealed class CommandShell
         PollsOrder po when po.WardId >= 0 && po.WardId < W.Wards.Count => $"{HoodName(po.HoodId)} works the polls in {W.Wards[po.WardId].Name}",
         ArsonOrder a => $"{HoodName(a.HoodId)} sets fire to {BizName(a.BusinessId)}",
         HitOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "go" : "goes")} after {HoodName(h.TargetHoodId)}",
+        PoachOrder po => $"offer {HoodName(po.TargetHoodId)} ${W.PoachFee(W.HoodById(po.TargetHoodId))} to walk out on {W.GangById(W.HoodById(po.TargetHoodId).GangId).Name}",
+        AbsorbOrder a => $"{HoodName(a.HoodId)} {(Sim.WeekRunning ? "put" : "puts")} it to {W.GangById(a.TargetGangId).Name} to come in with you (${W.AbsorbPrice(W.GangById(a.TargetGangId)):N0})",
+        WipeOutOrder x => $"{HoodName(x.HoodId)}{With(x.Backup)} {(Sim.WeekRunning ? "go" : "goes")} round to wipe out {W.GangById(x.TargetGangId).Name}",
         KidnapOrder k => $"{HoodName(k.HoodId)}{With(k.Backup)} {(Sim.WeekRunning ? "snatch" : "snatches")} {HoodName(k.TargetHoodId)}",
         RobberyOrder r => $"{HoodName(r.HoodId)}{With(r.Backup)} {(Sim.WeekRunning ? "hold" : "holds")} up {W.BankById(r.BankId)?.Name ?? "a bank"}",
         HijackOrder h => $"{HoodName(h.HoodId)}{With(h.Backup)} {(Sim.WeekRunning ? "stop" : "stops")} the beer truck for {BizName(h.BusinessId)}",
@@ -570,6 +578,25 @@ public sealed class CommandShell
                 if (target == null || target.GangId == Me || !target.IsActive) return "Pick a man from another gang. Type 'gangs'.";
                 if (!target.IsAvailable) return $"{target.Name} is in jail, out of reach.";
                 return h.Team.Select(id => CheckHood(id)).FirstOrDefault(x => x != null);
+            }
+            case PoachOrder po:
+            {
+                var man = W.Hoods.FirstOrDefault(x => x.Id == po.TargetHoodId);
+                if (man == null || !man.IsActive || man.GangId == Me) return "Pick a man from a small gang. Type 'small' and 'crews <gang>'.";
+                if (Already(o => o is PoachOrder q && q.TargetHoodId == po.TargetHoodId)) return $"You're already talking to {man.Name}.";
+                return W.CannotPoach(W.Player, man);
+            }
+            case AbsorbOrder a:
+            {
+                if (W.Gangs.FirstOrDefault(g => g.Id == a.TargetGangId) is not { } small) return "There's no such gang. Type 'small'.";
+                if (Already(o => o is AbsorbOrder q && q.TargetGangId == a.TargetGangId)) return $"Someone is already on his way to {small.Name}.";
+                return W.CannotAbsorb(W.Player, small) ?? CheckHood(a.HoodId);
+            }
+            case WipeOutOrder x:
+            {
+                if (W.Gangs.FirstOrDefault(g => g.Id == x.TargetGangId) is not { } small) return "There's no such gang. Type 'small'.";
+                if (Already(o => o is WipeOutOrder q && q.TargetGangId == x.TargetGangId)) return $"Men are already on their way to {small.Name}.";
+                return W.CannotWipeOut(W.Player, small) ?? x.Team.Select(id => CheckHood(id)).FirstOrDefault(e => e != null);
             }
             case KidnapOrder k:
             {

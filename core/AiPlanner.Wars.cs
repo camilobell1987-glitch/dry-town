@@ -21,7 +21,7 @@ public static partial class AiPlanner
         }
         if (g.IsPlayer || g.Aggression <= 0.5 || w.TopDog(g)) return false;
         bool wary = w.RivalWariness < 1;
-        var enemy = w.LivingGangs
+        var enemy = w.Outfits
             .Where(r => w.CannotDeclare(g, r) == null && w.GrudgeOf(g.Id, r.Id) >= 60 && w.Power(g) >= w.Power(r) * 0.9 && !(r.IsPlayer && wary))
             .OrderByDescending(r => w.GrudgeOf(g.Id, r.Id)).ThenBy(r => r.Id).FirstOrDefault();
         if (enemy == null || g.Cash < w.HoodsOf(g.Id).Count() * Content.MattressCost * 8 || !w.Rng.Chance(0.5)) return false;

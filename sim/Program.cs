@@ -57,6 +57,7 @@ int Soak()
     long gearBought = 0, armedAtEnd = 0, menAtEnd = 0;
     long frontsBought = 0, taxCases = 0, cleanAtEnd = 0, cashAtEnd = 0;
     long trials = 0, acquittals = 0, judgesPaid = 0, juries = 0, lawyered = 0, gangsAtEnd = 0;
+    long smallAtEnd = 0, smallStart = 0, absorbed = 0, wipedOut = 0, poached = 0, smallTakeovers = 0, outfitsAtEnd = 0;
     long truces = 0, alliances = 0, tributes = 0, broken = 0, pactsAtEnd = 0;
     long lifers = 0, repeat = 0, convictedAtEnd = 0;
     long asks = 0, asksPassed = 0, breaches = 0, playerBreaches = 0, seatsAtEnd = 0, warsAfter = 0, bossHitsAfter = 0, aliveAtSitdown = 0, aliveAfterSitdown = 0;
@@ -75,7 +76,7 @@ int Soak()
             allWeeks++;
             contractWeeks += sim.World.Contracts.Count(c => c.GangId >= 0);
             playerContractWeeks += sim.World.Contracts.Count(c => c.GangId == sim.World.Player.Id);
-            clubWeeks += sim.World.LivingGangs.Count(g => sim.World.ClubOf(g.Id) != null);
+            clubWeeks += sim.World.Outfits.Count(g => sim.World.ClubOf(g.Id) != null);
             if (sim.World.ClubOf(sim.World.Player.Id) != null) playerClubWeeks++;
             if (!sim.World.Prohibition) continue;
             prohibitionWeeks++;
@@ -100,14 +101,21 @@ int Soak()
         menAtEnd += sim.World.Hoods.Count(h => h.IsActive);
         frontsBought += ev.Count(e => e.Kind == EventKind.Front);
         taxCases += ev.Count(e => e.Text.StartsWith("Treasury agents brought a tax case") || e.Text.StartsWith("Treasury agents seized"));
-        cleanAtEnd += sim.World.LivingGangs.Sum(g => g.Clean);
-        cashAtEnd += sim.World.LivingGangs.Sum(g => Math.Max(0, g.Cash));
+        cleanAtEnd += sim.World.Outfits.Sum(g => g.Clean);
+        cashAtEnd += sim.World.Outfits.Sum(g => Math.Max(0, g.Cash));
         trials += ev.Count(e => e.Kind == EventKind.Trial && (e.Text.Contains(" was convicted ") || e.Text.StartsWith("A jury acquitted")));
         acquittals += ev.Count(e => e.Kind == EventKind.Trial && e.Text.StartsWith("A jury acquitted"));
         judgesPaid += ev.Count(e => e.Kind == EventKind.Bribe && e.Text.Contains(" paid the judge "));
         juries += ev.Count(e => e.Kind == EventKind.Trial && e.Text.Contains("paid visits to the jurors"));
-        lawyered += sim.World.LivingGangs.Count(g => g.Lawyer != Lawyer.None);
-        gangsAtEnd += sim.World.LivingGangs.Count();
+        lawyered += sim.World.Outfits.Count(g => g.Lawyer != Lawyer.None);
+        gangsAtEnd += sim.World.Outfits.Count();
+        outfitsAtEnd += sim.World.Outfits.Count();
+        smallAtEnd += sim.World.SmallGangs.Count();
+        smallStart += sim.World.Settings.SmallGangCount;
+        absorbed += ev.Count(e => e.Kind == EventKind.Takeover && e.Text.Contains(" came in with "));
+        wipedOut += ev.Count(e => e.Kind == EventKind.Hit && e.Text.Contains(" wiped out "));
+        poached += ev.Count(e => e.Kind == EventKind.Recruited && e.Text.Contains(" walked out on "));
+        smallTakeovers += ev.Count(e => e.Kind == EventKind.Takeover && sim.World.GangById(e.GangId).IsSmall);
         truces += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.EndsWith("agreed a truce."));
         alliances += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" are allies now"));
         tributes += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" a week to be left alone"));
@@ -127,7 +135,7 @@ int Soak()
         foreach (var e in ev.Where(e => e.Kind == EventKind.RacketOpened && e.Text.Contains(" opened a ")))
             foreach (var info in Content.Rackets.Values.Where(r => e.Text.Contains($" opened a {r.Label} ")))
                 rackets[info.Kind] = rackets.GetValueOrDefault(info.Kind) + 1;
-        foreach (var g in sim.World.LivingGangs.Where(g => !g.IsPlayer))
+        foreach (var g in sim.World.Outfits.Where(g => !g.IsPlayer))
         {
             rivalCrews += sim.World.CrewsOf(g.Id).Count();
             crewedMen += sim.World.CrewsOf(g.Id).Sum(c => c.Everyone.Count());
@@ -224,7 +232,7 @@ int Soak()
         pickedUp += ev.Count(e => e.Kind == EventKind.HoodJailed && e.Text.StartsWith("Police picked up ") && e.Text.Contains(" on the warrant in his case."));
         namesMade += ev.Count(e => e.Kind == EventKind.Name && e.Text.StartsWith("The papers have started writing about "));
         householdNames += ev.Count(e => e.Kind == EventKind.Name && e.Text.StartsWith("Everybody in the city knows the name "));
-        foreach (var g in sim.World.LivingGangs)
+        foreach (var g in sim.World.Outfits)
         {
             bossesAtEnd++;
             fearAtEnd += g.Fear;
@@ -270,6 +278,7 @@ int Soak()
     Console.WriteLine($"Street crime per city-year: {string.Join(", ", crimes.OrderBy(c => c.Key).Select(c => $"{c.Key} {c.Value / (double)(seeds * years):0.0}"))}.");
     Console.WriteLine($"Guns and cars bought per city-year: {gearBought / (double)(seeds * years):0.0}; men carrying a gun at the end: {armedAtEnd * 100 / Math.Max(1, menAtEnd)}%.");
     Console.WriteLine($"Fronts bought per city-year: {frontsBought / (double)(seeds * years):0.0}; tax cases per city-year: {taxCases / (double)(seeds * years):0.00}; gangs' cash clean at the end: {cleanAtEnd * 100 / Math.Max(1, cashAtEnd)}%.");
+    Console.WriteLine($"Small gangs: {smallStart / (double)seeds:0} to start, {smallAtEnd / (double)seeds:0.0} at the end; outfits at the end {outfitsAtEnd / (double)seeds:0.0}; per city-year {absorbed / (double)(seeds * years):0.00} brought in, {wipedOut / (double)(seeds * years):0.00} wiped out, {poached / (double)(seeds * years):0.00} men hired away, {smallTakeovers / (double)(seeds * years):0.0} takeovers by small gangs.");
     Console.WriteLine($"Trials per city-year: {trials / (double)(seeds * years):0.0}, {acquittals * 100 / Math.Max(1, trials)}% acquitted; judges paid {judgesPaid / (double)(seeds * years):0.0}, juries leaned on {juries / (double)(seeds * years):0.00} per city-year; gangs with a lawyer at the end: {lawyered * 100 / Math.Max(1, gangsAtEnd)}%.");
     double cy = seeds * years;
     Console.WriteLine($"Pacts per city-year: truces {truces / cy:0.0}, tribute deals {tributes / cy:0.0}, alliances {alliances / cy:0.0}, broken {broken / cy:0.0}; pacts standing at the end: {pactsAtEnd / (double)seeds:0.0} a city.");

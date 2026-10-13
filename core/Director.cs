@@ -28,14 +28,14 @@ public sealed class Director
     {
         if (!_w.Settings.DirectorEnabled) return;
 
-        int living = _w.LivingGangs.Count();
+        int living = _w.Outfits.Count();
         if (living < 2)
         {
             Outsiders("moved in to fill the vacuum");
             return;
         }
 
-        var top = _w.LivingGangs.OrderByDescending(g => _w.TurfOf(g.Id).Count()).First();
+        var top = _w.Outfits.OrderByDescending(g => _w.TurfOf(g.Id).Count()).First();
         double share = (double)_w.TurfOf(top.Id).Count() / _w.Businesses.Count;
         _dominantWeeks = share >= DominanceShare ? _dominantWeeks + 1 : 0;
 
@@ -48,8 +48,9 @@ public sealed class Director
             StirDissent(top);
             // A gang that owns most of the district has more than one lieutenant eyeing the chair.
             if (share >= 0.7) StirDissent(top);
-            // A full city still gets a challenger when one outfit owns most of it.
-            if (living < _w.Settings.MaxGangs + (share >= 0.7 ? 2 : 0)) Outsiders($"arrived to challenge {top.Name}");
+            // A challenger arrives when one outfit owns most of the city: a new outfit if there's room, else backing for the strongest rival.
+            if (living < _w.Settings.MaxGangs) Outsiders($"arrived to challenge {top.Name}");
+            else Backing(top);
         }
         else if (_quietWeeks >= QuietWeeks)
         {
@@ -77,10 +78,25 @@ public sealed class Director
         return true;
     }
 
+    /// <summary>
+    /// With every outfit's place taken, the money from out of town goes to the strongest rival of the
+    /// outfit on top instead: men and cash enough to take it on. The player is never the one backed.
+    /// </summary>
+    private void Backing(Gang top)
+    {
+        var rival = _w.Outfits.Where(g => g.Id != top.Id && !g.IsPlayer).OrderByDescending(_w.Power).ThenBy(g => g.Id).FirstOrDefault();
+        if (rival == null) return;
+        int most = Math.Clamp(12 * _w.Businesses.Count / 150, 12, 24);
+        int men = Math.Clamp(_w.HoodsOf(top.Id).Count() * 2 / 3 - _w.HoodsOf(rival.Id).Count(), 3, most);
+        for (int i = 0; i < men; i++) _w.NewHood(rival.Id, bossQuality: false);
+        rival.Cash += Math.Max(2500, top.Cash / 8);
+        _w.Log(EventKind.NewGang, rival.Id, $"A syndicate from out of town is backing {rival.Name} against {top.Name}: {men} men and the money to keep them.");
+    }
+
     /// <summary>An outside syndicate arrives, sized to be a threat to whoever is on top.</summary>
     private void Outsiders(string why)
     {
-        var top = _w.LivingGangs.OrderByDescending(g => _w.HoodsOf(g.Id).Count()).FirstOrDefault();
+        var top = _w.Outfits.OrderByDescending(g => _w.HoodsOf(g.Id).Count()).FirstOrDefault();
         long cash = Math.Max(2500, (top?.Cash ?? 0) / 8);
         // Bigger cities draw bigger syndicates.
         int most = Math.Clamp(12 * _w.Businesses.Count / 150, 12, 24);

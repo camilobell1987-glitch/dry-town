@@ -146,7 +146,7 @@ public sealed partial class World
         {
             g.Heat = Math.Min(100, g.Heat + Content.FixFoundHeat);
             string body = bout == Bout.Race ? "the stewards" : "the boxing commission";
-            foreach (var rival in LivingGangs.Where(r => r.Id != g.Id && Bookies(r.Id) > 0)) AddGrudge(rival.Id, g.Id, Content.GrudgeFix);
+            foreach (var rival in Outfits.Where(r => r.Id != g.Id && Bookies(r.Id) > 0)) AddGrudge(rival.Id, g.Id, Content.GrudgeFix);
             string found = $"{man.Name} of {g.Name} fixed {CardLabel(bout)}, and {how}, but {body} smelled it and called all bets off.";
             Log(EventKind.Fix, g.Id, found);
             return found;
@@ -156,7 +156,7 @@ public sealed partial class World
         g.Cash += pays;
         Ledger(g.Id).Rackets += pays;
         int loss = FixLoss(bout);
-        foreach (var rival in LivingGangs.Where(r => r.Id != g.Id))
+        foreach (var rival in Outfits.Where(r => r.Id != g.Id))
         {
             long lost = Math.Min(Math.Max(0, rival.Cash), (long)Bookies(rival.Id) * loss);
             if (lost <= 0) continue;

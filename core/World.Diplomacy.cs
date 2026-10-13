@@ -69,7 +69,7 @@ public sealed partial class World
         breaker.BrokeWordWeek = Week;
         Renown(breaker, respect: -Content.RespectBrokenWord * times);
         AddGrudge(partner.Id, breaker.Id, Content.GrudgeBetrayed * times);
-        foreach (var other in LivingGangs)
+        foreach (var other in Outfits)
             if (other.Id != breaker.Id && other.Id != partner.Id) AddGrudge(other.Id, breaker.Id, Content.GrudgeWitnessed * times);
         Log(EventKind.Diplomacy, breaker.Id, marriage != null
             ? $"{breaker.Name} turned on {partner.Name}, their own family by marriage, and {marriage.Bride} went home to her father. Nobody will take their word for a year."
@@ -83,6 +83,7 @@ public sealed partial class World
     public string? Refusal(Gang from, Gang to, PactKind kind, int tribute = 0)
     {
         if (from.Id == to.Id || !to.Alive) return "There's nobody to talk to.";
+        if (to.IsSmall || from.IsSmall) return $"{(to.IsSmall ? to : from).Name} are a small gang: nobody signs pacts with them. Bring them in or wipe them out.";
         var pact = PactBetween(from.Id, to.Id);
         if (pact != null && (pact.Kind == kind || pact.Kind == PactKind.Alliance)) return $"You already have {(pact.Kind == PactKind.Truce ? "a truce" : "an alliance")} with {to.Name}.";
         if (Untrusted(from)) return $"{to.Name} won't take the word of an outfit that broke its last one.";
@@ -98,7 +99,7 @@ public sealed partial class World
         }
         if (TopDog(to)) return $"{to.Name} runs half the city already. They don't need allies.";
         if (grudge > 20) return $"{to.Name} doesn't trust {from.Name} that far.";
-        bool threat = LivingGangs.Any(g => g.Id != from.Id && g.Id != to.Id && !AtPeace(g.Id, to.Id) && Power(g) > Math.Max(mine, theirs) * 1.2);
+        bool threat = Outfits.Any(g => g.Id != from.Id && g.Id != to.Id && !AtPeace(g.Id, to.Id) && Power(g) > Math.Max(mine, theirs) * 1.2);
         return threat ? null : $"{to.Name} sees nobody worth ganging up on.";
     }
 
@@ -106,6 +107,7 @@ public sealed partial class World
     public string? DemandRefusal(Gang from, Gang to, int amount)
     {
         if (from.Id == to.Id || !to.Alive) return "There's nobody to lean on.";
+        if (to.IsSmall || from.IsSmall) return $"{(to.IsSmall ? to : from).Name} are a small gang: they don't pay tribute. Bring them in or wipe them out.";
         if (AtPeace(from.Id, to.Id)) return $"You already have an understanding with {to.Name}.";
         if (Power(from) < Power(to) * Content.TributeRatio) return $"{to.Name} laughed. They aren't scared of {from.Name}.";
         if (amount > Math.Max(Content.TributeAsk(Income(to)) * 3 / 2, 150)) return $"{to.Name} can't find ${amount} a week. Ask for less.";

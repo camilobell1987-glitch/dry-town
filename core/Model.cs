@@ -13,6 +13,12 @@ public enum Weapon { None, Pistol, Shotgun, TommyGun }
 /// <summary>What a man drives. A car gets him there faster and away when it goes wrong.</summary>
 public enum Car { None, ModelT, Packard, Cadillac }
 
+/// <summary>
+/// An outfit is one of the four that run the city. The rest are small gangs dotted about it, each
+/// holding a block or a few: hoodlums on a corner, a street gang, or loan sharks.
+/// </summary>
+public enum GangKind { Outfit, Hoodlums, StreetGang, Sharks }
+
 public enum RacketKind { None, Speakeasy, Numbers, LoanShark, Still, Bookie, GamblingDen, Counterfeit, Slots, Casino, Brewery, Nightclub }
 
 public sealed class Hood
@@ -138,6 +144,12 @@ public sealed class Gang
     public int Id { get; init; }
     public required string Name { get; set; }
     public bool IsPlayer { get; init; }
+
+    /// <summary>An outfit, or one of the small gangs that hold a few blocks and no more.</summary>
+    public GangKind Kind { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsSmall => Kind != GangKind.Outfit;
+
     public bool Alive { get; set; } = true;
     public int FoundedWeek { get; init; }
     public int DissolvedWeek { get; set; } = -1;

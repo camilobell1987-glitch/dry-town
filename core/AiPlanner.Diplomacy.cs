@@ -65,7 +65,7 @@ public static partial class AiPlanner
     private static bool SeekTruce(World w, Gang g)
     {
         double mine = w.Power(g);
-        var enemy = w.LivingGangs
+        var enemy = w.Outfits
             .Where(r => r.Id != g.Id && !w.AtPeace(g.Id, r.Id) && w.Power(r) >= mine)
             .Select(r => (Gang: r, Fight: w.GrudgeOf(g.Id, r.Id)))
             .Where(x => x.Fight >= Content.GrudgeSuesForPeace)
@@ -84,9 +84,9 @@ public static partial class AiPlanner
     private static bool SeekAlliance(World w, Gang g)
     {
         if (w.TopDog(g) || w.AlliesOf(g.Id).Any()) return false;
-        var big = w.LivingGangs.FirstOrDefault(x => x.Id != g.Id && w.TopDog(x));
+        var big = w.Outfits.FirstOrDefault(x => x.Id != g.Id && w.TopDog(x));
         if (big == null) return false;
-        var partner = w.LivingGangs
+        var partner = w.Outfits
             .Where(h => h.Id != g.Id && h.Id != big.Id && !w.AtPeace(g.Id, h.Id) && !w.AlliesOf(h.Id).Any())
             .Where(h => w.GrudgeOf(h.Id, g.Id) <= 20 && w.GrudgeOf(g.Id, h.Id) <= 20)
             .OrderByDescending(h => w.Power(h)).ThenBy(h => h.Id).FirstOrDefault();
@@ -122,7 +122,7 @@ public static partial class AiPlanner
     {
         if (g.Aggression <= 0.6 || (w.Week / 4 + g.Id) % 2 != 0) return;
         double mine = w.Power(g);
-        var mark = w.LivingGangs
+        var mark = w.Outfits
             .Where(r => r.Id != g.Id && !w.AtPeace(g.Id, r.Id) && mine > w.Power(r) * Content.TributeRatio && w.GrudgeOf(r.Id, g.Id) < 50)
             .Where(r => r.Cash >= Content.TributeAsk(w.Income(r)) * 4)
             .OrderByDescending(r => w.Income(r)).ThenBy(r => r.Id).FirstOrDefault();

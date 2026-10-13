@@ -82,7 +82,7 @@ public class RatTests
     [Fact]
     public void AskingAroundFindsAnInformer()
     {
-        var (sim, w, me, man) = Start();
+        var (sim, w, me, man) = Start(5);
         man.Informer = true;
         man.Loyalty = 0;
         var asker = w.AvailableHoodsOf(me.Id).First(h => h.Id != me.BossHoodId && h.Id != man.Id);

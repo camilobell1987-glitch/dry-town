@@ -30,6 +30,7 @@ public sealed partial class World
     public string? CannotDeclare(Gang gang, Gang enemy)
     {
         if (gang.Id == enemy.Id || !enemy.Alive) return "There's nobody to fight.";
+        if (enemy.IsSmall) return $"{enemy.Name} are a small gang. Wipe them out instead, on the Gangs tab.";
         if (AtWar(gang.Id, enemy.Id)) return $"You're already at war with {enemy.Name}.";
         if (WarOf(gang.Id) is { } war) return $"You're already at war with {GangById(war.Other(gang.Id)).Name}.";
         if (WarOf(enemy.Id) is { } theirs) return $"{enemy.Name} already has its men on the mattresses against {GangById(theirs.Other(enemy.Id)).Name}.";

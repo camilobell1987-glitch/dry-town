@@ -41,7 +41,7 @@ public static partial class AiPlanner
         // that runs the city doesn't bother, and planting one of yours is your own call.
         if (!g.IsPlayer && !w.TopDog(g) && hoods.Count >= 6 && g.Aggression > 0.4 && w.Rng.Chance(0.03))
         {
-            var enemy = w.LivingGangs.Where(r => r.Id != g.Id && w.GrudgeOf(g.Id, r.Id) >= 30 && !w.HasManInside(g.Id, r.Id))
+            var enemy = w.Outfits.Where(r => r.Id != g.Id && w.GrudgeOf(g.Id, r.Id) >= 30 && !w.HasManInside(g.Id, r.Id))
                 .OrderByDescending(r => w.GrudgeOf(g.Id, r.Id)).ThenBy(r => r.Id).FirstOrDefault();
             var crews = w.CrewsOf(g.Id).Select(c => c.LieutenantHoodId).ToHashSet();
             var spy = hoods.Where(h => h.Id != g.BossHoodId && h.Id != g.HeirHoodId && !crews.Contains(h.Id) && Simulation.PlantChance(h) >= 0.6)

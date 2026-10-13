@@ -251,7 +251,7 @@ public static partial class Reports
         var me = w.GangById(gangId);
         var sb = new StringBuilder();
         sb.AppendLine($"{"Id",3} {"Gang",-28} {"Power",5} {"Hate you",8} {"You hate",8}  Standing");
-        foreach (var g in w.LivingGangs.Where(g => g.Id != gangId).OrderByDescending(w.Power))
+        foreach (var g in w.Outfits.Where(g => g.Id != gangId).OrderByDescending(w.Power))
             sb.AppendLine($"{g.Id,3} {Trim(g.Name, 28),-28} {w.Power(g),5:0} {w.GrudgeOf(g.Id, gangId),8} {w.GrudgeOf(gangId, g.Id),8}  {Standing(w, me, g)}");
         sb.AppendLine($"Your power: {w.Power(me):0}." + (w.Untrusted(me) ? " You broke your word this year: nobody will sign with you." : ""));
         foreach (var m in w.Marriages.Where(m => !m.Involves(gangId)))
@@ -288,12 +288,26 @@ public static partial class Reports
     {
         var sb = new StringBuilder();
         sb.AppendLine($"{"Gang",-28} {"Boss",-28} {"People",-7} {"Turf",4} {"Men",4} {"Cash",8} {"Heat",4}");
-        foreach (var g in w.LivingGangs.OrderByDescending(g => w.TurfOf(g.Id).Count()))
+        foreach (var g in w.Outfits.OrderByDescending(g => w.TurfOf(g.Id).Count()))
         {
             var boss = w.HoodById(g.BossHoodId);
             string name = g.IsPlayer ? $"{g.Name} (you)" : g.Name;
             sb.AppendLine($"{Trim(name, 28),-28} {Trim(boss.Name, 28),-28} {Content.Label(boss.Origin),-7} {w.TurfOf(g.Id).Count(),4} {w.HoodsOf(g.Id).Count(),4} {g.Cash,8} {g.Heat,4}");
         }
+        int small = w.SmallGangs.Count();
+        if (small > 0) sb.AppendLine($"And {small} small gang{(small == 1 ? "" : "s")} on corners about the city. Type 'small'.");
+        return sb.ToString();
+    }
+
+    /// <summary>The small gangs: what each is, what it holds, and what it would take to bring it in.</summary>
+    public static string SmallGangs(World w, int gangId)
+    {
+        var me = w.GangById(gangId);
+        var sb = new StringBuilder();
+        sb.AppendLine($"{"Id",3} {"Gang",-30} {"Kind",-12} {"Blocks",6} {"Shops",5} {"Men",4} {"Power",5} {"Price",7}");
+        foreach (var g in w.SmallGangs.OrderBy(g => w.Map.Distance(w.HqOf(me), w.HqOf(g))).ThenBy(g => g.Id))
+            sb.AppendLine($"{g.Id,3} {Trim(g.Name, 30),-30} {Content.Label(g.Kind),-12} {$"{w.BlocksOf(g).Count}/{Content.MaxBlocks(g.Kind)}",6} {w.TurfOf(g.Id).Count(),5} {w.HoodsOf(g.Id).Count(),4} {w.Power(g),5:0} {"$" + w.AbsorbPrice(g),7}");
+        sb.AppendLine("Shake down their shops to expand into their blocks, 'poach <their man>' to hire one away, 'absorb <hood> <gang>' to send a man to buy the whole gang in, or 'wipeout <hood> <gang> [backup..]' to finish them.");
         return sb.ToString();
     }
 

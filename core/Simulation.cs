@@ -74,7 +74,7 @@ public sealed partial class Simulation
             else
             {
                 if (g.IsPlayer) AiPlanner.TalkForPlayer(w);
-                list = AiPlanner.Plan(w, g);
+                list = g.IsSmall ? AiPlanner.PlanSmall(w, g) : AiPlanner.Plan(w, g);
             }
             plans.Add((g, list));
         }
@@ -130,6 +130,9 @@ public sealed partial class Simulation
                 case BoatOrder: w.BuyBoat(gang); break;
                 case SailOrder o when w.BoatById(o.BoatId) is { } boat: w.Sail(gang, boat, o.Run); break;
                 case FixOrder o: FixCard(gang, o); break;
+                case PoachOrder o: Poach(gang, o); break;
+                case AbsorbOrder o: Absorb(gang, o); break;
+                case WipeOutOrder o: WipeOut(gang, o); break;
                 case UnionOrder o: TakeLocal(gang, o); break;
                 case StrikeOrder o when w.LocalById(o.LocalId) is { } local && o.BusinessId >= 0 && o.BusinessId < w.Businesses.Count: w.CallStrike(gang, local, w.BusinessById(o.BusinessId)); break;
                 case HireOrder o: Hire(gang, o); break;
@@ -193,6 +196,9 @@ public sealed partial class Simulation
             WaylayOrder l when w.LineById(l.LineId) is { } line && w.DropOf(line) is { } drop => drop.LotId,
             UnionOrder u when w.LocalById(u.LocalId) is { LotId: >= 0 } local => local.LotId,
             HitOrder h => HauntOf(w, w.HoodById(h.TargetHoodId)),
+            PoachOrder p => HauntOf(w, w.HoodById(p.TargetHoodId)),
+            AbsorbOrder a when w.Gangs.FirstOrDefault(g => g.Id == a.TargetGangId) is { HqLotId: >= 0 } small => small.HqLotId,
+            WipeOutOrder x when w.Gangs.FirstOrDefault(g => g.Id == x.TargetGangId) is { HqLotId: >= 0 } small => small.HqLotId,
             KidnapOrder k => HauntOf(w, w.HoodById(k.TargetHoodId)),
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
@@ -221,6 +227,8 @@ public sealed partial class Simulation
         RacketOrder r => new[] { r.HoodId },
         ArsonOrder a => new[] { a.HoodId },
         HitOrder h => h.Team,
+        WipeOutOrder x => x.Team,
+        AbsorbOrder a => new[] { a.HoodId },
         KidnapOrder k => k.Team,
         RobberyOrder r => r.Team,
         HijackOrder h => h.Team,
@@ -275,6 +283,7 @@ public sealed partial class Simulation
         w.TidyCrews();
         RivalCrews();
         Director.Step();
+        NewSmallGangs();
 
         Metrics.Record(w, takeoversThisWeek);
         Scenarios.Check(w);
@@ -372,7 +381,7 @@ public sealed partial class Simulation
     {
         var w = World;
         var biz = w.Businesses.FirstOrDefault(b => b.Id == o.BusinessId);
-        if (biz == null || !biz.IsOpen || biz.ProtectorGangId == gang.Id) return;
+        if (biz == null || !biz.IsOpen || biz.ProtectorGangId == gang.Id || !w.CanReach(gang, biz)) return;
         if (!TryUseHood(gang, o.HoodId, out var hood)) return;
         var backup = TakeBackup(gang, o.Backup);
         var backupIds = backup.Select(h => h.Id).ToList();
@@ -720,6 +729,8 @@ public sealed partial class Simulation
         {
             var hoods = w.HoodsOf(gang.Id).Where(h => h.Id != gang.BossHoodId).ToList();
             long bill = hoods.Sum(h => h.State == HoodState.Jailed ? h.Wage / 2 : h.Wage) + MattressBill(w, gang);
+            // A small gang's men take a cut of what the corner brings in, not a wage.
+            if (gang.IsSmall) bill = (long)(bill * Content.SmallGangWages);
             var ledger = w.Ledger(gang.Id);
             if (gang.Cash >= bill)
             {
@@ -815,7 +826,8 @@ public sealed partial class Simulation
             {
                 if (hood.Id == gang.BossHoodId) continue;
                 if (net > 0 && hood.Loyalty < 85) hood.Loyalty++;
-                else if (net < 0) hood.Loyalty = Math.Max(0, hood.Loyalty - 1);
+                // A small gang is the block's own boys, and a thin week doesn't change that.
+                else if (net < 0 && !gang.IsSmall) hood.Loyalty = Math.Max(0, hood.Loyalty - 1);
 
                 // A crew takes its mood from its lieutenant.
                 var crew = w.CrewOfHood(hood.Id);
@@ -832,8 +844,8 @@ public sealed partial class Simulation
 
                 if (!hood.IsAvailable || hood.Loyalty >= 20 || !w.Rng.Chance(0.12)) continue;
 
-                // An outfit that owns most of the city splits even when the city is crowded.
-                if (hood.Ambition > 65 && (w.LivingGangs.Count() < w.Settings.MaxGangs || share >= 0.5))
+                // There is only room for so many outfits: with every place taken, a sour man just walks out.
+                if (!gang.IsSmall && hood.Ambition > 65 && w.Outfits.Count() < w.Settings.MaxGangs)
                     Breakaway(gang, hood);
                 else
                 {
@@ -973,7 +985,7 @@ public sealed partial class Simulation
             w.Log(EventKind.Succession, gang.Id, named ? $"{heir.Name} takes over {gang.Name}, as {boss.Name} wanted." : $"{heir.Name} takes over {gang.Name}.");
 
             var rival = heirs.Skip(1).FirstOrDefault(h => h.Ambition > 70 && h.Loyalty < 55 && h.IsAvailable);
-            if (rival != null && w.LivingGangs.Count() < w.Settings.MaxGangs)
+            if (rival != null && !gang.IsSmall && w.Outfits.Count() < w.Settings.MaxGangs)
             {
                 // Family by marriage stands behind the new boss, and nobody dares split from him.
                 if (w.InLawsOf(gang.Id).OrderBy(g => g.Id).FirstOrDefault() is { } family)

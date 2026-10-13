@@ -43,7 +43,7 @@ public partial class Main
     {
         _gangsTree.Clear();
         var root = _gangsTree.CreateItem();
-        foreach (var g in W.LivingGangs.OrderByDescending(g => W.TurfOf(g.Id).Count()))
+        foreach (var g in W.Outfits.OrderByDescending(g => W.TurfOf(g.Id).Count()))
         {
             var it = _gangsTree.CreateItem(root);
             var boss = W.HoodById(g.BossHoodId);
@@ -58,6 +58,7 @@ public partial class Main
             if (!g.IsPlayer) it.SetCustomColor(4, W.AtPeace(Me, g.Id) ? Palette.Good : W.AtWar(Me, g.Id) || W.GrudgeOf(g.Id, Me) > Content.GrudgeTooDeep ? Palette.Bad : Palette.InkQuiet);
             if (g.Id == _talkTo) it.Select(0);
         }
+        SmallGangRows(root);
         RefreshDiplomacy();
     }
 
@@ -102,6 +103,7 @@ public partial class Main
             return;
         }
 
+        if (them.IsSmall) { SmallGangSection(them); return; }
         AddLabel(_talkPanel, them.Name, Palette.Gang(W, them.Id), 17);
         AddLabel(_talkPanel, $"Run by {W.HoodById(them.BossHoodId).Name}. Their muscle {W.Power(them):0} against your {W.Power(me):0}.", Palette.Ink, wrap: true);
         int hate = W.GrudgeOf(them.Id, Me), mine = W.GrudgeOf(Me, them.Id);

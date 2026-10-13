@@ -106,7 +106,7 @@ public static class Scenarios
                 }
                 w.Goal.Baseline = w.TurfOf(me.Id).Count();
                 // Every other outfit smells blood, and bears the city's biggest outfit a grudge.
-                foreach (var rival in w.LivingGangs.Where(g => !g.IsPlayer).ToList()) w.Hostile(me, rival, 40);
+                foreach (var rival in w.Outfits.Where(g => !g.IsPlayer).ToList()) w.Hostile(me, rival, 40);
                 sim.Begin(CityEventKind.Crusade);
                 sim.Begin(CityEventKind.Shakeup);
                 break;
@@ -117,7 +117,7 @@ public static class Scenarios
             case ScenarioKind.Waterfront:
             {
                 var docks = w.Locals.First(l => l.IsDocks);
-                var rival = w.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(w.Power).ThenBy(g => g.Id).First();
+                var rival = w.Outfits.Where(g => !g.IsPlayer).OrderByDescending(w.Power).ThenBy(g => g.Id).First();
                 docks.OwnerGangId = rival.Id;
                 docks.PresidentHoodId = w.AvailableHoodsOf(rival.Id).Where(h => h.Id != rival.BossHoodId).OrderByDescending(h => h.Intimidation).ThenBy(h => h.Id).First().Id;
                 w.Log(EventKind.Union, rival.Id, $"{rival.Name} runs {docks.Name}.");
@@ -165,7 +165,7 @@ public static class Scenarios
     }
 
     /// <summary>Whether no other outfit holds as many shops.</summary>
-    private static bool Biggest(World w, int turf) => w.LivingGangs.All(g => g.IsPlayer || w.TurfOf(g.Id).Count() < turf);
+    private static bool Biggest(World w, int turf) => w.Outfits.All(g => g.IsPlayer || w.TurfOf(g.Id).Count() < turf);
 
     /// <summary>The open shops in the home ward that pay the player, and all the open shops there.</summary>
     private static (int Mine, int Open) WardShops(World w)
@@ -216,12 +216,12 @@ public static class Scenarios
             }
             case ScenarioKind.SurviveTheCrusade:
             {
-                var top = w.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(g => w.TurfOf(g.Id).Count()).ThenBy(g => g.Id).FirstOrDefault();
+                var top = w.Outfits.Where(g => !g.IsPlayer).OrderByDescending(g => w.TurfOf(g.Id).Count()).ThenBy(g => g.Id).FirstOrDefault();
                 return $"You hold {turf} shops, and need {w.Goal.Baseline}." + (top != null ? $" The next biggest outfit, {top.Name}, holds {w.TurfOf(top.Id).Count()}." : "");
             }
             case ScenarioKind.OffTheBoat:
             {
-                var top = w.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(g => w.TurfOf(g.Id).Count()).ThenBy(g => g.Id).FirstOrDefault();
+                var top = w.Outfits.Where(g => !g.IsPlayer).OrderByDescending(g => w.TurfOf(g.Id).Count()).ThenBy(g => g.Id).FirstOrDefault();
                 return $"You hold {turf} shops." + (top != null ? $" The biggest outfit, {top.Name}, holds {w.TurfOf(top.Id).Count()}." : "");
             }
             case ScenarioKind.Waterfront:

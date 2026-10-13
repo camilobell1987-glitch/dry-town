@@ -25,17 +25,20 @@ public static partial class Content
     public const int BribeUnit = 100;
     public const int HeatPerBribeUnit = 4;
 
+    /// <summary>Every city is run by four outfits, the player's among them. Everyone else is a small gang.</summary>
+    public const int Outfits = 4;
+
     /// <summary>The city's shape for each size: blocks, wards, precinct houses, businesses and how many gangs it holds.</summary>
-    public record CityShape(int BlocksX, int BlocksY, int WardsX, int WardsY, int Precincts, int Businesses, int StartingGangs, int MaxGangs, bool River = false, int Parks = 0);
+    public record CityShape(int BlocksX, int BlocksY, int WardsX, int WardsY, int Precincts, int Businesses, int StartingGangs, int MaxGangs, bool River = false, int Parks = 0, int SmallGangs = 0);
 
     public static CityShape Shape(CitySize size) => size switch
     {
-        CitySize.Medium => new(7, 5, 2, 2, 2, 90, 4, 8),
-        CitySize.Large => new(9, 7, 3, 2, 3, 150, 5, 10),
-        CitySize.Huge => new(13, 10, 4, 3, 5, 300, 7, 14, Parks: 2),
-        CitySize.Metropolis => new(18, 14, 5, 4, 8, 600, 9, 20, River: true, Parks: 3),
-        CitySize.Greater => new(24, 18, 6, 5, 12, 1050, 12, 28, River: true),
-        _ => new(5, 4, 2, 1, 1, 48, 3, 6),
+        CitySize.Medium => new(7, 5, 2, 2, 2, 90, Outfits, Outfits, SmallGangs: 4),
+        CitySize.Large => new(9, 7, 3, 2, 3, 150, Outfits, Outfits, SmallGangs: 6),
+        CitySize.Huge => new(13, 10, 4, 3, 5, 300, Outfits, Outfits, Parks: 2, SmallGangs: 11),
+        CitySize.Metropolis => new(18, 14, 5, 4, 8, 600, Outfits, Outfits, River: true, Parks: 3, SmallGangs: 20),
+        CitySize.Greater => new(24, 18, 6, 5, 12, 1050, Outfits, Outfits, River: true, SmallGangs: 34),
+        _ => new(5, 4, 2, 1, 1, 48, Outfits, Outfits, SmallGangs: 2),
     };
 
     // ---- Politics -----------------------------------------------------------
