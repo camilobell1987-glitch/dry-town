@@ -324,7 +324,7 @@ public partial class Main : Control
         if (id < 0)
         {
             AddLabel(_businessPanel, "Click a business, a bank or someone on the street.", Palette.InkQuiet);
-            AddLabel(_businessPanel, "Everyone on the map is a dot coloured by what he is: grey a citizen (the larger ones are drifters looking for work), bright blue a police officer, dark blue a detective, white a reporter and gold a witness. Gang men are black: a small gang's plain, and a big outfit's with its colour round the rim, yours in brass.", Palette.InkQuiet, wrap: true);
+            AddLabel(_businessPanel, "Everyone on the map is a dot coloured by what he is: grey a citizen (the larger ones are drifters looking for work), bright blue a police officer, dark blue a detective, white a reporter and gold a witness. Gang men are black: a small gang's plain, and a big outfit's with its colour round the rim, yours in brass. Click anyone in the crowd to pull their card from the city directory.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "A shop's rooftop sign is framed, and its awning striped, in the colours of the gang it pays; yours are brass. Plain ones pay nobody yet. A red badge on the roof means a racket in the back room.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "Scroll to zoom the map. Drag with the right mouse button to move it.", Palette.InkQuiet, wrap: true);
             return;
@@ -894,6 +894,7 @@ public partial class Main : Control
         LoadView();
         _map.BusinessClicked += _ => OnMapSelection();
         _map.PersonClicked += _ => OnMapSelection();
+        _map.CitizenClicked += _ => OnMapSelection();
         _map.HoodClicked += _ => OnMapSelection();
         _map.BankClicked += _ => OnMapSelection();
         _map.ShopClicked += _ => OnMapSelection();
@@ -1306,6 +1307,21 @@ public partial class Main : Control
             && W.People.Where(p => p.Kind == Enum.Parse<PersonKind>(kind, true) && (p.GangId < 0 || p.GangId == Me))
                 .OrderBy(p => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(p.LotId))).FirstOrDefault() is { } person)
             _map.Select(person: person.Id);
+        // A resident near headquarters: a shopkeeper, a landlord, or anyone.
+        if (Arg("--select-citizen") is string who && _map.Directory is { } directory)
+        {
+            var hq = W.HqOf(W.Player);
+            int pick = who switch
+            {
+                "owner" => W.Businesses.Where(b => b.IsOpen).OrderBy(b => W.BlocksFromHq(W.Player, b)).Select(b => directory.OwnerOf(b.Id)).First(i => i >= 0),
+                "landlord" => W.Map.Lots.OrderBy(l => W.Map.Distance(hq, l)).Select(l => directory.LandlordOf(l.Id)).First(i => i >= 0),
+                "walking" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
+                    .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n)).First(i => _map.WhereIs(i) != null),
+                _ => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, 0),
+            };
+            _map.Select(citizen: pick);
+        }
+        _revealCitizens = Flag("--reveal");
         if (Arg("--select-bank") is string bankArg)
             _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));
         if (Flag("--select-hood")) _map.Select(hood: W.Hoods.First(h => h.IsAvailable && h.GangId != Me && W.GangById(h.GangId).Alive).Id);
@@ -1464,6 +1480,7 @@ public partial class Main : Control
                     "bank" => W.Map.LotAt(W.Banks.OrderBy(b => W.Map.Distance(hq, W.Map.LotAt(b.LotId))).First().LotId),
                     "fire" => W.Businesses.Where(b => b.BurnedWeek >= W.Week - 1).Select(W.LotOf).FirstOrDefault() ?? hq,
                     "person" => W.PersonById(_map.SelectedPerson) is { } p ? W.Map.LotAt(p.LotId) : hq,
+                    "citizen" => _map.Directory is { } d && _map.SelectedCitizen >= 0 ? W.Map.LotAt(d.Get(_map.SelectedCitizen).HomeLotId) : hq,
                     "shop" => _map.SelectedShop >= 0 ? W.Map.LotAt(_map.SelectedShop) : hq,
                     "court" => W.Businesses.Where(b => b.Kind == BusinessKind.Court).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "corner" => W.SmallGangs.Where(g => Arg("--select-corner") is not { } k || k == "any" || g.Kind.ToString().Equals(k, StringComparison.OrdinalIgnoreCase))

@@ -23,7 +23,8 @@ public partial class MapView : Control
     /// <summary>Raised once per script action as the live clock passes the moment it happens.</summary>
     public event Action<ScriptAction>? ActionHappened;
 
-    public World? World { get; set; }
+    public World? World { get => _worldModel; set { _worldModel = value; _directory = null; } }
+    private World? _worldModel;
 
     private static readonly CityMap NoMap = new();
 
@@ -286,7 +287,15 @@ public partial class MapView : Control
             if (!ShowWards && PickAt(click.Position) is { } who)
             {
                 if (who.Kind == Pickable.Person) { Select(person: who.Id); PersonClicked?.Invoke(who.Id); }
+                else if (who.Kind == Pickable.Citizen) { Select(citizen: who.Id); CitizenClicked?.Invoke(who.Id); }
                 else { Select(hood: who.Id); HoodClicked?.Invoke(who.Id); }
+                return;
+            }
+            // Then anyone out walking.
+            if (!ShowWards && CrowdPick(click.Position) is int passerby and >= 0)
+            {
+                Select(citizen: passerby);
+                CitizenClicked?.Invoke(passerby);
                 return;
             }
             int lotId = LotUnder(click.Position);
@@ -614,6 +623,7 @@ public partial class MapView : Control
         DrawStreetPeople(view);
         DrawLoiterers(view);
         DrawChatter(view);
+        DrawCitizenRing();
         DrawFires(view);
         DrawRiverTraffic(view);
         DrawTrain(night, view);

@@ -83,6 +83,7 @@ Everyone on the map is drawn as a dot, coloured by what he is: grey for a citize
 
 The city has a dot for every soul who lives in it, from about 7,000 in a small city to 140,000 in the greater city, counted building by building: a tenement holds twenty families, a shop has flats over it. Most are indoors at any hour. The streets fill at the morning and evening rush and at lunch, empty out in the small hours, and at night a crowd gathers at the door of any speakeasy.
 
+- **Residents** (grey dots) each have a card in the city directory: a name, age, people, job, workplace, home, landlord and property. Click one in the crowd, or one of a pair stopped to talk, to see the card. It starts as question marks.
 - **Drifters** (larger grey dots) are looking for work. Unlike a stranger off the boat, you can see a drifter's skills before you hire him, and a good one asks more. He moves on after a few weeks.
 - **Beat cops** (bright blue) walk one ward each. Slip one $150 and he looks the other way for the week: your heat drops, and if the police raid you that week they leave your rackets in his ward alone. An honest one won't take it and writes you up instead. The panel tells you which ones look honest.
 - **Reporters** (white) turn up when a gang runs hot. In a few weeks the story runs: the gang's heat jumps, and so does the city's outrage, which helps the reformers at the polls. You can buy a story about you before it runs; the price goes up with your heat.

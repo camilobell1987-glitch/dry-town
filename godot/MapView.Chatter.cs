@@ -70,7 +70,8 @@ public partial class MapView
     /// <summary>Pairs of citizens stopped to talk on the blocks in view.</summary>
     private void DrawChatter(Rect2 view)
     {
-        if (Tile < 12) return;
+        _chatSpots.Clear();
+        if (Tile < 12 || Directory == null) return;
         var w = World!;
         var map = w.Map;
         float outside = OutsideAt(HourOfDay);
@@ -104,6 +105,12 @@ public partial class MapView
                 var b = spot + gap;
                 DrawDot(a * _t, r, Palette.Citizen);
                 DrawDot(b * _t, r, Palette.Citizen);
+                // They're residents of the block, and can be clicked like anyone else.
+                int first = Talker(bx, by, seed, 0), second = Talker(bx, by, seed, 1);
+                _chatSpots[first] = a;
+                _chatSpots[second] = b;
+                _clickables.Add(new Clickable(Pickable.Citizen, first, a, ClickRadius(r)));
+                _clickables.Add(new Clickable(Pickable.Citizen, second, b, ClickRadius(r)));
 
                 var (boss, resentment) = turf[bx, by];
                 var topic = PickTopic(Hash(seed, 943), ward, ward < gossip.Length ? gossip[ward] : default, drinking[bx, by] > 0, boss, resentment);
