@@ -613,6 +613,7 @@ public partial class MapView : Control
         _clickables.Clear();
         DrawStreetPeople(view);
         DrawLoiterers(view);
+        DrawChatter(view);
         DrawFires(view);
         DrawRiverTraffic(view);
         DrawTrain(night, view);
