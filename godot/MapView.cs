@@ -526,6 +526,7 @@ public partial class MapView : Control
         FindFactories();
         foreach (var (row, col) in rows) RecordRow(row, col);
         foreach (var (bx, by) in blocks!) RecordGround(bx, by);
+        FillCrowd();
     }
 
     /// <summary>The column of blocks a tile belongs to; the avenue on a block's west side goes with it.</summary>
@@ -580,7 +581,8 @@ public partial class MapView : Control
             foreach (var pen in _full) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
             foreach (var pen in _coarse) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
             foreach (var pen in _dyn) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
-            RenderingServer.CanvasItemSetSelfModulate(_crowdItem, shade);
+            // People on the street pass under the lamps, so they darken less than the buildings.
+            _crowdMaterial?.SetShaderParameter("shade", Colors.White.Lerp(NightShade, night * 0.5f));
             foreach (var pen in _lit) RenderingServer.CanvasItemSetSelfModulate(pen.Item, Colors.White with { A = night });
             RenderingServer.CanvasItemSetSelfModulate(_lampGlow.Item, Colors.White with { A = night });
         }
