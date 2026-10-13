@@ -34,6 +34,7 @@ public static partial class Content
         CitySize.Large => new(9, 7, 3, 2, 3, 150, 5, 10),
         CitySize.Huge => new(13, 10, 4, 3, 5, 300, 7, 14, Parks: 2),
         CitySize.Metropolis => new(18, 14, 5, 4, 8, 600, 9, 20, River: true, Parks: 3),
+        CitySize.Greater => new(24, 18, 6, 5, 12, 1050, 12, 28, River: true),
         _ => new(5, 4, 2, 1, 1, 48, 3, 6),
     };
 

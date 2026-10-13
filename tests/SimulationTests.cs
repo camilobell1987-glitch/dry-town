@@ -417,6 +417,7 @@ public class Phase5Tests
     [InlineData(CitySize.Large, 9, 7, 6, 3, 5)]
     [InlineData(CitySize.Huge, 13, 10, 12, 5, 7)]
     [InlineData(CitySize.Metropolis, 18, 14, 20, 8, 9)]
+    [InlineData(CitySize.Greater, 24, 18, 30, 12, 12)]
     public void CitiesComeInThreeSizes(CitySize size, int blocksX, int blocksY, int wards, int precincts, int gangs)
     {
         var w = World.Create(new WorldSettings { Seed = 3, Size = size });
