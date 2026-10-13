@@ -10,7 +10,10 @@ using Godot;
 /// </summary>
 public partial class Main : Control
 {
-    private const float HoursPerSecond = 8f;
+    private const float HoursPerSecond = 2f;
+
+    /// <summary>The live week's speeds: at 1× a week takes about a minute and a half, at ¼× six minutes, at 8× under eleven seconds.</summary>
+    private static readonly float[] Speeds = { 0.25f, 0.5f, 1, 2, 4, 8 };
 
     private CommandShell _shell = null!;
     private World W => _shell.Sim.World;
@@ -893,19 +896,19 @@ public partial class Main : Control
 
         _liveBar = new HBoxContainer { Visible = false };
         _liveBar.AddThemeConstantOverride("separation", 8);
-        _clock = new Label { CustomMinimumSize = new Vector2(170, 0) };
+        _clock = new Label { CustomMinimumSize = new Vector2(150, 0) };
         _clock.AddThemeFontSizeOverride("font_size", 17);
         _liveBar.AddChild(_clock);
         _pause = AddButton(_liveBar, "Pause", () => { _playing = !_playing; _pause.Text = _playing ? "Pause" : "Play"; });
-        foreach (var s in new[] { 1f, 2f, 4f, 8f })
+        foreach (var s in Speeds)
         {
             var speed = s;
-            var b = AddButton(_liveBar, $"{s}×", () => SetSpeed(speed));
+            var b = AddButton(_liveBar, s switch { 0.25f => "¼×", 0.5f => "½×", _ => $"{s}×" }, () => SetSpeed(speed));
             b.ToggleMode = true;
             _speedButtons.Add(b);
         }
         _liveBar.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-        AddButton(_liveBar, "Skip to Sunday report", () => _map.Advance(Content.HoursPerWeek));
+        AddButton(_liveBar, "Skip to Sunday", () => _map.Advance(Content.HoursPerWeek));
         left.AddChild(_liveBar);
 
         var tickerPanel = new PanelContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
@@ -952,8 +955,7 @@ public partial class Main : Control
     private void SetSpeed(float speed)
     {
         _speed = speed;
-        float[] speeds = { 1, 2, 4, 8 };
-        for (int i = 0; i < _speedButtons.Count; i++) _speedButtons[i].ButtonPressed = Math.Abs(speeds[i] - speed) < 0.01f;
+        for (int i = 0; i < _speedButtons.Count; i++) _speedButtons[i].ButtonPressed = Math.Abs(Speeds[i] - speed) < 0.01f;
     }
 
     private void SetLive(bool live)
