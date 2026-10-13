@@ -1413,6 +1413,7 @@ public partial class Main : Control
             _clock.Text = MapView.ClockText(_map.Clock);
             RefreshAll();
         }
+        if (Arg("--playtest") is string playtest) { await Playtest(int.Parse(playtest), Arg("--zoom")); return; }
         if (Arg("--bench") is string frames)
         {
             // Time how long the map takes to draw, for checking big cities stay smooth.
@@ -1422,7 +1423,7 @@ public partial class Main : Control
             MapView.CityDraws = 0;
             int n = int.Parse(frames);
             for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            GD.Print($"BENCH {W.Map.BlocksX}x{W.Map.BlocksY}: draw calls {Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame)}, primitives {Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame)}, items {Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame)}; {(Time.GetTicksUsec() - start) / 1000.0 / n:F1} ms per frame; city recorded in {MapView.CityMillis:F1} ms, moving things {MapView.OverlayMillis:F1} ms, rows re-recorded {MapView.CityDraws} times");
+            GD.Print($"BENCH {W.Map.BlocksX}x{W.Map.BlocksY}, {_map.Population} people: draw calls {Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame)}, primitives {Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame)}, items {Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame)}; {(Time.GetTicksUsec() - start) / 1000.0 / n:F1} ms per frame; city recorded in {MapView.CityMillis:F1} ms, moving things {MapView.OverlayMillis:F1} ms, rows re-recorded {MapView.CityDraws} times");
             GetTree().Quit();
             return;
         }
@@ -1467,6 +1468,7 @@ public partial class Main : Control
                     "court" => W.Businesses.Where(b => b.Kind == BusinessKind.Court).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "corner" => W.SmallGangs.Where(g => Arg("--select-corner") is not { } k || k == "any" || g.Kind.ToString().Equals(k, StringComparison.OrdinalIgnoreCase))
                         .Select(W.HqOf).OrderBy(l => W.Map.Distance(hq, l)).First(),
+                    "speakeasy" => W.Businesses.Where(b => b.IsOpen && b.Racket == RacketKind.Speakeasy).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "cemetery" => W.Map.Lots.Where(l => l.Terrain == Terrain.Cemetery).OrderByDescending(l => W.Map.LotsOfBlock((l.X - 1) / CityMap.StrideX, (l.Y - 1) / CityMap.StrideY).Count(x => x.Terrain == Terrain.Cemetery)).ThenBy(l => l.Id).First(),
                     "biz" => _map.SelectedBusiness >= 0 ? W.LotOf(W.BusinessById(_map.SelectedBusiness)) : hq,
