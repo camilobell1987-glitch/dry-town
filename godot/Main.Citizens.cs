@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using DryTown.Core;
 using Godot;
@@ -93,6 +94,17 @@ public partial class Main
         head.AddThemeColorOverride("font_color", CardInk);
         var rule = new ColorRect { Color = CardRule, CustomMinimumSize = new Vector2(0, 2) };
         lines.AddChild(rule);
+        if (W.Acquaintances.GetValueOrDefault(id) is { Standing: not Standing.None } dealt)
+        {
+            string stamp = dealt.Standing switch
+            {
+                Standing.Bought => dealt.GangId == Me ? "On your payroll" : "On someone's payroll",
+                Standing.Scared => dealt.GangId == Me ? "Scared of you" : "Scared",
+                Standing.Held => dealt.Note,
+                _ => $"Dead. {dealt.Note}",
+            };
+            AddLabel(lines, stamp, dealt.Standing is Standing.Dead or Standing.Held ? new Color("9a2a22") : new Color("3c6a34"), wrap: true);
+        }
 
         var grid = new GridContainer { Columns = 2 };
         grid.AddThemeConstantOverride("h_separation", 12);
@@ -120,31 +132,72 @@ public partial class Main
         if (_map.WhereIs(id) == null) AddLabel(panel, "Indoors just now.", Palette.InkQuiet);
         else AddLabel(panel, $"Seen on {W.Map.StreetOf(seen)} St in {W.Wards.ElementAtOrDefault(seen.WardId)?.Name ?? "the district"}.", Palette.InkQuiet, wrap: true);
         if (_overheard != null) AddLabel(panel, _overheard, Palette.Ink, wrap: true);
-        if (known == Fact.All) return;
+        var standing = W.Acquaintances.GetValueOrDefault(id);
+        if (standing?.Standing == Standing.Dead) return;
         if (known == Fact.None)
             AddLabel(panel, "You don't know the first thing about this one yet.", Palette.InkQuiet, wrap: true);
-        AddLabel(panel, "Word on the street fills in a line now and then on anyone you've come across, more often where you hold turf.", Palette.InkQuiet, wrap: true);
+        if (known != Fact.All)
+            AddLabel(panel, "Word on the street fills in a line now and then on anyone you've come across, more often where you hold turf.", Palette.InkQuiet, wrap: true);
 
         bool Concerns(Order o) => o switch
         {
             AskOrder a => a.CitizenId == id,
             TailOrder t => t.CitizenId == id,
+            LeanOrder l => l.CitizenId == id,
             _ => false,
         };
         ShowQueued(panel, Concerns);
         if (!CanGiveOrders(panel)) return;
         string who = WhoIs(c, known, seen);
-        if (!AlreadyGiven(o => o is AskOrder a && a.CitizenId == id))
+        if (known != Fact.All && !AlreadyGiven(o => o is AskOrder a && a.CitizenId == id))
         {
             var ask = AddButton(panel, $"Ask around about them (${Content.AskPrice})", () => Give(new AskOrder(Me, id, c.HomeLotId, who)));
             ask.Disabled = W.Player.Cash < Content.AskPrice;
         }
-        if (AlreadyGiven(o => o is TailOrder t && t.CitizenId == id)) return;
-        var hoods = FreeHoods().OrderByDescending(h => h.Stealth).ToList();
-        if (hoods.Count == 0) { AddLabel(panel, "All your men are busy, so nobody can follow them.", Palette.InkQuiet, wrap: true); return; }
-        AddLabel(panel, "Have a man follow them for the week. He'll see where they live and work, and a sharp one picks up more. If he's spotted, he only learns the address.", Palette.Ink, wrap: true);
-        var man = HoodPicker(hoods, h => $"{Simulation.SpottedChance(h):P0} spotted");
-        AddButton(panel, "Have them tailed", () => Give(new TailOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who)));
+        var hoods = FreeHoods().ToList();
+        if (hoods.Count == 0) { AddLabel(panel, "All your men are busy, so nobody can go to them.", Palette.InkQuiet, wrap: true); return; }
+        if (standing?.Standing == Standing.Held) return;
+        bool tailing = AlreadyGiven(o => o is TailOrder t && t.CitizenId == id), leaning = AlreadyGiven(o => o is LeanOrder l && l.CitizenId == id);
+        if (tailing || leaning) return;
+
+        panel.AddChild(new HSeparator());
+        AddLabel(panel, "Send a man to them", Palette.Ink, 16);
+        // The boss goes himself only when there's hardly anyone else.
+        var men = hoods.Where(h => h.Id != W.Player.BossHoodId || W.AvailableHoodsOf(Me).Count() < 3).OrderByDescending(h => h.Strength).ToList();
+        if (men.Count == 0) return;
+        var man = HoodPicker(men, h => $"Intim. {h.Intimidation} · Muscle {h.Muscle} · Stealth {h.Stealth}");
+        if (known != Fact.All)
+            AddButton(panel, "Tail them for the week", () => Give(new TailOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who)));
+        // What each would cost and the odds with the man picked; nerve shows only once you know the person.
+        int nerve = W.NerveOf(id);
+        var buttons = new List<(Button Button, Lean Lean, Func<string> Label)>();
+        void Act(Lean lean, Func<string> label)
+        {
+            var b = AddButton(panel, "", () => Give(new LeanOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who, lean, c.Worth)));
+            buttons.Add((b, lean, label));
+        }
+        // What they're good for shows once you know what they do.
+        int price = World.BribePrice(c.Worth);
+        bool sized = known.HasFlag(Fact.Job) || known.HasFlag(Fact.Owns);
+        string Money(int dollars) => sized ? $"${dollars}" : "$???";
+        Act(Lean.Bribe, () => $"Put them on the payroll ({Money(price)})");
+        Act(Lean.Intimidate, () => "Lean on them");
+        Act(Lean.Extort, () => $"Shake them down (about {Money(Math.Max(5, c.Worth * 3))})");
+        Act(Lean.Kidnap, () => $"Snatch them for ransom ({Money(Math.Max(50, c.Worth * Content.RansomOfWorth))})");
+        Act(Lean.Kill, () => "Have them killed");
+        void Odds()
+        {
+            var hood = W.HoodById(man.GetSelectedId());
+            foreach (var (b, lean, label) in buttons)
+            {
+                string why = W.CannotLean(W.Player, id, lean) is { } no ? $" · {no}" : "";
+                b.Text = $"{label()} · {Simulation.LeanChance(hood, lean, nerve):P0}{why}";
+                b.Disabled = why != "" || lean == Lean.Bribe && W.Player.Cash < price;
+            }
+        }
+        man.ItemSelected += _ => Odds();
+        Odds();
+        AddLabel(panel, "A bribed man tells you what he hears, and so does a frightened one for a while. Shaking someone down pays now; a snatch pays if the family comes up with the money. Every one but a bribe brings heat, and anyone can be seen doing it. A killing makes you feared and the neighbourhood talks of murder.", Palette.InkQuiet, wrap: true);
     }
 
     /// <summary>The people you know something about, so you can find their cards again.</summary>

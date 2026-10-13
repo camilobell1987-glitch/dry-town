@@ -141,6 +141,7 @@ public sealed partial class Simulation
                 case SilenceOrder o: Silence(gang, o); break;
                 case AskOrder o: Ask(gang, o); break;
                 case TailOrder o: Tail(gang, o); break;
+                case LeanOrder o: LeanOn(gang, o); break;
                 case ArmOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Arm(gang, man, o.Weapon); break;
                 case CarOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Drive(gang, man, o.Car); break;
                 case JuryOrder o: Jury(gang, o); break;
@@ -205,6 +206,7 @@ public sealed partial class Simulation
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
             TailOrder t => t.LotId,
+            LeanOrder l => l.LotId,
             JuryOrder => w.PrecinctNear(w.Map.LotAt(hq)).Id,
             SeenToOrder s when w.Hoods.FirstOrDefault(h => h.Id == s.TargetHoodId) is { } t =>
                 t.State == HoodState.Jailed ? w.PrecinctNear(w.Map.LotAt(hq)).Id : HauntOf(w, t),
@@ -239,6 +241,7 @@ public sealed partial class Simulation
         UnionOrder u => u.Team,
         SilenceOrder s => new[] { s.HoodId },
         TailOrder t => new[] { t.HoodId },
+        LeanOrder l => new[] { l.HoodId },
         JuryOrder j => new[] { j.HoodId },
         PollsOrder p => new[] { p.HoodId },
         HuntOrder h => new[] { h.HoodId },
@@ -271,6 +274,7 @@ public sealed partial class Simulation
         Rats();
         Street();
         Rumours();
+        Residents();
         Politics.Step(w, w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.HoodKilled));
         // After the city's temper has cooled for the week, so the war's share of it stays.
         Wars();

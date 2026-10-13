@@ -40,7 +40,7 @@ public static partial class Content
 }
 
 /// <summary>What you know about one resident, and the ward he lives in, so the street can talk about him.</summary>
-public sealed class Acquaintance
+public sealed partial class Acquaintance
 {
     public Fact Known { get; set; }
     public int WardId { get; set; } = -1;
@@ -155,7 +155,7 @@ public sealed partial class Simulation
         {
             var unknown = Content.Facts.Where(f => !a.Known.HasFlag(f)).ToList();
             if (unknown.Count == 0) continue;
-            double chance = Content.RumourChance + (a.WardId >= 0 && w.HoldsTurfIn(me, a.WardId) ? Content.RumourOnTurf : 0);
+            double chance = Content.RumourChance + (a.WardId >= 0 && w.HoldsTurfIn(me, a.WardId) ? Content.RumourOnTurf : 0) + Informants(me, a.WardId);
             if (!w.Rng.Chance(chance)) continue;
             // The easy things get round first.
             a.Known |= unknown[w.Rng.Chance(0.6) ? 0 : w.Rng.Range(0, unknown.Count - 1)];

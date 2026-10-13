@@ -470,6 +470,9 @@ public sealed class CommandShell
             AskOrder a => Pending.Any(q => q is AskOrder x && x.CitizenId == a.CitizenId) ? "You're already asking about them."
                 : W.Player.Cash < Content.AskPrice ? $"It takes ${Content.AskPrice} to ask around." : null,
             TailOrder t => CheckHood(t.HoodId) ?? (Pending.Any(q => q is TailOrder x && x.CitizenId == t.CitizenId) ? "Someone is already following them." : null),
+            LeanOrder l => CheckHood(l.HoodId) ?? W.CannotLean(W.Player, l.CitizenId, l.Lean)
+                ?? (Pending.Any(q => q is LeanOrder x && x.CitizenId == l.CitizenId) ? "Someone is already on their way to them."
+                : l.Lean == Lean.Bribe && W.Player.Cash < World.BribePrice(l.Worth) ? $"It takes ${World.BribePrice(l.Worth)}." : null),
             _ => CheckStreet(order),
         };
         if (problem != null) return problem + "\n";
@@ -529,6 +532,7 @@ public sealed class CommandShell
         FrontOrder f => $"buy {BizName(f.BusinessId)} outright (${Content.FrontPrice(W.BusinessById(f.BusinessId)):N0})",
         AskOrder a => $"ask around about {a.Who} (${Content.AskPrice})",
         TailOrder t => $"{HoodName(t.HoodId)} tails {t.Who}",
+        LeanOrder l => $"{HoodName(l.HoodId)} goes to {Content.Label(l.Lean)} {l.Who}",
         _ => o.ToString(),
     };
 

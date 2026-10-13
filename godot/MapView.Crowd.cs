@@ -115,6 +115,11 @@ void fragment() {
 
     private int[,] _crowdBlocks = new int[0, 0];
     private float[,] _crowdDoors = new float[0, 0];
+    private int _goneCount;
+
+    /// <summary>Whether resident n of a block is held somewhere or dead.</summary>
+    private bool Gone(int bx, int by, int n) =>
+        World!.StandingOf(by * World.Map.BlocksX * CityDirectory.PerBlock + bx * CityDirectory.PerBlock + n) is Standing.Held or Standing.Dead;
     private const float CrowdW = 4.2f, CrowdH = 2.2f, CrowdPerimeter = 2 * (CrowdW + CrowdH);
 
     /// <summary>How far round a block's pavement a lot's front door is, from its north-west corner.</summary>
@@ -158,7 +163,8 @@ void fragment() {
             int k = i * 16, salt = by * 7919 + bx * 104729 + n;
             buffer[k + 0] = 1; buffer[k + 5] = 1;
             buffer[k + 8] = (Hash(salt, 910) - 0.5f) * 0.14f;
-            buffer[k + 9] = Hash(salt, 914);
+            // The kidnapped and the dead are never seen out.
+            buffer[k + 9] = Gone(bx, by, n) ? 2 : Hash(salt, 914);
             buffer[k + 10] = Hash(salt, 915);
             buffer[k + 11] = doors[bx, by];
             buffer[k + 12] = bx * CityMap.StrideX + 1 - 0.1f;
@@ -187,6 +193,13 @@ void fragment() {
     private void PlaceCrowd()
     {
         if (_crowdMaterial == null) return;
+        // Someone was snatched, killed or let go: take them off the street, or put them back.
+        int gone = World!.Acquaintances.Count(kv => kv.Value.Standing is Standing.Held or Standing.Dead);
+        if (gone != _goneCount)
+        {
+            _goneCount = gone;
+            FillCrowd();
+        }
         float hour = HourOfDay;
         _crowdMaterial.SetShaderParameter("t", _anim);
         _crowdMaterial.SetShaderParameter("outside", OutsideAt(hour));
