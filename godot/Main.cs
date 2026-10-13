@@ -356,6 +356,7 @@ public partial class Main : Control
         BoozeLine(b);
         RepealLine(b);
         ClubLine(b);
+        ContractLine(b);
         SquadLine(b);
         UnionLine(b);
         if (!b.IsOpen) AddLabel(_businessPanel, W.Week - b.BurnedWeek <= 8 ? $"Burned out. Rebuilding for {b.ShutWeeks} more weeks." : $"Closed by the police for {b.ShutWeeks} more weeks.", Palette.Bad);
@@ -1112,6 +1113,7 @@ public partial class Main : Control
         if (Flag("--fixing")) SetUpFixing();
         if (Flag("--kidnapping")) SetUpKidnapping();
         if (Flag("--nightclub")) SetUpNightclub();
+        if (Flag("--contracts")) SetUpContracts();
         if (Flag("--reputation"))
         {
             // A boss the papers have started writing about, with a soup kitchen.

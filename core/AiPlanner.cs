@@ -249,10 +249,13 @@ public static partial class AiPlanner
             orders.Add(new FrontOrder(g.Id, hotel.Id));
             return Content.FrontPrice(hotel);
         }
-        if (TopDog(w, g) || g.Dirty < Content.TaxCaseDirty) return 0;
-        if (w.FrontsOf(g.Id).Count() >= 1 + turf.Count / 8) return 0;
-        var buy = turf.Where(b => w.CannotBuyFront(g, b) == null && Content.FrontPrice(b) * 2 <= cash - 6000)
-            .OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault();
+        if (TopDog(w, g) || w.FrontsOf(g.Id).Count() >= 1 + turf.Count / 8) return 0;
+        // An outfit with the aldermen to win a city contract buys a place that can do the work.
+        var wanted = w.Wards.Count > 0 && Contracts.CannotWin(w, g) == null && Contracts.Votes(w, g) >= Contracts.VotesNeeded(w)
+            ? w.Contracts.Where(c => c.GangId < 0 && Contracts.FrontFor(w, g, c.Kind) == null).SelectMany(c => Contracts.Needs(c.Kind)).ToHashSet()
+            : new HashSet<BusinessKind>();
+        var affordable = turf.Where(b => w.CannotBuyFront(g, b) == null && Content.FrontPrice(b) * 2 <= cash - 6000).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).ToList();
+        var buy = affordable.FirstOrDefault(b => wanted.Contains(b.Kind)) ?? (g.Dirty >= Content.TaxCaseDirty ? affordable.FirstOrDefault() : null);
         if (buy == null) return 0;
         orders.Add(new FrontOrder(g.Id, buy.Id));
         return Content.FrontPrice(buy);

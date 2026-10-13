@@ -37,7 +37,7 @@ public sealed class CommandShell
         "send <crew> <biz> (the crew leans on it or takes it) | post <crew> <biz> (the crew guards it)\n" +
         "name (what the city thinks of each boss) | soup [on|off] (a soup kitchen in the boss's name, $" + Content.SoupKitchenWeekly + " a week)\n" +
         "inside [on|off] (whether a jailed boss runs it from his cell) | heir <hood> (name who takes over) | family (bring a young relative in, $" + Content.FamilyCost + ", once a year)\n" +
-        "neighbourhoods (whose people live where) | wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars>\n" +
+        "neighbourhoods (whose people live where) | wards (City Hall) | payoff <ward> (put the alderman on the payroll) | campaign <ward|mayor> <dollars> | contracts (the city's)\n" +
         "stand <hood> <ward> (run him for alderman) | polls <hood> <ward> (lean on voters, last " + Content.PollsWeeks + " weeks) | results (the last vote)\n" +
         "street (people about) | hire <person> | paycop <person> | buystory <person> | silence <hood> <person>\n" +
         "kidnap <hood> <target hood> [backup..] (hold him for ransom) | hostages | release <hood>\n" +
@@ -102,6 +102,7 @@ public sealed class CommandShell
                 case "rate": return Queue(new SetRateOrder(Me, int.Parse(p[1]), int.Parse(p[2])));
                 case "crews": return p.Length > 1 ? RivalCrews(int.Parse(p[1])) : Reports.Crews(W, Me);
                 case "wards": return Reports.Wards(W, Me);
+                case "contracts": return Reports.Contracts(W, Me);
                 case "neighbourhoods": return Reports.Neighbourhoods(W, Me);
                 case "payoff": return Queue(new PayoffOrder(Me, int.Parse(p[1])));
                 case "campaign": return Queue(new CampaignOrder(Me, p[1].ToLowerInvariant() == "mayor" ? -1 : int.Parse(p[1]), int.Parse(p[2])));
