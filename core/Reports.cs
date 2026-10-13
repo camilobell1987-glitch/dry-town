@@ -261,6 +261,10 @@ public static partial class Reports
             sb.AppendLine($"  {w.GangById(war.A).Name} has been at war with {w.GangById(war.B).Name} for {w.Week - war.StartWeek} weeks.");
         if (w.WarOf(gangId) is { } mine)
             sb.AppendLine($"Your men are on the mattresses: ${Simulation.MattressBill(w, me)} a week for the safehouses, hits on {w.GangById(mine.Other(gangId)).Name} {Content.WarHit:+0%} likelier and drawing half the heat." + (mine.A == gangId ? " Type 'calloff' to end it." : " They started it: only a truce ends it from your side."));
+        foreach (var f in w.Funerals.Where(f => w.Week < f.UntilWeek))
+            sb.AppendLine(f.GangId == gangId
+                ? $"You're burying {f.Boss}. Wreaths so far from {f.Flowers.Count} outfit{(f.Flowers.Count == 1 ? "" : "s")}."
+                : $"{w.GangById(f.GangId).Name} are burying {f.Boss}. Moving on them before the funeral breaks its peace." + (f.Flowers.Contains(gangId) ? " Your wreath is there." : $" 'flowers {f.GangId}' sends a wreath (${Content.FlowersCost})."));
         foreach (var o in w.Offers)
             sb.AppendLine($"  Offer {o.Id}: {w.Describe(o)} Answer by week {o.ExpiresWeek % Content.WeeksPerYear + 1} with 'accept {o.Id}' or 'decline {o.Id}'.");
         return sb.ToString();

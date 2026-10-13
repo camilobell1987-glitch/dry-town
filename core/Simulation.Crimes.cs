@@ -21,7 +21,8 @@ public sealed partial class Simulation
         Math.Clamp(0.45 + hood.Stealth * 0.03 + (hood.Strength + BackupStrength(backup) - target.Strength) * 0.03
             - (IsGuardedBoss(w, target) ? 0.25 : 0) - (target.Car == Car.Cadillac ? Content.ArmouredCar : 0)
             + Inside(w, hood.GangId, target.GangId, w.GangById(target.GangId).BossHoodId == target.Id ? Content.InsideBossHit : Content.InsideHit)
-            + (w.AtWar(hood.GangId, target.GangId) ? Content.WarHit : 0), 0.05, 0.9);
+            + (w.AtWar(hood.GangId, target.GangId) ? Content.WarHit : 0)
+            + (w.Mourning(target.GangId) ? Content.FuneralHit : 0), 0.05, 0.9);
 
     /// <summary>What men planted on either side do to a job's chances: help their own side's, spoil the other's.</summary>
     public static double Inside(World w, int gangId, int targetGangId, double help) =>

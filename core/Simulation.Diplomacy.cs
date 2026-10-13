@@ -3,8 +3,22 @@ namespace DryTown.Core;
 /// <summary>Sunday among the gangs: tribute changes hands, old grudges fade, and the bosses sit down to talk.</summary>
 public sealed partial class Simulation
 {
-    /// <summary>A rival doesn't send men against a gang it has a pact with. Only the player breaks his word on the street.</summary>
-    private bool KeepsTheirWord(Gang gang, int otherId) => !gang.IsPlayer && World.AtPeace(gang.Id, otherId);
+    /// <summary>A rival holds off an outfit it has a pact with, or one that's burying its boss.</summary>
+    private bool KeepsTheirWord(Gang gang, int otherId) => !gang.IsPlayer && (World.AtPeace(gang.Id, otherId) || World.Mourning(otherId));
+
+    /// <summary>On the day of a funeral, the rival outfits decide whether to send a wreath: most do, unless they're at war with the dead man's outfit or hate it. The player sends his own, or the planner does on Monday.</summary>
+    private void SendFlowers()
+    {
+        var w = World;
+        foreach (var f in w.Funerals.Where(f => f.UntilWeek == w.Week + 1).ToList())
+        {
+            var g = w.GangById(f.GangId);
+            if (!g.Alive) continue;
+            foreach (var other in w.LivingGangs.Where(x => !x.IsPlayer && x.Id != g.Id).ToList())
+                if (AiPlanner.WouldSendFlowers(w, other, g) && w.Rng.Chance(Content.AiFlowers))
+                    w.SendFlowers(other, g);
+        }
+    }
 
     private void Diplomacy()
     {
@@ -12,6 +26,7 @@ public sealed partial class Simulation
         w.KeepFamily();
         PayTribute();
         Hostages();
+        SendFlowers();
 
         foreach (var g in w.Grudges.ToList()) w.AddGrudge(g.From, g.To, -Content.GrudgeFade);
         foreach (var pact in w.Pacts.Where(p => p.UntilWeek <= w.Week + 1).ToList())

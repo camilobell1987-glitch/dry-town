@@ -77,6 +77,7 @@ public partial class Main
         var me = W.Player;
         if (!me.Alive) return;
 
+        FuneralSection();
         foreach (var offer in W.Offers.ToList())
         {
             AddLabel(_talkPanel, W.Describe(offer), Palette.Player, wrap: true);

@@ -46,6 +46,7 @@ int Soak()
     long localsTaken = 0, localsSeized = 0, strikes = 0, strikesWon = 0, strikesWonFromRivals = 0, localsHeld = 0, localsTotal = 0, docksHeld = 0;
     long warsDeclared = 0, warsOnPlayer = 0, warsCalledOff = 0, warsMadePeace = 0, warsFinished = 0, warsAtEnd = 0;
     long weddings = 0, playerWeddings = 0, marriagesBroken = 0, takenIn = 0, stoodBehind = 0, marriagesAtEnd = 0;
+    long funerals = 0, wreaths = 0, playerWreaths = 0, funeralBreaches = 0, playerFuneralBreaches = 0;
     long contractWeeks = 0, playerContractWeeks = 0, contractsWon = 0, playerContractsWon = 0, graftStories = 0;
     long clubWeeks = 0, playerClubWeeks = 0, allWeeks = 0, clubsAtEnd = 0;
     long breweryWeeks = 0, playerBreweryWeeks = 0, prohibitionWeeks = 0, breweriesSmashed = 0, breweriesLegal = 0, breweriesAtEnd = 0;
@@ -168,6 +169,12 @@ int Soak()
         ransomsKilled += kidnaps.Count(e => e.Text.Contains(" found in the river."));
         ransomsLetGo += kidnaps.Count(e => e.Text.Contains(" let him go anyway."));
         ransomsEscaped += kidnaps.Count(e => e.Text.Contains(" got away from the men "));
+        var talks = ev.Where(e => e.Kind == EventKind.Diplomacy).ToList();
+        funerals += talks.Count(e => e.Text.Contains(" next week. Until then, nobody who wants"));
+        wreaths += talks.Count(e => e.Text.Contains(" sent a wreath to "));
+        playerWreaths += talks.Count(e => e.Text.Contains(" sent a wreath to ") && e.GangId == sim.World.Player.Id);
+        funeralBreaches += talks.Count(e => e.Text.Contains(" while they were burying "));
+        playerFuneralBreaches += talks.Count(e => e.Text.Contains(" while they were burying ") && e.GangId == sim.World.Player.Id);
         var cityHall = ev.Where(e => e.Kind == EventKind.Politics).ToList();
         contractsWon += cityHall.Count(e => e.Text.StartsWith("The aldermen gave "));
         playerContractsWon += cityHall.Count(e => e.Text.StartsWith("The aldermen gave ") && e.GangId == sim.World.Player.Id);
@@ -279,6 +286,7 @@ int Soak()
     if (squadWeeks > 0)
         Console.WriteLine($"The Untouchables, per city-year with the squad in town ({squadYears / seeds:0.0} a city): outfits gone after {squadNamed / squadYears:0.00} ({squadNamedPlayer} times the player's), places smashed {squadSmashed / squadYears:0.00}, raids that came up empty {squadEmpty / squadYears:0.00}, men taken {squadArrests / squadYears:0.00}, bosses indicted {indictments / squadYears:0.00} ({indictedPlayer} times the player's; out of town {indictedAway}).");
     Console.WriteLine($"Marriages per city-year: weddings {weddings / cy:0.00} (the player's {playerWeddings / cy:0.00}), broken {marriagesBroken / cy:0.00}, outfits taken in by family {takenIn / cy:0.00}, splits stopped by in-laws {stoodBehind / cy:0.00}; marriages at the end {marriagesAtEnd / (double)seeds:0.0} a city.");
+    Console.WriteLine($"Funerals per city-year: {funerals / cy:0.00}, with {wreaths / (double)Math.Max(1, funerals):0.0} wreaths each (the player's {playerWreaths / cy:0.00} a year); peace broken {funeralBreaches / cy:0.00} (by the player {playerFuneralBreaches / cy:0.00}).");
     Console.WriteLine($"City contracts: held by an outfit in an average week {contractWeeks / (double)Math.Max(1, allWeeks):0.00} of 4 (the player's {playerContractWeeks / (double)Math.Max(1, allWeeks):0.00}); won per city-year {contractsWon / cy:0.00} (the player's {playerContractsWon / cy:0.00}); torn up by the papers {graftStories / cy:0.00}.");
     Console.WriteLine($"Nightclubs: running in an average week {clubWeeks / (double)Math.Max(1, allWeeks):0.00} a city (the player has one {playerClubWeeks / (double)Math.Max(1, allWeeks):0%} of the time); clubs at the end {clubsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Breweries: running in an average Prohibition week {breweryWeeks / (double)Math.Max(1, prohibitionWeeks):0.00} a city (the player has one {playerBreweryWeeks / (double)Math.Max(1, prohibitionWeeks):0%} of the time); smashed by the Untouchables {breweriesSmashed / cy:0.00} per city-year, gone legal at repeal {breweriesLegal / (double)seeds:0.00} a city; breweries at the end {breweriesAtEnd / (double)seeds:0.0} a city.");

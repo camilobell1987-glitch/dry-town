@@ -265,6 +265,7 @@ public sealed partial class Simulation
         Untouchables();
         Gmen();
         Reputation();
+        w.HoldFunerals();
         Sit();
         CityNews();
         Loyalty();
@@ -961,6 +962,7 @@ public sealed partial class Simulation
 
             var heirs = BestSuccessor(gang).ToList();
             if (heirs.Count == 0) continue; // handled by Dissolutions
+            if (boss.State == HoodState.Dead) w.Bury(gang, boss);
 
             var heir = heirs[0];
             bool named = heir.Id == gang.HeirHoodId;

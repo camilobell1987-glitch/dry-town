@@ -511,6 +511,7 @@ public sealed partial class World
         Marriages = Marriages,
         Hostages = Hostages,
         Contracts = Contracts,
+        Funerals = Funerals,
         Wars = Wars,
         Goal = Goal,
         Repeal = Repeal,
@@ -541,6 +542,7 @@ public sealed partial class World
         w.Marriages.AddRange(d.Marriages);
         w.Hostages.AddRange(d.Hostages);
         w.Contracts.AddRange(d.Contracts);
+        w.Funerals.AddRange(d.Funerals);
         w.Wars.AddRange(d.Wars);
         if (d.Goal != null) w.Goal = d.Goal;
         if (d.Repeal != null) w.Repeal = d.Repeal;

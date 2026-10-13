@@ -1114,6 +1114,7 @@ public partial class Main : Control
         if (Flag("--kidnapping")) SetUpKidnapping();
         if (Flag("--nightclub")) SetUpNightclub();
         if (Flag("--contracts")) SetUpContracts();
+        if (Flag("--funeral")) SetUpFuneral();
         if (Flag("--reputation"))
         {
             // A boss the papers have started writing about, with a soup kitchen.

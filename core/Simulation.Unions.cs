@@ -163,7 +163,7 @@ public sealed partial class Simulation
                 ?? w.AvailableHoodsOf(gang.Id).Where(h => h.Id != gang.BossHoodId).OrderBy(h => h.Id).FirstOrDefault();
             if (handler == null) return;
             string was = b.IsProtected ? $" and dropped {w.GangById(b.ProtectorGangId).Name}" : "";
-            if (b.IsProtected) w.Hostile(gang, w.GangById(b.ProtectorGangId), Content.GrudgeStrike);
+            if (b.IsProtected) w.Hostile(gang, w.GangById(b.ProtectorGangId), Content.GrudgeStrike, violent: false);
             b.ProtectorGangId = gang.Id;
             b.HandlerHoodId = handler.Id;
             b.ProtectionRate = Content.DefaultRatePercent;
