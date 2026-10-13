@@ -81,6 +81,7 @@ public partial class MapView : Control
         if (_builtFor != World.Map) BuildCity();
         RefreshChangedLots();
         PlaceWorld();
+        PlaceCrowd();
         DrawFrame();
     }
 
@@ -443,6 +444,7 @@ public partial class MapView : Control
             _groundFull[bx, by] = NewPen(_world);
             _groundCoarse[bx, by] = NewPen(_world);
         }
+        BuildCrowd(_world);
 
         _full = new Pen[rows, cols];
         _coarse = new Pen[rows, cols];
@@ -578,6 +580,7 @@ public partial class MapView : Control
             foreach (var pen in _full) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
             foreach (var pen in _coarse) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
             foreach (var pen in _dyn) RenderingServer.CanvasItemSetSelfModulate(pen.Item, shade);
+            RenderingServer.CanvasItemSetSelfModulate(_crowdItem, shade);
             foreach (var pen in _lit) RenderingServer.CanvasItemSetSelfModulate(pen.Item, Colors.White with { A = night });
             RenderingServer.CanvasItemSetSelfModulate(_lampGlow.Item, Colors.White with { A = night });
         }
@@ -605,7 +608,6 @@ public partial class MapView : Control
         float night = Night;
         DrawTraffic(night, view);
         DrawParkedOfficials(night, view);
-        DrawPassersBy(view);
         _clickables.Clear();
         DrawStreetPeople(view);
         DrawLoiterers(view);

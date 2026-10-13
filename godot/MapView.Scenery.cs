@@ -285,31 +285,6 @@ public partial class MapView
         }
     }
 
-    /// <summary>Ordinary citizens on the pavements, walking round the blocks: small grey dots.</summary>
-    private void DrawPassersBy(Rect2 view)
-    {
-        float r = DotRadius * 0.75f;
-        if (Tile < 9) return;
-        for (int i = 0; i < 26 * Map.BlocksX * Map.BlocksY / 20; i++)
-        {
-            int bx = (int)(Hash(i, 300) * Map.BlocksX), by = (int)(Hash(i, 301) * Map.BlocksY);
-            if (by == Map.RiverRow) continue;
-            float x0 = bx * CityMap.StrideX + 1 - 0.11f, y0 = by * CityMap.StrideY + 1 - 0.11f;
-            float w = CityMap.LotsPerBlockX + 0.22f, h = CityMap.LotsPerBlockY + 0.22f;
-            float perimeter = 2 * (w + h);
-            int dir = Hash(i, 304) < 0.5f ? 1 : -1;
-            float d = (Hash(i, 302) * perimeter + _anim * (0.15f + Hash(i, 303) * 0.12f) * dir) % perimeter;
-            if (d < 0) d += perimeter;
-            Vector2 at;
-            if (d < w) at = new Vector2(x0 + d, y0);
-            else if (d < w + h) at = new Vector2(x0 + w, y0 + d - w);
-            else if (d < 2 * w + h) at = new Vector2(x0 + w - (d - w - h), y0 + h);
-            else at = new Vector2(x0, y0 + h - (d - 2 * w - h));
-            if (!view.HasPoint(at)) continue;
-            DrawDot(at * _t, r, Palette.Citizen);
-        }
-    }
-
     /// <summary>Barges and tugs working up and down the river.</summary>
     private void DrawRiverTraffic(Rect2 view)
     {
