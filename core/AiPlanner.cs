@@ -130,6 +130,7 @@ public static partial class AiPlanner
         PlanUnions(w, g, hoods, orders);
         cash -= PlanFix(w, g, hoods, cash, orders);
         PlanKidnap(w, g, hoods, orders);
+        cash -= PlanSmallGangs(w, g, hoods, cash, orders);
         PlanCrimes(w, g, turf, hoods, cash, orders);
 
         // Score each target as about ten weeks of income, less the expected cost of losing the man.
@@ -206,7 +207,7 @@ public static partial class AiPlanner
     private static void PlanKidnap(World w, Gang g, List<Hood> hoods, List<Order> orders)
     {
         if (hoods.Count < 3 || g.Aggression < 0.4 || w.TopDog(g) || w.HeldBy(g.Id).Any() || !w.Rng.Chance(Content.AiKidnap)) return;
-        var mark = w.LivingGangs
+        var mark = w.Outfits
             .Where(r => r.Id != g.Id && !w.AtPeace(g.Id, r.Id) && r.Cash >= Content.AiKidnapCash && (w.AtWar(g.Id, r.Id) || w.GrudgeOf(g.Id, r.Id) >= Content.AiKidnapGrudge))
             .SelectMany(r => w.AvailableHoodsOf(r.Id).Where(h => w.CannotKidnap(g, h) == null))
             .OrderByDescending(w.RansomFor).ThenBy(h => h.Strength).ThenBy(h => h.Id).FirstOrDefault();

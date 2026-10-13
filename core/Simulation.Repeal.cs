@@ -66,7 +66,7 @@ public sealed partial class Simulation
     private void Name()
     {
         var w = World;
-        var pick = w.LivingGangs.Select(g => (g, turf: w.TurfOf(g.Id).Count()))
+        var pick = w.Outfits.Select(g => (g, turf: w.TurfOf(g.Id).Count()))
             .Where(x => x.turf >= Content.PublicEnemyTurf)
             .OrderByDescending(x => x.turf * (x.g.Heat + 20) * World.NameDraw(x.g)).ThenBy(x => x.g.Id).Select(x => x.g).FirstOrDefault();
         int was = w.Repeal.PublicEnemyGangId;

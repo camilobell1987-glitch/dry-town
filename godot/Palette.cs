@@ -41,6 +41,19 @@ public static class Palette
         new("e3a3a8"), // blush
     };
 
+    /// <summary>The small gangs wear duller colours than the outfits, so the four that run the city stand out.</summary>
+    private static readonly Color[] Small =
+    {
+        new("8c6a5a"), // clay
+        new("6a7f78"), // slate green
+        new("7d7092"), // dusk
+        new("94845a"), // khaki
+        new("5f7590"), // denim
+        new("8a5e6e"), // mulberry
+        new("6f8a5c"), // moss
+        new("9a7f6a"), // tan
+    };
+
     private static readonly Dictionary<int, int> Assigned = new();
 
     public static void Reset() => Assigned.Clear();
@@ -52,9 +65,10 @@ public static class Palette
         var gang = w.Gangs.FirstOrDefault(g => g.Id == gangId);
         if (gang == null) return Neutral;
         if (gang.IsPlayer) return Player;
+        if (gang.IsSmall) return Small[gangId % Small.Length];
         if (!Assigned.TryGetValue(gangId, out int index))
         {
-            var inUse = w.LivingGangs.Where(g => g.Id != gangId && Assigned.ContainsKey(g.Id)).Select(g => Assigned[g.Id]).ToHashSet();
+            var inUse = w.Outfits.Where(g => g.Id != gangId && Assigned.ContainsKey(g.Id)).Select(g => Assigned[g.Id]).ToHashSet();
             index = Enumerable.Range(0, Rivals.Length).FirstOrDefault(i => !inUse.Contains(i), gangId % Rivals.Length);
             Assigned[gangId] = index;
         }

@@ -19,7 +19,7 @@ public static partial class Reports
             : $"A soup kitchen would cost ${Content.SoupKitchenWeekly} a week and earn {w.SoupRespect:0.0} respect a week{(w.Depression ? "" : ", twice as much once the Depression comes")}. Type soup on.");
         sb.AppendLine("Killings, fires and shops taken by force make a boss feared. Acquittals and looking after jailed men's families make him admired, and breaking his word costs him. Names fade slowly, and a new boss keeps half the old one's.");
         sb.AppendLine();
-        foreach (var g in w.LivingGangs.Where(g => g.Id != gangId).OrderByDescending(World.Fame).ThenBy(g => g.Id))
+        foreach (var g in w.Outfits.Where(g => g.Id != gangId).OrderByDescending(World.Fame).ThenBy(g => g.Id))
             sb.AppendLine($"  {Trim(w.HoodById(g.BossHoodId).Name, 28),-28} {Trim(g.Name, 24),-24} {World.NameOf(g)}{(g.SoupKitchen ? ", runs a soup kitchen" : "")}");
         return sb.ToString();
     }

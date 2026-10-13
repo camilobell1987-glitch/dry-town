@@ -17,6 +17,9 @@ public partial class MapView : Control
     /// <summary>Raised when a ward is clicked while wards are shown.</summary>
     public event Action<int>? WardClicked;
 
+    /// <summary>A small gang's corner was clicked: the gang's id.</summary>
+    public event Action<int>? CornerClicked;
+
     /// <summary>Raised once per script action as the live clock passes the moment it happens.</summary>
     public event Action<ScriptAction>? ActionHappened;
 
@@ -292,6 +295,7 @@ public partial class MapView : Control
                 Select(shop: lot.Id);
                 ShopClicked?.Invoke(lot.Id);
             }
+            else if (CornerOf(lot) is { } corner) CornerClicked?.Invoke(corner.Id);
         }
     }
 
@@ -335,7 +339,7 @@ public partial class MapView : Control
                 return $"{b.Name}\n{takes}\n{owner}{front}{racket}{shut}{WardLine(lot)}";
             case LotUse.Headquarters:
                 var g = World.Gangs.First(x => x.Id == lot.GangId);
-                return $"Headquarters of {g.Name}";
+                return g.IsSmall ? CornerTip(g) : $"Headquarters of {g.Name}";
             case LotUse.Precinct:
                 return "Precinct house" + WardLine(lot);
             case LotUse.Bank:
@@ -611,6 +615,7 @@ public partial class MapView : Control
         var font = ThemeDB.FallbackFont;
         DrawStreetNames(font, view);
         DrawHeadquartersSigns(font, view);
+        DrawCornerSigns(font, view);
         DrawWards(font);
         foreach (var pen in _dyn) pen.Flush();
         _frameGlow.Flush();
@@ -637,7 +642,7 @@ public partial class MapView : Control
         else if (lot.Use == LotUse.Headquarters)
         {
             rim = Palette.Gang(w, lot.GangId);
-            width = Px(3);
+            width = CornerOf(lot) != null ? Px(2) : Px(3);
         }
 
         var outline = Silhouette(lot).Select(p => p * _t).ToArray();

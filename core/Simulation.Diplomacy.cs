@@ -14,7 +14,7 @@ public sealed partial class Simulation
         {
             var g = w.GangById(f.GangId);
             if (!g.Alive) continue;
-            foreach (var other in w.LivingGangs.Where(x => !x.IsPlayer && x.Id != g.Id).ToList())
+            foreach (var other in w.Outfits.Where(x => !x.IsPlayer && x.Id != g.Id).ToList())
                 if (AiPlanner.WouldSendFlowers(w, other, g) && w.Rng.Chance(Content.AiFlowers))
                     w.SendFlowers(other, g);
         }
@@ -36,7 +36,7 @@ public sealed partial class Simulation
         }
         foreach (var offer in w.Offers.Where(o => o.ExpiresWeek <= w.Week + 1).ToList()) w.Answer(offer, false, lapsed: true);
 
-        foreach (var g in w.LivingGangs.ToList())
+        foreach (var g in w.Outfits.ToList())
         {
             // The player does his own talking, or the planner does it for him on Monday.
             if (g.IsPlayer) continue;

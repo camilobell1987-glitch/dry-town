@@ -117,7 +117,7 @@ public static class Contracts
         int needed = VotesNeeded(w);
         foreach (var c in w.Contracts.Where(c => c.GangId < 0))
         {
-            var winner = w.LivingGangs.Where(g => CannotWin(w, g) == null && FrontFor(w, g, c.Kind) != null)
+            var winner = w.Outfits.Where(g => CannotWin(w, g) == null && FrontFor(w, g, c.Kind) != null)
                 .Select(g => (g, votes: Votes(w, g)))
                 .Where(x => x.votes >= needed)
                 .OrderByDescending(x => x.votes).ThenBy(x => x.g.Id)

@@ -225,7 +225,7 @@ public partial class MapView
         switch (lot.Use)
         {
             case LotUse.Precinct: return 0.72f;
-            case LotUse.Headquarters: return 0.62f;
+            case LotUse.Headquarters: return CornerOf(lot) != null ? (0.45f + 0.15f * h) * (1 + 1.2f * d) : 0.62f;
             case LotUse.Bank: return 0.68f;
             case LotUse.GunShop: return 0.5f + 0.15f * h;
             case LotUse.CarDealer: return 0.24f;
@@ -540,6 +540,9 @@ public partial class MapView
                 else DrawShop(lot, b, protector >= 0 ? Palette.Gang(w, protector) : null, racket, b.IsOpen || Live);
                 break;
             }
+            case LotUse.Headquarters when CornerOf(lot) is { } corner:
+                DrawCorner(lot, corner, Palette.Gang(w, lot.GangId));
+                break;
             case LotUse.Headquarters:
                 DrawHeadquarters(lot, Palette.Gang(w, lot.GangId));
                 break;
@@ -1182,7 +1185,7 @@ public partial class MapView
         int size = Mathf.Max(8, (int)(_t * 0.2f));
         foreach (var lot in World!.Map.Lots)
         {
-            if (lot.Use != LotUse.Headquarters || !view.HasPoint(new Vector2(lot.X, lot.Y))) continue;
+            if (lot.Use != LotUse.Headquarters || !view.HasPoint(new Vector2(lot.X, lot.Y)) || CornerOf(lot) != null) continue;
             var centre = SignCentre(lot, HeightCached(lot));
             var colour = Palette.Gang(World, lot.GangId).Lightened(0.25f);
             C.DrawString(font, centre + new Vector2(-_t * 0.25f, size * 0.36f), "HQ", HorizontalAlignment.Center, _t * 0.5f, size, colour);

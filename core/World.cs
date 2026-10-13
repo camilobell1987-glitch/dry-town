@@ -20,6 +20,10 @@ public sealed class WorldSettings
     public int StartingGangCount => StartingGangs > 0 ? StartingGangs : Shape.StartingGangs;
     public int MaxGangs => Shape.MaxGangs;
 
+    /// <summary>Small gangs dotted about the city, or -1 to fit its size. A city set up with a given number of outfits has none unless asked.</summary>
+    public int SmallGangs { get; init; } = -1;
+    public int SmallGangCount => SmallGangs >= 0 ? SmallGangs : StartingGangs > 0 ? 0 : Shape.SmallGangs;
+
     public int StartingHoods { get; init; } = 4;
     public long StartingCash { get; init; } = 1500;
     public Difficulty Difficulty { get; init; } = Difficulty.Normal;
@@ -209,6 +213,7 @@ public sealed partial class World
             // A campaign's outfit keeps its name from city to city.
             if (player && settings.Campaign?.Outfit is { } name) gang.Name = name;
         }
+        world.PlaceSmallGangs();
         world.PlaceShops();
         world.PlaceLines();
         world.PlaceLocals();
@@ -239,7 +244,7 @@ public sealed partial class World
         var free = Map.Lots.Where(l => l.IsFree).ToList();
         Rng.Shuffle(free);
         var kinds = Enum.GetValues<BusinessKind>().Where(k => k != BusinessKind.Court).ToArray();
-        int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs);
+        int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs - Settings.SmallGangCount);
         for (int i = 0; i < count; i++)
         {
             var lot = free[i];
@@ -384,13 +389,14 @@ public sealed partial class World
         lot.GangId = -1;
     }
 
-    public Gang FoundGang(bool isPlayer, long cash, int hoods, Hood? boss = null, double? aggression = null)
+    public Gang FoundGang(bool isPlayer, long cash, int hoods, Hood? boss = null, double? aggression = null, GangKind kind = GangKind.Outfit)
     {
         var gang = new Gang
         {
             Id = _nextGangId++,
             Name = "",
             IsPlayer = isPlayer,
+            Kind = kind,
             FoundedWeek = Week,
             Cash = cash,
             Aggression = aggression ?? (isPlayer ? 0.5 : 0.25 + Rng.NextDouble() * 0.6),
@@ -417,6 +423,7 @@ public sealed partial class World
         var patterns = Content.GangPatterns.OrderBy(_ => Rng.NextDouble()).ToList();
         gang.Name = patterns.Select(p => string.Format(p, surname)).FirstOrDefault(n => !taken.Contains(n))
                     ?? string.Format(patterns[0], boss.Name.Split(' ')[0] + " " + surname);
+        if (gang.IsSmall) gang.Name = SmallGangName(gang, hq, surname, taken);
 
         for (int i = 1; i < hoods; i++) NewHood(gang.Id, bossQuality: false);
         return gang;

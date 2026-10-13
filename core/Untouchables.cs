@@ -113,7 +113,7 @@ public sealed partial class Simulation
     {
         var w = World;
         var s = w.Untouchables;
-        var pick = w.LivingGangs.Select(g => (g, size: w.Bootlegging(g)))
+        var pick = w.Outfits.Select(g => (g, size: w.Bootlegging(g)))
             .Where(x => x.size >= Content.SquadRackets)
             .OrderByDescending(x => x.size * (x.g.Heat + 20) * World.NameDraw(x.g)).ThenBy(x => x.g.Id).Select(x => x.g).FirstOrDefault();
         int was = s.TargetGangId;

@@ -44,6 +44,9 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(SailOrder), "sail")]
 [JsonDerivedType(typeof(UnionOrder), "union")]
 [JsonDerivedType(typeof(StrikeOrder), "strike")]
+[JsonDerivedType(typeof(PoachOrder), "poach")]
+[JsonDerivedType(typeof(AbsorbOrder), "absorb")]
+[JsonDerivedType(typeof(WipeOutOrder), "wipeout")]
 public abstract record Order(int GangId);
 
 /// <summary>
@@ -198,3 +201,15 @@ public sealed record KidnapOrder(int GangId, int HoodId, int TargetHoodId, int[]
 
 /// <summary>Send a man to buy the fighter or the jockey on this week's card.</summary>
 public sealed record FixOrder(int GangId, int HoodId) : Order(GangId);
+
+/// <summary>Offer one of a small gang's men more than his gang pays, to walk out on it and work for you.</summary>
+public sealed record PoachOrder(int GangId, int TargetHoodId) : Order(GangId);
+
+/// <summary>Send a man round to a small gang's corner to buy the whole gang in: its men, its shops and its money.</summary>
+public sealed record AbsorbOrder(int GangId, int HoodId, int TargetGangId) : Order(GangId);
+
+/// <summary>Send men round to a small gang's corner to finish it for good.</summary>
+public sealed record WipeOutOrder(int GangId, int HoodId, int TargetGangId, int[]? Backup = null) : Order(GangId)
+{
+    [JsonIgnore] public IEnumerable<int> Team => (Backup ?? Array.Empty<int>()).Prepend(HoodId);
+}

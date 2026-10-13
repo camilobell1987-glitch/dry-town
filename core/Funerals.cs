@@ -49,6 +49,8 @@ public sealed partial class World
         WaylayOrder l when LineById(l.LineId) is { } line => line.OwnerGangId,
         UnionOrder u when LocalById(u.LocalId) is { } local => local.OwnerGangId,
         HitOrder h when Hoods.FirstOrDefault(x => x.Id == h.TargetHoodId) is { } t => t.GangId,
+        PoachOrder p when Hoods.FirstOrDefault(x => x.Id == p.TargetHoodId) is { } t => t.GangId,
+        WipeOutOrder x => x.TargetGangId,
         KidnapOrder k when Hoods.FirstOrDefault(x => x.Id == k.TargetHoodId) is { } t => t.GangId,
         _ => -1,
     };
@@ -84,7 +86,8 @@ public sealed partial class World
     /// <summary>A boss is dead: his outfit buries him, and the city holds off until it's done.</summary>
     public void Bury(Gang gang, Hood boss)
     {
-        if (Funerals.Any(f => f.GangId == gang.Id && f.Boss == boss.Name)) return;
+        // A small gang buries its own without the city stopping for it.
+        if (gang.IsSmall || Funerals.Any(f => f.GangId == gang.Id && f.Boss == boss.Name)) return;
         Funerals.Add(new Funeral { GangId = gang.Id, Boss = boss.Name, Week = Week, UntilWeek = Week + Content.FuneralWeeks });
         Log(EventKind.Diplomacy, gang.Id, $"{gang.Name} will bury {boss.Name} next week. Until then, nobody who wants to be thought well of will lay a finger on them.");
     }
@@ -96,7 +99,7 @@ public sealed partial class World
         f.Breakers.Add(breaker.Id);
         Renown(breaker, respect: -Content.RespectFuneralBreach);
         AddGrudge(victim.Id, breaker.Id, Content.GrudgeFuneralBreach);
-        foreach (var other in LivingGangs)
+        foreach (var other in Outfits)
             if (other.Id != breaker.Id && other.Id != victim.Id) AddGrudge(other.Id, breaker.Id, Content.GrudgeFuneralWitnessed);
         Log(EventKind.Diplomacy, breaker.Id, $"{breaker.Name} moved against {victim.Name} while they were burying {f.Boss}. The whole city is talking about it.");
         if (Seated(breaker.Id)) Breach(breaker, victim, $"broke the peace of {f.Boss}'s funeral");
@@ -111,7 +114,7 @@ public sealed partial class World
             if (!g.Alive) continue;
             var sent = f.Flowers.Select(GangById).Select(x => x.Name).ToList();
             Renown(g, respect: Content.FuneralRespect * f.Flowers.Count);
-            foreach (var other in LivingGangs.Where(x => x.Id != g.Id && !f.Flowers.Contains(x.Id))) AddGrudge(g.Id, other.Id, Content.NoFlowersGrudge);
+            foreach (var other in Outfits.Where(x => x.Id != g.Id && !f.Flowers.Contains(x.Id))) AddGrudge(g.Id, other.Id, Content.NoFlowersGrudge);
             Log(EventKind.Diplomacy, g.Id, sent.Count == 0
                 ? $"{f.Boss} of {g.Name} was buried with nobody's flowers but his own outfit's."
                 : $"{f.Boss} of {g.Name} was buried. Wreaths came from {Join(sent)}.");

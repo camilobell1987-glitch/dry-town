@@ -79,6 +79,7 @@ public sealed partial class World
     public string? MatchRefusal(Gang from, Gang to)
     {
         if (from.Id == to.Id || !to.Alive) return "There's nobody to talk to.";
+        if (to.IsSmall || from.IsSmall) return "A small gang's boss has no daughter to marry into an outfit.";
         if (MarriageBetween(from.Id, to.Id) != null) return $"You're already family with {to.Name}.";
         if (CannotMatch(from) is { } no) return no;
         if (InLawsOf(to.Id).FirstOrDefault() is { } theirs) return $"{to.Name} is already family with {theirs.Name}.";

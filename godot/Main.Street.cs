@@ -183,6 +183,7 @@ public partial class Main
             (lead, backup) => new HitOrder(Me, lead, target.Id, backup), byStealth: true);
         if (hoods.Count == 0 && !W.CrewsOf(Me).Any()) AddLabel(panel, "All your men are busy.", Palette.InkQuiet);
         KidnapActions(panel, target, hoods);
+        PoachAction(panel, target);
     }
 
     /// <summary>Snatch him instead, and make his outfit pay to get him back.</summary>

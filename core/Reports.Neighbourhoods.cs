@@ -15,7 +15,7 @@ public static partial class Reports
         foreach (var people in w.Wards.Select(w.Neighbourhood).Distinct().OrderBy(e => e))
         {
             var wards = w.Wards.Where(x => w.Neighbourhood(x) == people).ToList();
-            var outfits = w.LivingGangs.Where(g => w.PeopleOf(g) == people).Select(g => g.Id == gangId ? "you" : g.Name).ToList();
+            var outfits = w.Outfits.Where(g => w.PeopleOf(g) == people).Select(g => g.Id == gangId ? "you" : g.Name).ToList();
             sb.AppendLine($"{Content.Label(people)}: {string.Join(", ", wards.Select(x => x.Name))}. " +
                           (outfits.Count > 0 ? $"Their own outfits: {string.Join(", ", outfits)}." : "No outfit of their own."));
             var shops = wards.SelectMany(x => Politics.BusinessesIn(w, x)).Where(b => b.IsProtected)

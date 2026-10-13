@@ -9,9 +9,9 @@ public sealed class Metrics
 
     public void Record(World w, int takeovers)
     {
-        var shares = w.LivingGangs.Select(g => (double)w.TurfOf(g.Id).Count() / w.Businesses.Count).DefaultIfEmpty(0);
+        var shares = w.Outfits.Select(g => (double)w.TurfOf(g.Id).Count() / w.Businesses.Count).DefaultIfEmpty(0);
         var player = w.Player;
-        Samples.Add(new WeekSample(w.Week, w.LivingGangs.Count(), shares.Max(), takeovers, player.Cash, player.Alive));
+        Samples.Add(new WeekSample(w.Week, w.Outfits.Count(), shares.Max(), takeovers, player.Cash, player.Alive));
     }
 
     /// <summary>

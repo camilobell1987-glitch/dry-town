@@ -511,11 +511,11 @@ public partial class Main : Control
         }
     }
 
-    private OptionButton HoodPicker(List<Hood> hoods, Func<Hood, string> note)
+    private OptionButton HoodPicker(List<Hood> hoods, Func<Hood, string> note, Container? into = null)
     {
         var pick = new OptionButton { ClipText = true, SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(120, 0) };
         foreach (var h in hoods) pick.AddItem($"{h.Name} · {note(h)}", h.Id);
-        _businessPanel.AddChild(pick);
+        (into ?? _businessPanel).AddChild(pick);
         return pick;
     }
 
@@ -777,12 +777,12 @@ public partial class Main : Control
     {
         var menu = _gameMenu.GetPopup();
         menu.Clear();
-        menu.AddItem("New small city: one district, three outfits", 2);
-        menu.AddItem("New medium city: four wards, four outfits", 3);
-        menu.AddItem("New large city: six wards, five outfits", 4);
-        menu.AddItem("New huge city: twelve wards, seven outfits", 5);
-        menu.AddItem("New metropolis: a river city of twenty wards, nine outfits", 6);
-        menu.AddItem("New greater city: thirty wards, twelve outfits", 7);
+        menu.AddItem("New small city: one district, two small gangs", 2);
+        menu.AddItem("New medium city: four wards, four small gangs", 3);
+        menu.AddItem("New large city: six wards, six small gangs", 4);
+        menu.AddItem("New huge city: twelve wards, eleven small gangs", 5);
+        menu.AddItem("New metropolis: a river city of twenty wards, twenty small gangs", 6);
+        menu.AddItem("New greater city: thirty wards, thirty-four small gangs", 7);
         menu.AddSeparator();
         FillScenarioMenu(menu);
         menu.AddSeparator();
@@ -949,6 +949,7 @@ public partial class Main : Control
         // The map shows the wards while City Hall is open.
         _tabs.TabChanged += _ => { _map.ShowWards = _tabs.GetCurrentTabControl()?.Name == "City Hall"; };
         _map.WardClicked += ward => { _selectedWard = ward; RefreshCityHall(); };
+        _map.CornerClicked += ShowCorner;
 
         SetSpeed(1);
     }
@@ -1203,7 +1204,7 @@ public partial class Main : Control
             // A truce with the smallest outfit, a paid truce offered by the second biggest, and the biggest picked to talk to.
             W.Pacts.RemoveAll(p => p.Involves(Me));
             W.Offers.Clear();
-            var rivals = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(W.Power).ToList();
+            var rivals = W.Outfits.Where(g => !g.IsPlayer).OrderByDescending(W.Power).ToList();
             W.Sign(W.Player, rivals[^1], PactKind.Truce);
             W.Put(rivals[1], OfferKind.Truce, Content.TributeAsk(W.Income(rivals[1])));
             _talkTo = rivals[0].Id;
@@ -1214,7 +1215,7 @@ public partial class Main : Control
             // Your nephew married into the second biggest outfit, picked to talk to.
             W.Pacts.RemoveAll(p => p.Involves(Me));
             W.Offers.Clear();
-            var family = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(W.Power).ElementAt(1);
+            var family = W.Outfits.Where(g => !g.IsPlayer).OrderByDescending(W.Power).ElementAt(1);
             W.Player.Cash = Math.Max(W.Player.Cash, 8000);
             var groom = W.Groom(W.Player) ?? W.NewRelative(W.Player);
             W.Sign(W.Player, family, PactKind.Truce).SignedWeek = W.Week - Content.MatchPactWeeks;
@@ -1239,7 +1240,7 @@ public partial class Main : Control
         {
             // At war with the biggest rival for a few weeks, talking to them.
             W.Pacts.RemoveAll(p => p.Involves(Me));
-            var enemy = W.LivingGangs.Where(g => !g.IsPlayer && W.WarOf(g.Id) == null).OrderByDescending(W.Power).First();
+            var enemy = W.Outfits.Where(g => !g.IsPlayer && W.WarOf(g.Id) == null).OrderByDescending(W.Power).First();
             W.Declare(W.Player, enemy);
             W.Wars.Single(x => x.Involves(Me)).StartWeek = W.Week - 5;
             _talkTo = enemy.Id;
@@ -1256,7 +1257,7 @@ public partial class Main : Control
         if (Flag("--gang-crews"))
         {
             // Talk to the outfit with the most crews, with a man of yours inside it.
-            var rival = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(g => W.CrewsOf(g.Id).Count()).First();
+            var rival = W.Outfits.Where(g => !g.IsPlayer).OrderByDescending(g => W.CrewsOf(g.Id).Count()).First();
             _talkTo = rival.Id;
             var spy = W.AvailableHoodsOf(Me).Where(h => h.Id != W.Player.BossHoodId).OrderBy(h => h.Strength).FirstOrDefault();
             if (spy != null) { spy.State = HoodState.Inside; spy.InsideGangId = rival.Id; spy.InsideSinceWeek = W.Week; }
@@ -1287,6 +1288,11 @@ public partial class Main : Control
                 : W.FrontsOf(Me).First()).Id;
         if (Arg("--select") is string sel) { _map.SelectedBusiness = int.Parse(sel); }
         if (Flag("--select-mine")) _map.SelectedBusiness = W.TurfOf(Me).First().Id;
+        // A small gang to deal with: the nearest of the kind asked for, or the nearest of any.
+        if (Arg("--select-corner") is string corner
+            && W.SmallGangs.Where(g => corner == "any" || g.Kind.ToString().Equals(corner, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(g => W.Map.Distance(W.HqOf(W.Player), W.HqOf(g))).FirstOrDefault() is { } small)
+            ShowCorner(small.Id);
         if (Flag("--select-court")) _map.SelectedBusiness = W.Businesses.Where(b => b.Kind == BusinessKind.Court).OrderBy(b => W.BlocksFromHq(W.Player, b)).First().Id;
         if (Flag("--select-rival"))
             _map.SelectedBusiness = W.Businesses.Where(b => b.IsProtected && b.ProtectorGangId != Me && b.IsOpen)
@@ -1344,7 +1350,7 @@ public partial class Main : Control
                 if (line == null)
                 {
                     // Nobody has one yet: set the biggest rival up with a speakeasy and a line into it.
-                    var rival = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(g => W.TurfOf(g.Id).Count()).First();
+                    var rival = W.Outfits.Where(g => !g.IsPlayer).OrderByDescending(g => W.TurfOf(g.Id).Count()).First();
                     var bar = W.TurfOf(rival.Id).Where(b => b.IsOpen).OrderByDescending(b => Content.RacketsFor(b.Kind).Contains(RacketKind.Speakeasy)).First();
                     bar.Racket = RacketKind.Speakeasy;
                     line = W.SupplyLines.OrderBy(l => l.OwnerGangId >= 0).First();
@@ -1372,7 +1378,7 @@ public partial class Main : Control
             men[1].Informer = true;
             men[1].Loyalty = 18;
             men[1].ExposedWeek = W.Week;
-            var host = W.LivingGangs.First(g => !g.IsPlayer);
+            var host = W.Outfits.First(g => !g.IsPlayer);
             men[2].State = HoodState.Inside;
             men[2].InsideGangId = host.Id;
             men[2].InsideSinceWeek = W.Week;
@@ -1454,6 +1460,8 @@ public partial class Main : Control
                     "person" => W.PersonById(_map.SelectedPerson) is { } p ? W.Map.LotAt(p.LotId) : hq,
                     "shop" => _map.SelectedShop >= 0 ? W.Map.LotAt(_map.SelectedShop) : hq,
                     "court" => W.Businesses.Where(b => b.Kind == BusinessKind.Court).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).First(),
+                    "corner" => W.SmallGangs.Where(g => Arg("--select-corner") is not { } k || k == "any" || g.Kind.ToString().Equals(k, StringComparison.OrdinalIgnoreCase))
+                        .Select(W.HqOf).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "cemetery" => W.Map.Lots.Where(l => l.Terrain == Terrain.Cemetery).OrderByDescending(l => W.Map.LotsOfBlock((l.X - 1) / CityMap.StrideX, (l.Y - 1) / CityMap.StrideY).Count(x => x.Terrain == Terrain.Cemetery)).ThenBy(l => l.Id).First(),
                     "biz" => _map.SelectedBusiness >= 0 ? W.LotOf(W.BusinessById(_map.SelectedBusiness)) : hq,

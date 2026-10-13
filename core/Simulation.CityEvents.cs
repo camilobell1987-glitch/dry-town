@@ -56,7 +56,7 @@ public sealed partial class Simulation
             case CityEventKind.Crusade:
                 w.Hall.Outrage = Math.Min(100, w.Hall.Outrage + 15);
                 // The papers go after whoever runs the most of the city.
-                var biggest = w.LivingGangs.OrderByDescending(g => w.TurfOf(g.Id).Count()).ThenBy(g => g.Id).FirstOrDefault();
+                var biggest = w.Outfits.OrderByDescending(g => w.TurfOf(g.Id).Count()).ThenBy(g => g.Id).FirstOrDefault();
                 if (biggest != null)
                 {
                     biggest.Heat = Math.Min(100, biggest.Heat + Content.CrusadeHeat);

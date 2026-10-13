@@ -9,7 +9,7 @@ public partial class Main
     {
         W.Pacts.RemoveAll(p => p.Involves(Me));
         foreach (var h in W.HeldBy(Me).ToList()) W.LetGo(W.Player, h);
-        var rival = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(W.Power).First();
+        var rival = W.Outfits.Where(g => !g.IsPlayer).OrderByDescending(W.Power).First();
         var men = W.AvailableHoodsOf(rival.Id).Where(h => h.Id != rival.BossHoodId).OrderBy(h => h.Id).ToList();
         var mark = men.FirstOrDefault(h => h.Id == rival.HeirHoodId) ?? men[0];
         var held = men.First(h => h.Id != mark.Id);

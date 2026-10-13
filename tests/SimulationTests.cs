@@ -412,20 +412,22 @@ public class Phase5Tests
     }
 
     [Theory]
-    [InlineData(CitySize.Small, 5, 4, 2, 1, 3)]
+    [InlineData(CitySize.Small, 5, 4, 2, 1, 2)]
     [InlineData(CitySize.Medium, 7, 5, 4, 2, 4)]
-    [InlineData(CitySize.Large, 9, 7, 6, 3, 5)]
-    [InlineData(CitySize.Huge, 13, 10, 12, 5, 7)]
-    [InlineData(CitySize.Metropolis, 18, 14, 20, 8, 9)]
-    [InlineData(CitySize.Greater, 24, 18, 30, 12, 12)]
-    public void CitiesComeInThreeSizes(CitySize size, int blocksX, int blocksY, int wards, int precincts, int gangs)
+    [InlineData(CitySize.Large, 9, 7, 6, 3, 6)]
+    [InlineData(CitySize.Huge, 13, 10, 12, 5, 11)]
+    [InlineData(CitySize.Metropolis, 18, 14, 20, 8, 20)]
+    [InlineData(CitySize.Greater, 24, 18, 30, 12, 34)]
+    public void CitiesComeInThreeSizes(CitySize size, int blocksX, int blocksY, int wards, int precincts, int smallGangs)
     {
         var w = World.Create(new WorldSettings { Seed = 3, Size = size });
         Assert.Equal(blocksX, w.Map.BlocksX);
         Assert.Equal(blocksY, w.Map.BlocksY);
         Assert.Equal(wards, w.Wards.Count);
         Assert.Equal(precincts, w.Map.Lots.Count(l => l.Use == LotUse.Precinct));
-        Assert.Equal(gangs, w.LivingGangs.Count());
+        // Four outfits run every city, whatever its size; the small gangs grow with it.
+        Assert.Equal(Content.Outfits, w.Outfits.Count());
+        Assert.Equal(smallGangs, w.SmallGangs.Count());
         Assert.Equal(Content.Shape(size).Businesses, w.Businesses.Count(b => b.Kind != BusinessKind.Court));
         Assert.Equal(w.Map.CourtGates().Count(), w.Businesses.Count(b => b.Kind == BusinessKind.Court));
         // Every ward has shops in it, and every walk stays on the streets.

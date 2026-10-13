@@ -40,11 +40,11 @@ public partial class Main
     /// <summary>For the screenshot: the biggest rival's boss is dead, and it's burying him.</summary>
     private void SetUpFuneral()
     {
-        var rival = W.LivingGangs.Where(g => !g.IsPlayer).OrderByDescending(W.Power).First();
+        var rival = W.Outfits.Where(g => !g.IsPlayer).OrderByDescending(W.Power).First();
         var boss = W.HoodById(rival.BossHoodId);
         boss.State = HoodState.Dead;
         _shell.Execute("end");
-        W.SendFlowers(W.LivingGangs.First(g => !g.IsPlayer && g.Id != rival.Id), rival);
+        W.SendFlowers(W.Outfits.First(g => !g.IsPlayer && g.Id != rival.Id), rival);
         _talkTo = -1;
         RefreshAll();
     }

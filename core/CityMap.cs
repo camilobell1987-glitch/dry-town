@@ -85,6 +85,12 @@ public sealed class CityMap
         foreach (var lot in Lots) lot.WardId = WardOfBlock((lot.X - 1) / StrideX, (lot.Y - 1) / StrideY);
     }
 
+    /// <summary>The block a lot stands in, as a number: its row times the blocks across, plus its column.</summary>
+    public int BlockOf(Lot lot) => (lot.Y - 1) / StrideY * BlocksX + (lot.X - 1) / StrideX;
+
+    /// <summary>Two blocks side by side or one above the other, across a street or an avenue.</summary>
+    public bool NextDoor(int a, int b) => Math.Abs(a % BlocksX - b % BlocksX) + Math.Abs(a / BlocksX - b / BlocksX) == 1;
+
     public static bool IsStreetRow(int y) => y % StrideY == 0;
     public static bool IsAvenue(int x) => x % StrideX == 0;
     public static bool IsRoad(int x, int y) => IsStreetRow(y) || IsAvenue(x);

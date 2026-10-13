@@ -71,7 +71,7 @@ public partial class Main
         }
 
         var spies = FreeHoods().Where(h => !h.Exposed && h.Id != p.BossHoodId && h.Id != p.HeirHoodId).OrderByDescending(Simulation.PlantChance).ThenBy(h => h.Id).ToList();
-        var hosts = W.LivingGangs.Where(g => g.Id != Me && !W.HasManInside(Me, g.Id)).ToList();
+        var hosts = W.Outfits.Where(g => g.Id != Me && !W.HasManInside(Me, g.Id)).ToList();
         if (spies.Count == 0 || hosts.Count == 0) return;
         var plantRow = new HBoxContainer();
         var spy = Picker(plantRow, spies.Select(h => ($"{h.Name} · {Simulation.PlantChance(h) * 100:0}%", h.Id)));
