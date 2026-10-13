@@ -538,6 +538,7 @@ public sealed partial class World
         Hostages = Hostages,
         Contracts = Contracts,
         Funerals = Funerals,
+        Acquaintances = Acquaintances,
         Wars = Wars,
         Goal = Goal,
         Repeal = Repeal,
@@ -569,6 +570,7 @@ public sealed partial class World
         w.Hostages.AddRange(d.Hostages);
         w.Contracts.AddRange(d.Contracts);
         w.Funerals.AddRange(d.Funerals);
+        foreach (var (id, a) in d.Acquaintances) w.Acquaintances[id] = a;
         w.Wars.AddRange(d.Wars);
         if (d.Goal != null) w.Goal = d.Goal;
         if (d.Repeal != null) w.Repeal = d.Repeal;

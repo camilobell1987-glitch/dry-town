@@ -21,6 +21,10 @@ public partial class MapView
 
     /// <summary>Residents stopped to talk this frame, and where they stand.</summary>
     private readonly Dictionary<int, Vector2> _chatSpots = new();
+    private readonly Dictionary<int, int> _chatPartners = new();
+
+    /// <summary>Who a resident is stopped talking to this moment, or -1.</summary>
+    public int TalkingWith(int citizen) => _chatPartners.GetValueOrDefault(citizen, -1);
 
     /// <summary>Where resident n of a block is on the pavement now, in tiles, and whether he's out at all.</summary>
     private (Vector2 At, bool Out) CrowdSpot(int bx, int by, int n)

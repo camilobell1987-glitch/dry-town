@@ -71,6 +71,7 @@ public partial class MapView
     private void DrawChatter(Rect2 view)
     {
         _chatSpots.Clear();
+        _chatPartners.Clear();
         if (Tile < 12 || Directory == null) return;
         var w = World!;
         var map = w.Map;
@@ -109,6 +110,8 @@ public partial class MapView
                 int first = Talker(bx, by, seed, 0), second = Talker(bx, by, seed, 1);
                 _chatSpots[first] = a;
                 _chatSpots[second] = b;
+                _chatPartners[first] = second;
+                _chatPartners[second] = first;
                 _clickables.Add(new Clickable(Pickable.Citizen, first, a, ClickRadius(r)));
                 _clickables.Add(new Clickable(Pickable.Citizen, second, b, ClickRadius(r)));
 

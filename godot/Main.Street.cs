@@ -25,6 +25,7 @@ public partial class Main
         _tabs.CurrentTab = TabIndex("Selected");
         // One of yours clicked on the map: turn the rolodex to his card.
         if (_map.SelectedHood >= 0 && W.HoodById(_map.SelectedHood).GangId == Me) _rolodex.Show(_map.SelectedHood);
+        if (_map.SelectedCitizen >= 0) MeetCitizen(_map.SelectedCitizen);
         RefreshBusiness();
     }
 

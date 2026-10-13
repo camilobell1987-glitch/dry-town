@@ -327,6 +327,7 @@ public partial class Main : Control
             AddLabel(_businessPanel, "Everyone on the map is a dot coloured by what he is: grey a citizen (the larger ones are drifters looking for work), bright blue a police officer, dark blue a detective, white a reporter and gold a witness. Gang men are black: a small gang's plain, and a big outfit's with its colour round the rim, yours in brass. Click anyone in the crowd to pull their card from the city directory.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "A shop's rooftop sign is framed, and its awning striped, in the colours of the gang it pays; yours are brass. Plain ones pay nobody yet. A red badge on the roof means a racket in the back room.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "Scroll to zoom the map. Drag with the right mouse button to move it.", Palette.InkQuiet, wrap: true);
+            Acquaintances(_businessPanel);
             return;
         }
 
@@ -1313,7 +1314,7 @@ public partial class Main : Control
             var hq = W.HqOf(W.Player);
             int pick = who switch
             {
-                "owner" => W.Businesses.Where(b => b.IsOpen).OrderBy(b => W.BlocksFromHq(W.Player, b)).Select(b => directory.OwnerOf(b.Id)).First(i => i >= 0),
+                "owner" => W.Businesses.Where(b => b.IsOpen).OrderBy(b => b.ProtectorGangId == Me ? 0 : 1).ThenBy(b => W.BlocksFromHq(W.Player, b)).Select(b => directory.OwnerOf(b.Id)).First(i => i >= 0),
                 "landlord" => W.Map.Lots.OrderBy(l => W.Map.Distance(hq, l)).Select(l => directory.LandlordOf(l.Id)).First(i => i >= 0),
                 "walking" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
                     .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n)).First(i => _map.WhereIs(i) != null),
