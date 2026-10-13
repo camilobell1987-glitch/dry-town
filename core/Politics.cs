@@ -119,6 +119,8 @@ public static class Politics
             w.Wards.Add(new Ward { Id = i, Name = name, Alderman = NewPolitician(w.Rng, false) });
         }
         w.Hall = new CityHall { Mayor = NewPolitician(w.Rng, false), DA = NewPolitician(w.Rng, false) };
+        w.Contracts.Clear();
+        foreach (var k in Enum.GetValues<ContractKind>()) w.Contracts.Add(new Contract { Kind = k });
     }
 
     public static IEnumerable<Business> BusinessesIn(World w, Ward ward) => w.Businesses.Where(b => w.LotOf(b).WardId == ward.Id);
@@ -263,6 +265,7 @@ public static class Politics
     {
         if (w.Wards.Count == 0 || !w.Settings.PoliticsEnabled) return;
         PayRetainers(w);
+        Contracts.Step(w);
 
         var hall = w.Hall;
         // Each killing makes the papers; the story fades over a few months.
@@ -500,5 +503,6 @@ public static class Politics
         }
         if (w.Hall.FriendGangId == g.Id) w.Hall.FriendGangId = -1;
         if (w.Hall.DAFriendGangId == g.Id) w.Hall.DAFriendGangId = -1;
+        Contracts.Forget(w, g);
     }
 }

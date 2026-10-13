@@ -57,6 +57,7 @@ public partial class Main
             AddLabel(_hallPanel, (mine > 0 ? $"You've put in ${mine:N0}. " : "") + "The biggest backer has the new mayor's ear and the DA's, if they win. Every $400 draws a little heat.", Palette.InkQuiet, wrap: true);
         }
 
+        ContractsSection();
         CourtsSection();
 
         // The selected ward in full.
