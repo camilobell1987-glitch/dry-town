@@ -713,7 +713,8 @@ public partial class MapView : Control
         return gang.IsSmall ? (Palette.SmallGangMan, null) : (Palette.SmallGangMan, Palette.Gang(World, gangId));
     }
 
-    private float DotRadius => Mathf.Max(Px(3.5f), _t * 0.11f);
+    /// <summary>A person's dot: small enough that two fit side by side on a pavement.</summary>
+    private float DotRadius => Mathf.Max(Px(2.5f), _t * 0.05f);
 
     private void DrawActors()
     {
@@ -826,8 +827,10 @@ public partial class MapView : Control
         var back = ahead.LengthSquared() > 0.0001f ? -ahead.Normalized() : Vector2.Down;
         for (int i = 0; i < count; i++)
         {
+            // On the move they walk two abreast: the first man beside the leader, the next two a pace behind.
+            int slot = i + 1, row = slot / 2, side = slot % 2;
             var at = walking
-                ? pos + back * radius * 2.3f * (i + 1) + back.Orthogonal() * radius * 0.7f * (i % 2 == 0 ? 1 : -1)
+                ? pos + back * radius * 2.6f * row + back.Orthogonal() * radius * 2.3f * side
                 : pos + back.Rotated(Mathf.Pi / 2 + i * 1.1f - 1.1f) * radius * 2.4f;
             DrawDot(at, radius * 0.92f, fill, rim);
         }

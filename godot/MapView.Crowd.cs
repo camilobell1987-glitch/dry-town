@@ -188,6 +188,6 @@ void fragment() {
         _crowdMaterial.SetShaderParameter("t", _anim);
         _crowdMaterial.SetShaderParameter("outside", OutsideAt(hour));
         _crowdMaterial.SetShaderParameter("night", hour >= 20 || hour < 2 ? 1f : 0f);
-        _crowdMaterial.SetShaderParameter("radius", Mathf.Max(3.5f / Mathf.Max(0.01f, Tile), 0.11f) * 0.75f);
+        _crowdMaterial.SetShaderParameter("radius", Mathf.Max(2.5f / Mathf.Max(0.01f, Tile), 0.05f) * 0.85f);
     }
 }
