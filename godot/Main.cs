@@ -10,7 +10,10 @@ using Godot;
 /// </summary>
 public partial class Main : Control
 {
-    private const float HoursPerSecond = 8f;
+    private const float HoursPerSecond = 2f;
+
+    /// <summary>The live week's speeds: at 1× a week takes about a minute and a half, at 8× under eleven seconds.</summary>
+    private static readonly float[] Speeds = { 0.5f, 1, 2, 4, 8 };
 
     private CommandShell _shell = null!;
     private World W => _shell.Sim.World;
@@ -897,10 +900,10 @@ public partial class Main : Control
         _clock.AddThemeFontSizeOverride("font_size", 17);
         _liveBar.AddChild(_clock);
         _pause = AddButton(_liveBar, "Pause", () => { _playing = !_playing; _pause.Text = _playing ? "Pause" : "Play"; });
-        foreach (var s in new[] { 1f, 2f, 4f, 8f })
+        foreach (var s in Speeds)
         {
             var speed = s;
-            var b = AddButton(_liveBar, $"{s}×", () => SetSpeed(speed));
+            var b = AddButton(_liveBar, s < 1 ? "½×" : $"{s}×", () => SetSpeed(speed));
             b.ToggleMode = true;
             _speedButtons.Add(b);
         }
@@ -952,8 +955,7 @@ public partial class Main : Control
     private void SetSpeed(float speed)
     {
         _speed = speed;
-        float[] speeds = { 1, 2, 4, 8 };
-        for (int i = 0; i < _speedButtons.Count; i++) _speedButtons[i].ButtonPressed = Math.Abs(speeds[i] - speed) < 0.01f;
+        for (int i = 0; i < _speedButtons.Count; i++) _speedButtons[i].ButtonPressed = Math.Abs(Speeds[i] - speed) < 0.01f;
     }
 
     private void SetLive(bool live)
