@@ -139,6 +139,8 @@ public sealed partial class Simulation
                 case PayCopOrder o: PayCop(gang, o); break;
                 case BuyStoryOrder o: BuyStory(gang, o); break;
                 case SilenceOrder o: Silence(gang, o); break;
+                case AskOrder o: Ask(gang, o); break;
+                case TailOrder o: Tail(gang, o); break;
                 case ArmOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Arm(gang, man, o.Weapon); break;
                 case CarOrder o when w.Hoods.FirstOrDefault(h => h.Id == o.HoodId) is { } man: w.Drive(gang, man, o.Car); break;
                 case JuryOrder o: Jury(gang, o); break;
@@ -202,6 +204,7 @@ public sealed partial class Simulation
             KidnapOrder k => HauntOf(w, w.HoodById(k.TargetHoodId)),
             RobberyOrder r => w.BankById(r.BankId)?.LotId ?? hq,
             SilenceOrder s => w.PersonById(s.PersonId)?.LotId ?? hq,
+            TailOrder t => t.LotId,
             JuryOrder => w.PrecinctNear(w.Map.LotAt(hq)).Id,
             SeenToOrder s when w.Hoods.FirstOrDefault(h => h.Id == s.TargetHoodId) is { } t =>
                 t.State == HoodState.Jailed ? w.PrecinctNear(w.Map.LotAt(hq)).Id : HauntOf(w, t),
@@ -235,6 +238,7 @@ public sealed partial class Simulation
         WaylayOrder l => l.Team,
         UnionOrder u => u.Team,
         SilenceOrder s => new[] { s.HoodId },
+        TailOrder t => new[] { t.HoodId },
         JuryOrder j => new[] { j.HoodId },
         PollsOrder p => new[] { p.HoodId },
         HuntOrder h => new[] { h.HoodId },
@@ -266,6 +270,7 @@ public sealed partial class Simulation
         OnTheLam();
         Rats();
         Street();
+        Rumours();
         Politics.Step(w, w.Events.Count(e => e.Week == w.Week && e.Kind == EventKind.HoodKilled));
         // After the city's temper has cooled for the week, so the war's share of it stays.
         Wars();
@@ -318,7 +323,7 @@ public sealed partial class Simulation
             BribeOrder or PayoffOrder => rng.Range(0, 5) * 24 + rng.Range(19, 22),
             CampaignOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
             RecruitOrder or HireOrder => rng.Range(0, 5) * 24 + rng.Range(10, 17),
-            PayCopOrder or BuyStoryOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
+            PayCopOrder or BuyStoryOrder or AskOrder => rng.Range(0, 5) * 24 + rng.Range(12, 20),
             // Fires are set and trucks stopped after dark; banks are robbed while the doors are open.
             ArsonOrder or HijackOrder or WaylayOrder => rng.Range(0, 5) * 24 + rng.Range(20, 23),
             RobberyOrder => rng.Range(0, 5) * 24 + rng.Range(10, 15),

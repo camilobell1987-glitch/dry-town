@@ -20,6 +20,8 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(PayCopOrder), "paycop")]
 [JsonDerivedType(typeof(BuyStoryOrder), "buystory")]
 [JsonDerivedType(typeof(SilenceOrder), "silence")]
+[JsonDerivedType(typeof(AskOrder), "ask")]
+[JsonDerivedType(typeof(TailOrder), "tail")]
 [JsonDerivedType(typeof(ArmOrder), "arm")]
 [JsonDerivedType(typeof(CarOrder), "car")]
 [JsonDerivedType(typeof(FrontOrder), "front")]

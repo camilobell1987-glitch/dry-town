@@ -19,8 +19,50 @@ public partial class Main
     /// <summary>Show every line of every card, for screenshots and testing until there are ways to find things out.</summary>
     private bool _revealCitizens;
 
-    /// <summary>What you know about a resident.</summary>
-    private Fact KnownAbout(int citizen) => _revealCitizens ? Fact.All : Fact.None;
+    /// <summary>What you know about a resident: what you've found out, plus what's plain from dealing with him.</summary>
+    private Fact KnownAbout(int citizen)
+    {
+        if (_revealCitizens) return Fact.All;
+        var known = W.KnownAbout(citizen);
+        // A shopkeeper who pays you is someone you know: his name, his shop, and that he lives over it.
+        if (_map.Directory is { } d && d.Get(citizen) is { OwnsBusinessId: >= 0 } c && W.BusinessById(c.OwnsBusinessId).ProtectorGangId == Me)
+            known |= Fact.Name | Fact.Job | Fact.Work | Fact.Home | Fact.Landlord | Fact.Owns;
+        return known;
+    }
+
+    /// <summary>What was overheard when a resident was picked out of a conversation, to show on the card.</summary>
+    private string? _overheard;
+
+    /// <summary>
+    /// Someone has been picked out of the crowd: note that you've come across them, so the street can tell you more. Picked
+    /// out of a conversation, you overhear what the pair call each other and what language they speak.
+    /// </summary>
+    private void MeetCitizen(int id)
+    {
+        _overheard = null;
+        if (_map.Directory is not { } d || !d.Exists(id)) return;
+        var c = d.Get(id);
+        W.Meet(id, W.Map.LotAt(c.HomeLotId).WardId);
+        int partner = _map.TalkingWith(id);
+        if (partner < 0) return;
+        var other = d.Get(partner);
+        W.Learn(id, Fact.Name | Fact.Origin, W.Map.LotAt(c.HomeLotId).WardId);
+        W.Learn(partner, Fact.Name | Fact.Origin, W.Map.LotAt(other.HomeLotId).WardId);
+        string tongue = c.Origin == other.Origin && c.Origin is not (Ethnicity.Irish or Ethnicity.Unknown) ? $"in {Language(c.Origin)}" : "in English";
+        _overheard = $"You overheard them talking {tongue}. This one is {c.Name}, and the other is {other.Name}.";
+    }
+
+    private static string Language(Ethnicity e) => e switch
+    {
+        Ethnicity.Italian => "Italian",
+        Ethnicity.Jewish => "Yiddish",
+        Ethnicity.Polish => "Polish",
+        Ethnicity.German => "German",
+        _ => "English",
+    };
+
+    /// <summary>How the directory refers to someone in orders and news: by name if you know it.</summary>
+    private string WhoIs(Citizen c, Fact known, Lot seen) => known.HasFlag(Fact.Name) ? c.Name : $"someone on {W.Map.StreetOf(seen)} St";
 
     private void CitizenPanel(int id)
     {
@@ -77,8 +119,56 @@ public partial class Main
 
         if (_map.WhereIs(id) == null) AddLabel(panel, "Indoors just now.", Palette.InkQuiet);
         else AddLabel(panel, $"Seen on {W.Map.StreetOf(seen)} St in {W.Wards.ElementAtOrDefault(seen.WardId)?.Name ?? "the district"}.", Palette.InkQuiet, wrap: true);
-        if (known != Fact.All)
-            AddLabel(panel, "You don't know the first thing about this one yet. Asking around, having them followed and dealing with them will fill in the card.", Palette.InkQuiet, wrap: true);
+        if (_overheard != null) AddLabel(panel, _overheard, Palette.Ink, wrap: true);
+        if (known == Fact.All) return;
+        if (known == Fact.None)
+            AddLabel(panel, "You don't know the first thing about this one yet.", Palette.InkQuiet, wrap: true);
+        AddLabel(panel, "Word on the street fills in a line now and then on anyone you've come across, more often where you hold turf.", Palette.InkQuiet, wrap: true);
+
+        bool Concerns(Order o) => o switch
+        {
+            AskOrder a => a.CitizenId == id,
+            TailOrder t => t.CitizenId == id,
+            _ => false,
+        };
+        ShowQueued(panel, Concerns);
+        if (!CanGiveOrders(panel)) return;
+        string who = WhoIs(c, known, seen);
+        if (!AlreadyGiven(o => o is AskOrder a && a.CitizenId == id))
+        {
+            var ask = AddButton(panel, $"Ask around about them (${Content.AskPrice})", () => Give(new AskOrder(Me, id, c.HomeLotId, who)));
+            ask.Disabled = W.Player.Cash < Content.AskPrice;
+        }
+        if (AlreadyGiven(o => o is TailOrder t && t.CitizenId == id)) return;
+        var hoods = FreeHoods().OrderByDescending(h => h.Stealth).ToList();
+        if (hoods.Count == 0) { AddLabel(panel, "All your men are busy, so nobody can follow them.", Palette.InkQuiet, wrap: true); return; }
+        AddLabel(panel, "Have a man follow them for the week. He'll see where they live and work, and a sharp one picks up more. If he's spotted, he only learns the address.", Palette.Ink, wrap: true);
+        var man = HoodPicker(hoods, h => $"{Simulation.SpottedChance(h):P0} spotted");
+        AddButton(panel, "Have them tailed", () => Give(new TailOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who)));
+    }
+
+    /// <summary>The people you know something about, so you can find their cards again.</summary>
+    private void Acquaintances(VBoxContainer panel)
+    {
+        if (_map.Directory is not { } d) return;
+        var known = W.Acquaintances.Where(kv => kv.Value.Known != Fact.None && d.Exists(kv.Key))
+            .OrderByDescending(kv => System.Numerics.BitOperations.PopCount((uint)kv.Value.Known)).ThenBy(kv => kv.Key).Take(12).ToList();
+        if (known.Count == 0) return;
+        panel.AddChild(new HSeparator());
+        AddLabel(panel, "Your directory", Palette.Ink, 16);
+        foreach (var (id, a) in known)
+        {
+            var c = d.Get(id);
+            string name = a.Known.HasFlag(Fact.Name) ? c.Name : "Name unknown";
+            string job = a.Known.HasFlag(Fact.Job) ? $", {c.Job.ToLowerInvariant()[0]}{c.Job[1..]}" : "";
+            AddButton(panel, $"{name}{job}", () =>
+            {
+                _map.Select(citizen: id);
+                _map.ResetView(W.Map.LotAt(c.HomeLotId));
+                _overheard = null;
+                RefreshBusiness();
+            });
+        }
     }
 
     /// <summary>A street address for a lot, as the directory would print it.</summary>

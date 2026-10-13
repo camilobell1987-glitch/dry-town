@@ -467,6 +467,9 @@ public sealed class CommandShell
             JuryOrder j => W.Hoods.FirstOrDefault(h => h.Id == j.DefendantId) is not { Case: not null } d || d.GangId != Me ? "He isn't one of yours waiting on a trial. Type 'cases'."
                 : d.Case.JuryFixed || Pending.Any(o => o is JuryOrder q && q.DefendantId == j.DefendantId) ? "Someone is already seeing to that jury."
                 : CheckHood(j.HoodId),
+            AskOrder a => Pending.Any(q => q is AskOrder x && x.CitizenId == a.CitizenId) ? "You're already asking about them."
+                : W.Player.Cash < Content.AskPrice ? $"It takes ${Content.AskPrice} to ask around." : null,
+            TailOrder t => CheckHood(t.HoodId) ?? (Pending.Any(q => q is TailOrder x && x.CitizenId == t.CitizenId) ? "Someone is already following them." : null),
             _ => CheckStreet(order),
         };
         if (problem != null) return problem + "\n";
@@ -524,6 +527,8 @@ public sealed class CommandShell
         LawyerOrder l => $"keep {Content.Lawyers[l.Lawyer].Label}",
         JudgeOrder j => $"pay the judge in {HoodName(j.DefendantId)}'s case",
         FrontOrder f => $"buy {BizName(f.BusinessId)} outright (${Content.FrontPrice(W.BusinessById(f.BusinessId)):N0})",
+        AskOrder a => $"ask around about {a.Who} (${Content.AskPrice})",
+        TailOrder t => $"{HoodName(t.HoodId)} tails {t.Who}",
         _ => o.ToString(),
     };
 
