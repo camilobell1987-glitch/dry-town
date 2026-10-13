@@ -58,8 +58,9 @@ public partial class MapView
     private void Glow(Vector2 centre, float radius, Color colour, float strength)
     {
         if (strength <= 0.01f) return;
-        for (int i = 5; i >= 1; i--)
-            C.DrawCircle(centre, radius * i / 5f, colour with { A = colour.A * strength * 0.07f });
+        // Brightest at the middle and fading smoothly out, with a little more in the core.
+        C.DrawRadial(centre, radius, colour with { A = colour.A * strength * 0.3f }, colour with { A = 0 });
+        C.DrawRadial(centre, radius * 0.4f, colour with { A = colour.A * strength * 0.12f }, colour with { A = 0 }, 16);
     }
 
     private void Star(Vector2 c, float r, Color colour, int points = 5, float inner = 0.45f)
@@ -406,11 +407,19 @@ public partial class MapView
             if (bh <= 0) continue;
             var (fx0, fy0, fx1, fy1) = Footprint(lot);
             float dx = bh * 0.55f, dy = bh * 0.18f;
+            // A soft edge round a darker core, so the shadow doesn't look cut out of card.
+            if (Fine)
+                C.DrawColoredPolygon(new[]
+                {
+                    P(fx0, fy0 - 0.03f), P(fx1 + 0.03f, fy0 - 0.03f), P(fx1 + dx * 1.12f + 0.04f, fy0 + dy * 1.1f), P(fx1 + dx * 1.12f + 0.04f, fy1 + dy * 1.1f + 0.04f),
+                    P(fx0 + dx * 1.12f, fy1 + dy * 1.1f + 0.04f), P(fx0, fy1 + 0.03f),
+                }, Shadow with { A = 0.12f });
             C.DrawColoredPolygon(new[]
             {
                 P(fx0, fy0), P(fx1, fy0), P(fx1 + dx, fy0 + dy), P(fx1 + dx, fy1 + dy), P(fx0 + dx, fy1 + dy), P(fx0, fy1),
-            }, Shadow);
+            }, Shadow with { A = Fine ? 0.24f : Shadow.A });
         }
+        if (Fine) DressStreet(bx, by);
     }
 
     private Rect2 BlockRect(int bx, int by) =>
@@ -553,18 +562,23 @@ public partial class MapView
         var (x0, y0, x1, y1) = Footprint(lot);
         bool setback = h > 1.3f;
         float lower = setback ? h * 0.68f : h;
+        bool stone = IsStone(lot);
+        float zFrom = groundFloorWindows == 1 ? 0 : 0.2f;
         Box(x0, y0, x1, y1, 0, lower, wall, wall.Lightened(0.12f), roof);
+        DressWall(lot, x0, y0, x1, y1, zFrom, lower, wall, stone);
+        DressRoof(lot, x0, y0, x1, y1, lower, roof);
         if (setback)
         {
-            Box(x0 + 0.1f, y0 + 0.08f, x1 - 0.1f, y1 - 0.1f, lower, h, wall.Lightened(0.04f), wall.Lightened(0.16f), roof.Lightened(0.05f));
+            var upper = wall.Lightened(0.04f);
+            Box(x0 + 0.1f, y0 + 0.08f, x1 - 0.1f, y1 - 0.1f, lower, h, upper, wall.Lightened(0.16f), roof.Lightened(0.05f));
             DrawWindows(lot, x0 + 0.1f, x1 - 0.1f, y1 - 0.1f, lower, h);
+            DressRoof(lot, x0 + 0.1f, y0 + 0.08f, x1 - 0.1f, y1 - 0.1f, h, roof.Lightened(0.05f));
+            DrawCornice(x0 + 0.1f, y1 - 0.1f, x1 - 0.1f, h, upper);
         }
-        DrawWindows(lot, x0, x1, y1, groundFloorWindows == 1 ? 0 : 0.2f, lower);
+        DrawWindows(lot, x0, x1, y1, zFrom, lower);
+        DrawCornice(x0, y1, x1, lower, wall);
         if (Fine)
         {
-            // Parapet along the roof's front edge, and a cornice line under it.
-            C.DrawLine(Q(x0, y1, h), Q(x1, y1, h), roof.Lightened(0.25f), Mathf.Max(1, _t * 0.03f));
-            C.DrawLine(Q(x0, y1, lower - 0.03f), Q(x1, y1, lower - 0.03f), wall.Darkened(0.3f), Mathf.Max(1, _t * 0.02f));
             // Windows down the west wall.
             for (float z = 0.06f; z + 0.12f <= lower; z += 0.2f)
                 for (float y = y0 + 0.15f; y < y1 - 0.15f; y += 0.28f)
@@ -581,13 +595,11 @@ public partial class MapView
         int floor = 0;
         for (float z = zFrom; z + 0.13f <= zTo; z += 0.2f, floor++)
             for (int i = 0; i < n; i++)
-            {
-                float wx = x0 + span * i + span * 0.28f, ww = span * 0.44f;
-                Face(wx, wx + ww, y, z + 0.05f, z + 0.14f, Glass);
-                if (Hash(lot.Id * 13 + floor, i + 500) < 0.42f)
-                    Lit(() => Face(wx, wx + ww, y, z + 0.05f, z + 0.14f, WindowLit));
-            }
+                DrawSashWindow(lot, x0 + span * i + span * 0.28f, span * 0.44f, y, z, floor, i);
     }
+
+    /// <summary>Whether a lot's building is faced in stone rather than brick: downtown, and the city's own buildings.</summary>
+    private bool IsStone(Lot lot) => lot.Use is LotUse.Precinct or LotUse.Bank || Downtown(lot.X + 0.5f, lot.Y + 0.5f) > 0.3f;
 
     private Color WallFor(Lot lot)
     {
@@ -617,6 +629,8 @@ public partial class MapView
                 C.DrawLine(Q(x, y0, h), Q(x, y1, h), roof.Darkened(0.2f), 1);
         if (b.Kind == BusinessKind.Hotel) DrawWaterTower(x1 - 0.22f, y0 + 0.25f, h);
         else if (Fine) DrawRoofClutter(lot, h, roof);
+        if (h >= 0.55f && b.Kind is not (BusinessKind.Warehouse or BusinessKind.Garage) && Hash(lot.Id, 660) < 0.4f)
+            DrawFireEscape(Hash(lot.Id, 4) < 0.5f ? x0 + 0.08f : x1 - 0.4f, y1, 0.2f, h);
 
         if (FacesSouth(lot)) DrawShopfront(lot, b, gang, open);
         DrawBillboard(lot, h, gang ?? new Color("3a332b"), gang.HasValue ? 3 : 1, open, () => { if (Fine) DrawTradeIcon(b.Kind, SignCentre(lot, h), _t * 0.11f); });
@@ -709,7 +723,10 @@ public partial class MapView
         {
             Face(x0 + 0.08f, x1 - 0.3f, y1, 0.02f, 0.13f, new Color("56636e"));
             Face(x1 - 0.24f, x1 - 0.1f, y1, 0, 0.14f, new Color("3e2c20"));
-            if (open && Hash(lot.Id, 13) < 0.7f) Lit(() => Face(x0 + 0.08f, x1 - 0.3f, y1, 0.02f, 0.13f, WindowLit));
+            if (Fine) DressShopfront(lot, x0, x1, y1);
+            // The shop window is under the awning; after dark its light shows through the canvas instead.
+            if (open && Hash(lot.Id, 13) < 0.7f)
+                Lit(() => C.DrawColoredPolygon(new[] { Q(x0 + 0.04f, y1 + 0.13f, 0.12f), Q(x1 - 0.04f, y1 + 0.13f, 0.12f), Q(x1 - 0.04f, y1 + 0.13f, 0.08f), Q(x0 + 0.04f, y1 + 0.13f, 0.08f) }, WindowLit with { A = 0.4f }));
             if (open) Lit(() => Glow(P(lot.X + 0.5f, lot.Y + 1.05f), _t * 0.4f, Lamplight, 0.55f));
 
             // The awning: striped in the protector's colours, plain canvas otherwise.
@@ -723,6 +740,7 @@ public partial class MapView
                 if (!open) c = c.Darkened(0.45f);
                 C.DrawColoredPolygon(new[] { Q(a, y1, 0.17f), Q(z, y1, 0.17f), Q(z, y1 + 0.13f, 0.12f), Q(a, y1 + 0.13f, 0.12f) }, c);
                 C.DrawColoredPolygon(new[] { Q(a, y1 + 0.13f, 0.12f), Q(z, y1 + 0.13f, 0.12f), Q(z, y1 + 0.13f, 0.09f), Q(a, y1 + 0.13f, 0.09f) }, c.Darkened(0.2f));
+                if (Fine) C.DrawColoredPolygon(new[] { Q(a, y1 + 0.13f, 0.09f), Q(z, y1 + 0.13f, 0.09f), Q((a + z) / 2, y1 + 0.13f, 0.072f) }, c.Darkened(0.2f));
             }
         }
     }
@@ -754,14 +772,9 @@ public partial class MapView
     private void DrawRoofClutter(Lot lot, float h, Color roof)
     {
         var (x0, y0, x1, y1) = Footprint(lot);
-        int clutter = 1 + (int)(Hash(lot.Id, 3) * 2);
-        for (int i = 0; i < clutter; i++)
-        {
-            float cx = x0 + 0.1f + Hash(lot.Id, 100 + i) * (x1 - x0 - 0.3f);
-            float cy = y0 + 0.08f + Hash(lot.Id, 110 + i) * 0.2f;
-            float ch = i == 0 ? 0.14f : 0.06f;
-            Box(cx, cy, cx + 0.1f, cy + 0.1f, h, h + ch, roof.Darkened(0.3f), roof.Darkened(0.15f), roof.Darkened(0.4f));
-        }
+        var brick = Bricks[(int)(Hash(lot.Id, 2) * Bricks.Length)];
+        DrawChimney(x0 + 0.1f + Hash(lot.Id, 100) * (x1 - x0 - 0.3f), y0 + 0.06f + Hash(lot.Id, 110) * 0.12f, h, brick);
+        if (Hash(lot.Id, 3) < 0.6f) DrawBulkhead(x1 - 0.32f, y0 + 0.28f + Hash(lot.Id, 111) * 0.12f, h, roof);
     }
 
     /// <summary>A wooden water tank on stilts, on the roofs of hotels and tenements.</summary>
@@ -772,6 +785,17 @@ public partial class MapView
         C.DrawLine(Q(x, y + 0.12f, h), Q(x, y + 0.12f, h + 0.14f), new Color("2a2622"), lw);
         C.DrawLine(Q(x + 0.16f, y + 0.12f, h), Q(x + 0.16f, y + 0.12f, h + 0.14f), new Color("2a2622"), lw);
         Box(x - 0.02f, y, x + 0.18f, y + 0.14f, h + 0.14f, h + 0.36f, wood, wood.Lightened(0.12f), wood.Darkened(0.2f));
+        if (Fine)
+        {
+            // Iron hoops round the staves.
+            foreach (float z in new[] { 0.18f, 0.25f, 0.32f })
+            {
+                C.DrawLine(Q(x - 0.02f, y + 0.14f, h + z), Q(x + 0.18f, y + 0.14f, h + z), Iron, Hair(0.006f));
+                C.DrawLine(Q(x - 0.02f, y, h + z), Q(x - 0.02f, y + 0.14f, h + z), Iron, Hair(0.006f));
+            }
+            for (float sx = x; sx < x + 0.17f; sx += 0.035f)
+                C.DrawLine(Q(sx, y + 0.14f, h + 0.14f), Q(sx, y + 0.14f, h + 0.36f), wood.Darkened(0.25f) with { A = 0.6f }, Hair(0.003f));
+        }
         C.DrawColoredPolygon(new[] { Q(x - 0.04f, y + 0.14f, h + 0.36f), Q(x + 0.2f, y + 0.14f, h + 0.36f), Q(x + 0.08f, y + 0.07f, h + 0.46f) }, new Color("3a2a1e"));
     }
 
@@ -1000,14 +1024,7 @@ public partial class MapView
                 DrawBlock(lot, h, WallFor(lot), RoofFor(lot), 1);
                 if (Fine)
                 {
-                    // A fire escape zig-zagging down the front.
-                    var iron = new Color("1e1c1a");
-                    float fx = Hash(lot.Id, 4) < 0.5f ? x0 + 0.08f : x1 - 0.4f;
-                    for (float z = 0.2f; z + 0.1f < h; z += 0.2f)
-                    {
-                        C.DrawLine(Q(fx, y1 + 0.03f, z), Q(fx + 0.32f, y1 + 0.03f, z), iron, Mathf.Max(1, _t * 0.025f));
-                        C.DrawLine(Q(fx + 0.04f, y1 + 0.03f, z), Q(fx + 0.28f, y1 + 0.03f, z + 0.2f), iron, 1);
-                    }
+                    DrawFireEscape(Hash(lot.Id, 4) < 0.5f ? x0 + 0.08f : x1 - 0.4f, y1, 0.2f, h);
                     if (Hash(lot.Id, 5) < 0.35f) DrawWaterTower(x0 + 0.15f, y0 + 0.2f, h);
                     else DrawRoofClutter(lot, h, RoofFor(lot));
                 }
@@ -1116,6 +1133,7 @@ public partial class MapView
 
     private void DrawLampPost(Vector2 l)
     {
+        if (Fine) { DrawLantern(l); return; }
         C.DrawLine(Q(l.X, l.Y, 0), Q(l.X, l.Y, 0.42f), new Color("1e1d1c"), Mathf.Max(1, _t * 0.03f));
         C.DrawCircle(Q(l.X, l.Y, 0.44f), _t * 0.045f, new Color("8a8478"));
         Lit(() => C.DrawCircle(Q(l.X, l.Y, 0.44f), _t * 0.045f, Lamplight));

@@ -61,6 +61,32 @@ public sealed class Pen
         Triangle(i, i + 2, i + 3);
     }
 
+    /// <summary>A four-cornered shape whose colour blends between its corners: soot fading up a wall, shade inside a parapet.</summary>
+    public void DrawShadedQuad(Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color ca, Color cb, Color cc, Color cd)
+    {
+        if (_points.Count > 60000) Flush();
+        int i = Vertex(a, ca);
+        Vertex(b, cb);
+        Vertex(c, cc);
+        Vertex(d, cd);
+        Triangle(i, i + 1, i + 2);
+        Triangle(i, i + 2, i + 3);
+    }
+
+    /// <summary>A disc whose colour fades smoothly from its centre to its rim: a pool of lamplight, a glow round a sign.</summary>
+    public void DrawRadial(Vector2 centre, float radius, Color inner, Color outer, int points = 28)
+    {
+        if (radius <= 0) return;
+        if (_points.Count > 60000) Flush();
+        int mid = Vertex(centre, inner);
+        for (int i = 0; i < points; i++)
+        {
+            float a = Mathf.Tau * i / points;
+            Vertex(centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius, outer);
+        }
+        for (int i = 0; i < points; i++) Triangle(mid, mid + 1 + i, mid + 1 + (i + 1) % points);
+    }
+
     public void DrawRect(Rect2 r, Color c, bool filled = true, float width = -1)
     {
         var p = r.Position;

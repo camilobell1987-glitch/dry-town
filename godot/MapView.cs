@@ -70,8 +70,8 @@ public partial class MapView : Control
         DrawFrame();
     }
 
-    /// <summary>Big cities draw small when fitted, so they can be zoomed in further.</summary>
-    private float MaxZoom => Mathf.Max(4, Map.Width / 6f);
+    /// <summary>Close enough to see the brickwork: a lot can fill about a fifth of a wide screen, whatever the city's size.</summary>
+    private float MaxZoom => Mathf.Max(4, 220f / Mathf.Max(1, FitTile));
 
     /// <summary>Zoom about a point on screen, keeping whatever is under it in place.</summary>
     private void ZoomAt(Vector2 screen, float factor)
@@ -666,29 +666,62 @@ public partial class MapView : Control
     /// A standing man, three-quarters on: shadow at his feet, legs, coat, a face and a hat. He leans
     /// the way he walks, and his legs scissor while he does.
     /// </summary>
-    private void DrawFigure(Vector2 ground, Vector2 facing, float r, Color coat, Color hat, Color band, bool walking)
+    private void DrawFigure(Vector2 ground, Vector2 facing, float r, Color coat, Color hat, Color band, bool walking, Color? skin = null, bool woman = false)
     {
         var pen = DynAt(ground.Y / _t);
         var keep = C;
         C = pen;
         float step = walking ? Mathf.Sin(_anim * 10 + ground.X * 0.1f) : 0;
         float side = facing.X >= 0 ? 1 : -1;
+        var face = skin ?? new Color("d9b48f");
+        var shade = coat.Darkened(0.28f);
         Ellipse(ground + new Vector2(r * 0.3f, 0), new Vector2(r * 0.85f, r * 0.32f), Shadow);
-        var legs = coat.Darkened(0.6f);
-        C.DrawLine(ground + new Vector2(-r * 0.22f, -r * 1.0f), ground + new Vector2(-r * 0.22f + step * r * 0.35f, 0), legs, r * 0.32f);
-        C.DrawLine(ground + new Vector2(r * 0.22f, -r * 1.0f), ground + new Vector2(r * 0.22f - step * r * 0.35f, 0), legs, r * 0.32f);
-        var body = new[]
+        if (woman)
         {
-            ground + new Vector2(-r * 0.55f, -r * 0.9f), ground + new Vector2(r * 0.55f, -r * 0.9f),
-            ground + new Vector2(r * 0.5f, -r * 2.05f), ground + new Vector2(-r * 0.5f, -r * 2.05f),
-        };
-        C.DrawColoredPolygon(body, coat);
-        C.DrawLine(body[0], body[3], coat.Darkened(0.35f), r * 0.12f);
-        var head = ground + new Vector2(side * r * 0.04f, -r * 2.38f);
-        C.DrawCircle(head, r * 0.36f, new Color("d9b48f"));
-        Ellipse(head + new Vector2(0, -r * 0.2f), new Vector2(r * 0.6f, r * 0.16f), hat);
-        C.DrawRect(new Rect2(head + new Vector2(-r * 0.36f, -r * 0.6f), new Vector2(r * 0.72f, r * 0.4f)), hat);
-        C.DrawRect(new Rect2(head + new Vector2(-r * 0.36f, -r * 0.3f), new Vector2(r * 0.72f, r * 0.1f)), band);
+            // Stockinged legs under a dropped-waist dress, and a cloche hat pulled down to the brow.
+            var stocking = face.Darkened(0.15f);
+            C.DrawLine(ground + new Vector2(-r * 0.18f, -r * 0.75f), ground + new Vector2(-r * 0.18f + step * r * 0.25f, 0), stocking, r * 0.2f);
+            C.DrawLine(ground + new Vector2(r * 0.18f, -r * 0.75f), ground + new Vector2(r * 0.18f - step * r * 0.25f, 0), stocking, r * 0.2f);
+            var dress = new[]
+            {
+                ground + new Vector2(-r * 0.62f, -r * 0.72f), ground + new Vector2(r * 0.62f, -r * 0.72f),
+                ground + new Vector2(r * 0.42f, -r * 2.0f), ground + new Vector2(-r * 0.42f, -r * 2.0f),
+            };
+            C.DrawColoredPolygon(dress, coat);
+            C.DrawColoredPolygon(new[] { ground + new Vector2(r * 0.05f, -r * 0.72f), dress[1], dress[2], ground + new Vector2(r * 0.05f, -r * 2.0f) }, shade);
+            C.DrawLine(ground + new Vector2(-r * 0.55f, -r * 1.2f), ground + new Vector2(r * 0.55f, -r * 1.2f), coat.Lightened(0.2f), r * 0.1f);
+            C.DrawLine(ground + new Vector2(-r * 0.44f, -r * 1.95f), ground + new Vector2(-r * 0.55f - step * r * 0.15f, -r * 1.15f), shade, r * 0.18f);
+            var head = ground + new Vector2(side * r * 0.04f, -r * 2.33f);
+            C.DrawCircle(head, r * 0.34f, face);
+            Ellipse(head + new Vector2(0, -r * 0.12f), new Vector2(r * 0.44f, r * 0.3f), hat);
+            Ellipse(head + new Vector2(0, r * 0.02f), new Vector2(r * 0.5f, r * 0.09f), hat.Darkened(0.2f));
+        }
+        else
+        {
+            var legs = coat.Darkened(0.6f);
+            C.DrawLine(ground + new Vector2(-r * 0.22f, -r * 1.0f), ground + new Vector2(-r * 0.22f + step * r * 0.35f, 0), legs, r * 0.32f);
+            C.DrawLine(ground + new Vector2(r * 0.22f, -r * 1.0f), ground + new Vector2(r * 0.22f - step * r * 0.35f, 0), legs, r * 0.32f);
+            var body = new[]
+            {
+                ground + new Vector2(-r * 0.55f, -r * 0.9f), ground + new Vector2(r * 0.55f, -r * 0.9f),
+                ground + new Vector2(r * 0.5f, -r * 2.05f), ground + new Vector2(-r * 0.5f, -r * 2.05f),
+            };
+            C.DrawColoredPolygon(body, coat);
+            // The side away from the light, the shirt and tie at the open collar, and an arm swinging.
+            C.DrawColoredPolygon(new[] { ground + new Vector2(r * 0.08f, -r * 0.9f), body[1], body[2], ground + new Vector2(r * 0.08f, -r * 2.05f) }, shade);
+            C.DrawColoredPolygon(new[] { ground + new Vector2(-r * 0.2f, -r * 2.05f), ground + new Vector2(r * 0.2f, -r * 2.05f), ground + new Vector2(0, -r * 1.6f) }, new Color("e8e2d4"));
+            C.DrawLine(ground + new Vector2(0, -r * 2.0f), ground + new Vector2(0, -r * 1.68f), band.Darkened(0.2f), r * 0.1f);
+            C.DrawLine(body[0], body[3], coat.Darkened(0.35f), r * 0.12f);
+            var shoulder = ground + new Vector2(-r * 0.5f, -r * 1.95f);
+            var hand = ground + new Vector2(-r * 0.62f - step * r * 0.25f, -r * 1.05f);
+            C.DrawLine(shoulder, hand, shade, r * 0.22f);
+            C.DrawCircle(hand, r * 0.12f, face);
+            var head = ground + new Vector2(side * r * 0.04f, -r * 2.38f);
+            C.DrawCircle(head, r * 0.36f, face);
+            Ellipse(head + new Vector2(0, -r * 0.2f), new Vector2(r * 0.6f, r * 0.16f), hat);
+            C.DrawRect(new Rect2(head + new Vector2(-r * 0.36f, -r * 0.6f), new Vector2(r * 0.72f, r * 0.4f)), hat);
+            C.DrawRect(new Rect2(head + new Vector2(-r * 0.36f, -r * 0.3f), new Vector2(r * 0.72f, r * 0.1f)), band);
+        }
         C = keep;
     }
 

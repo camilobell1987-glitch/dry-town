@@ -168,9 +168,27 @@ public partial class MapView
             Box(cx - len / 2, cy - wid / 2, cx + len / 2, cy + wid / 2, z0, z1, paint, light, light);
             float cab = cx - heading * len * 0.08f;
             Box(cab - len * 0.22f, cy - wid * 0.4f, cab + len * 0.22f, cy + wid * 0.4f, z1, z2, paint, light, cabinTop);
-            if (Fine) Face(cab - len * 0.17f, cab + len * 0.17f, cy + wid * 0.4f, z1 + 0.015f, z2 - 0.02f, Glass.Lightened(0.25f));
-            C.DrawCircle(Q(cx - len * 0.3f, cy + wid / 2, z0 + 0.01f), 0.045f * scale * _t, wheel);
-            C.DrawCircle(Q(cx + len * 0.3f, cy + wid / 2, z0 + 0.01f), 0.045f * scale * _t, wheel);
+            if (Fine)
+            {
+                Face(cab - len * 0.17f, cab + len * 0.17f, cy + wid * 0.4f, z1 + 0.015f, z2 - 0.02f, Glass.Lightened(0.25f));
+                C.DrawLine(Q(cab, cy + wid * 0.4f, z1 + 0.015f), Q(cab, cy + wid * 0.4f, z2 - 0.02f), paint, _t * 0.012f * scale);
+                // A chrome strip down the side, the running board, and a bumper at each end.
+                C.DrawLine(Q(cx - len / 2, cy + wid / 2, z1 - 0.012f), Q(cx + len / 2, cy + wid / 2, z1 - 0.012f), paint.Lightened(0.35f), _t * 0.006f);
+                Face(cx - len * 0.36f, cx + len * 0.36f, cy + wid / 2 + 0.015f, z0 - 0.01f, z0 + 0.005f, new Color("1a1a1a"));
+                Face(cx - len / 2 - 0.02f, cx - len / 2 + 0.04f, cy + wid / 2, z0, z0 + 0.018f, new Color("b8b4a8"));
+                Face(cx + len / 2 - 0.04f, cx + len / 2 + 0.02f, cy + wid / 2, z0, z0 + 0.018f, new Color("b8b4a8"));
+            }
+            foreach (float wx in new[] { cx - len * 0.3f, cx + len * 0.3f })
+            {
+                var hub = Q(wx, cy + wid / 2, z0 + 0.01f);
+                if (Fine) C.DrawColoredPolygon(new[] { Q(wx - len * 0.14f, cy + wid / 2 + 0.005f, z0), Q(wx + len * 0.14f, cy + wid / 2 + 0.005f, z0), Q(wx + len * 0.1f, cy + wid / 2 + 0.005f, z0 + 0.07f * scale), Q(wx - len * 0.1f, cy + wid / 2 + 0.005f, z0 + 0.07f * scale) }, paint.Darkened(0.35f));
+                C.DrawCircle(hub, 0.045f * scale * _t, wheel);
+                if (Fine)
+                {
+                    C.DrawCircle(hub, 0.026f * scale * _t, new Color("8a8478"));
+                    C.DrawCircle(hub, 0.01f * scale * _t, new Color("2a2826"));
+                }
+            }
             float front = cx + heading * len / 2;
             C.DrawCircle(Q(front, cy + wid * 0.3f, z1 - 0.02f), 0.025f * scale * _t, new Color("f3e6b0"));
             if (police) C.DrawCircle(Q(cab, cy, z2 + 0.02f), _t * 0.035f, ((int)(_anim * 3) % 2 == 0 && Live) ? Palette.Bad : Palette.Police);
@@ -185,7 +203,15 @@ public partial class MapView
             float lamps = cy + len / 2;
             if (heading > 0)
             {
-                if (Fine) Face(cx - wid * 0.34f, cx + wid * 0.34f, cab + len * 0.2f, z1 + 0.015f, z2 - 0.02f, Glass.Lightened(0.25f));
+                if (Fine)
+                {
+                    Face(cx - wid * 0.34f, cx + wid * 0.34f, cab + len * 0.2f, z1 + 0.015f, z2 - 0.02f, Glass.Lightened(0.25f));
+                    // The radiator grille between the lamps, and the bumper under it.
+                    Face(cx - wid * 0.16f, cx + wid * 0.16f, lamps, z0 + 0.015f, z1 - 0.005f, new Color("a8a498"));
+                    for (float gx = cx - wid * 0.12f; gx < cx + wid * 0.14f; gx += wid * 0.06f)
+                        C.DrawLine(Q(gx, lamps, z0 + 0.02f), Q(gx, lamps, z1 - 0.01f), new Color("4a4844"), _t * 0.004f);
+                    Face(cx - wid * 0.5f, cx + wid * 0.5f, lamps + 0.012f, z0 - 0.005f, z0 + 0.012f, new Color("b8b4a8"));
+                }
                 C.DrawCircle(Q(cx - wid * 0.3f, lamps, z1 - 0.025f), 0.025f * scale * _t, new Color("f3e6b0"));
                 C.DrawCircle(Q(cx + wid * 0.3f, lamps, z1 - 0.025f), 0.025f * scale * _t, new Color("f3e6b0"));
             }
@@ -260,6 +286,9 @@ public partial class MapView
     }
 
     /// <summary>People on the pavements, walking round the blocks. They're scenery, so they're small and muted.</summary>
+    private static readonly Color[] Dresses = { new("8a3a44"), new("4a6680"), new("a88a4a"), new("6a4a7a"), new("3a5a4a"), new("b8a888") };
+    private static readonly Color[] Skins = { new("e0b896"), new("c89870"), new("9a6a48"), new("ecc8a8"), new("b07c58") };
+
     private void DrawPassersBy(Rect2 view)
     {
         var coats = new[] { new Color("6a6258"), new Color("4e4a46"), new Color("7a6a58"), new Color("5a5f66"), new Color("8a7a66") };
@@ -282,7 +311,10 @@ public partial class MapView
             else if (d < 2 * w + h) { at = new Vector2(x0 + w - (d - w - h), y0 + h); facing = Vector2.Left; }
             else { at = new Vector2(x0, y0 + h - (d - 2 * w - h)); facing = Vector2.Up; }
             if (!view.HasPoint(at)) continue;
-            DrawFigure(at * _t, facing * dir, r, coats[i % coats.Length], hats[i % hats.Length], hats[i % hats.Length].Lightened(0.2f), true);
+            bool woman = i % 3 == 0;
+            var coat = woman ? Dresses[i % Dresses.Length] : coats[i % coats.Length];
+            var hat = woman ? Dresses[(i + 2) % Dresses.Length].Darkened(0.2f) : hats[i % hats.Length];
+            DrawFigure(at * _t, facing * dir, r, coat, hat, hat.Lightened(0.2f), true, Skins[i % Skins.Length], woman);
         }
     }
 
