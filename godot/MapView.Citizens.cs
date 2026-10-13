@@ -40,7 +40,7 @@ public partial class MapView
         float d = Mathf.PosMod(start + _anim * pace, CrowdPerimeter);
         bool drinking = night && door > 0 && barRoll < 0.6f;
         if (drinking) d = Mathf.PosMod(door * CrowdPerimeter + (barRoll / 0.6f - 0.5f) * 0.7f, CrowdPerimeter);
-        bool shown = outRoll < OutsideAt(hour) * (drinking ? 2.5f : 1);
+        bool shown = outRoll < OutsideAt(hour) * (drinking ? 2.5f : 1) && !Gone(bx, by, n);
         float w = CrowdW, h = CrowdH;
         var p = d < w ? new Vector2(d, across)
             : d < w + h ? new Vector2(w - across, d - w)
@@ -101,8 +101,9 @@ public partial class MapView
         for (int k = 0; k < 6; k++)
         {
             n = (int)(Hash(seed, 950 + side * 10 + k) * people);
-            if (!CrowdSpot(bx, by, n).Out) break;
+            if (!CrowdSpot(bx, by, n).Out && !Gone(bx, by, n)) break;
         }
+        for (int k = 0; k < 10 && Gone(bx, by, n); k++) n = (n + 1) % people;
         return Directory!.IdOf(bx, by, n);
     }
 }

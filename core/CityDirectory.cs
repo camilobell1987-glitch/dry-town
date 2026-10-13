@@ -3,7 +3,7 @@ namespace DryTown.Core;
 /// <summary>Everything there is to know about one resident of the city, whether or not you know it yet.</summary>
 public sealed record Citizen(
     int Id, string Name, bool Woman, int Age, Ethnicity Origin, string Job,
-    int HomeLotId, int WorkBusinessId, int LandlordId, IReadOnlyList<int> Owns, int OwnsBusinessId);
+    int HomeLotId, int WorkBusinessId, int LandlordId, IReadOnlyList<int> Owns, int OwnsBusinessId, int Worth);
 
 /// <summary>
 /// The city directory: every man, woman and child living in the city, each with a name, an age, a
@@ -155,7 +155,13 @@ public sealed class CityDirectory
         }
         else job = age < 19 ? (woman ? "Shop girl" : "Newsboy") : Pick(woman ? WomensTrades : MensTrades, id, 11);
 
-        var citizen = new Citizen(id, $"{first} {last}", woman, age, origin, job, homeLot, work, LandlordOf(homeLot), buildings, owns);
+        // What he's good for in a week, which sets what a bribe costs and what he can be shaken down or ransomed for.
+        int worth = owns >= 0 ? Math.Max(15, _w.BusinessById(owns).Takings / 5)
+            : buildings.Count > 0 ? 25 * buildings.Count
+            : job is "Out of work" or "Newsboy" ? 2
+            : job is "Retired" or "Keeps house" ? 5
+            : 8 + (int)(Roll(id, 13) * 11);
+        var citizen = new Citizen(id, $"{first} {last}", woman, age, origin, job, homeLot, work, LandlordOf(homeLot), buildings, owns, worth);
         _cache[id] = citizen;
         return citizen;
     }
