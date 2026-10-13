@@ -5,8 +5,8 @@ using DryTown.Core;
 using Godot;
 
 /// <summary>
-/// The people on the street who can be clicked: drifters, beat cops, reporters and witnesses,
-/// and each gang's men hanging about outside headquarters. Also the banks, and businesses that
+/// The people on the street who can be clicked, drawn as dots coloured by what they are: drifters,
+/// beat cops, reporters and witnesses, and each gang's men hanging about outside headquarters. Also the banks, and businesses that
 /// have been burned out.
 /// </summary>
 public partial class MapView
@@ -43,21 +43,13 @@ public partial class MapView
     private bool Burnt(Business b) =>
         _burntNow.Contains(b.Id) || (!b.IsOpen && b.BurnedWeek >= 0 && b.BurnedWeek < World!.Week && World.Week - b.BurnedWeek <= 8);
 
-    private static Color CoatOf(PersonKind kind) => kind switch
-    {
-        PersonKind.BeatCop => new Color("24365e"),
-        PersonKind.Reporter => new Color("a08c6a"),
-        PersonKind.Witness => new Color("8a8276"),
-        _ => new Color("6b5a45"),
-    };
-
-    /// <summary>The colour of the marker over someone's head, which says what he is from across the city.</summary>
+    /// <summary>The colour of someone's dot, which says what he is from across the city.</summary>
     public static Color MarkerOf(PersonKind kind) => kind switch
     {
-        PersonKind.BeatCop => new Color("5b8ad9"),
-        PersonKind.Reporter => new Color("f0ead8"),
-        PersonKind.Witness => new Color("e0584a"),
-        _ => new Color("e0b04a"),
+        PersonKind.BeatCop => Palette.Officer,
+        PersonKind.Reporter => Palette.Reporter,
+        PersonKind.Witness => Palette.Interest,
+        _ => Palette.Citizen,
     };
 
     /// <summary>Where someone stands outside a lot: on the pavement, spread along it so two don't stand in one spot.</summary>
@@ -68,16 +60,16 @@ public partial class MapView
     }
 
     /// <summary>
-    /// Where someone waiting outside a lot can be seen. In front of a door facing the viewer that's
-    /// the pavement; a door facing away is hidden by its own building, so he waits across the street.
+    /// Where someone waiting outside a lot can be seen. Seen from above that's the pavement at his door.
+    /// In the angled view a door facing away is hidden by its own building, so he waits across the street.
     /// </summary>
-    private static Vector2 Kerbside(Lot lot) =>
-        lot.FrontY < lot.Y ? new Vector2(lot.X + 0.5f, lot.Y - 0.8f) : new Vector2(lot.X + 0.5f, lot.Y + 1.22f);
+    private Vector2 Kerbside(Lot lot) =>
+        lot.FrontY < lot.Y ? new Vector2(lot.X + 0.5f, Angled ? lot.Y - 0.8f : lot.Y - 0.1f) : new Vector2(lot.X + 0.5f, lot.Y + 1.1f);
 
     private void DrawStreetPeople(Rect2 view)
     {
         var w = World!;
-        float r = FigureRadius;
+        float r = DotRadius;
         foreach (var p in w.People)
         {
             var lot = w.Map.LotAt(p.LotId);
@@ -91,58 +83,19 @@ public partial class MapView
             };
             var at = StandingSpot(lot, p.Id * 3 + 1, pace);
             if (!view.HasPoint(at)) continue;
-            var coat = CoatOf(p.Kind);
-            var hat = p.Kind == PersonKind.BeatCop ? new Color("1b2a4a") : coat.Darkened(0.5f);
-            var band = p.Kind switch { PersonKind.BeatCop => new Color("d9b44a"), PersonKind.Reporter => new Color("f0ead8"), _ => hat.Lightened(0.2f) };
-            float drift = Mathf.Cos(_anim * (p.Kind == PersonKind.BeatCop ? 0.18f : 0.4f) + p.Id);
-            bool walking = p.Kind is PersonKind.BeatCop or PersonKind.Drifter or PersonKind.Reporter;
-            DrawFigure(at * _t, new Vector2(drift, 0), r, coat, hat, band, walking);
-            if (p.Id == SelectedPerson)
-            {
-                var keep = C;
-                C = DynAt(at.Y);
-                FlatRing(at * _t, r * 1.4f, Palette.Ink, Px(2));
-                C = keep;
-            }
-            DrawMarker(at, r, p.Kind, p.Id == SelectedPerson);
-            _clickables.Add(new Clickable(Pickable.Person, p.Id, at, r / _t));
+            DrawDot(at * _t, r, MarkerOf(p.Kind));
+            if (p.Id == SelectedPerson) SelectionRing(at, r);
+            _clickables.Add(new Clickable(Pickable.Person, p.Id, at, r * 1.6f / _t));
         }
     }
 
-    /// <summary>A little sign over someone's head, big enough to find from across the city.</summary>
-    private void DrawMarker(Vector2 feet, float r, PersonKind kind, bool selected)
+    /// <summary>A ring round whoever is selected, with a glow so he can be found from across the city.</summary>
+    private void SelectionRing(Vector2 at, float r)
     {
-        var pen = DynAt(feet.Y);
         var keep = C;
-        C = pen;
-        float m = Mathf.Max(r * 0.55f, Px(5));
-        var c = feet * _t - new Vector2(0, r * 3.1f + m * (1.2f + 0.15f * Mathf.Sin(_anim * 3 + feet.X)));
-        var ink = new Color("1a1716");
-        if (selected) Glow(c, m * 3, MarkerOf(kind), 0.9f);
-        switch (kind)
-        {
-            case PersonKind.Drifter: // a diamond: for hire
-                C.DrawColoredPolygon(new[] { c + new Vector2(0, -m * 1.25f), c + new Vector2(m * 1.05f, 0), c + new Vector2(0, m * 1.25f), c + new Vector2(-m * 1.05f, 0) }, ink);
-                C.DrawColoredPolygon(new[] { c + new Vector2(0, -m), c + new Vector2(m * 0.8f, 0), c + new Vector2(0, m), c + new Vector2(-m * 0.8f, 0) }, MarkerOf(kind));
-                break;
-            case PersonKind.BeatCop: // a badge
-                C.DrawCircle(c, m * 1.1f, ink);
-                C.DrawCircle(c, m * 0.9f, MarkerOf(kind));
-                Star(c, m * 0.65f, new Color("e9d27a"), 6, 0.5f);
-                break;
-            case PersonKind.Reporter: // a press card
-                C.DrawRect(new Rect2(c - new Vector2(m * 1.15f, m * 0.85f), new Vector2(m * 2.3f, m * 1.7f)), ink);
-                C.DrawRect(new Rect2(c - new Vector2(m * 0.95f, m * 0.65f), new Vector2(m * 1.9f, m * 1.3f)), MarkerOf(kind));
-                for (int i = 0; i < 3; i++)
-                    C.DrawLine(c + new Vector2(-m * 0.6f, -m * 0.3f + i * m * 0.3f), c + new Vector2(m * 0.6f, -m * 0.3f + i * m * 0.3f), ink, Mathf.Max(1, m * 0.15f));
-                break;
-            default: // an exclamation mark: he saw something
-                C.DrawCircle(c, m * 1.1f, ink);
-                C.DrawCircle(c, m * 0.9f, MarkerOf(kind));
-                C.DrawRect(new Rect2(c + new Vector2(-m * 0.14f, -m * 0.6f), new Vector2(m * 0.28f, m * 0.75f)), Colors.White);
-                C.DrawCircle(c + new Vector2(0, m * 0.45f), m * 0.16f, Colors.White);
-                break;
-        }
+        C = DynAt(at.Y);
+        Glow(at * _t, r * 4, Palette.Ink, 0.5f);
+        C.DrawArc(at * _t, r * 1.6f, 0, Mathf.Tau, 24, Palette.Ink, Px(2));
         C = keep;
     }
 
@@ -151,26 +104,26 @@ public partial class MapView
     {
         var w = World!;
         if (Tile < 9) return;
-        float r = FigureRadius;
+        float r = DotRadius;
         foreach (var gang in w.LivingGangs)
         {
             var hq = w.HqOf(gang);
             if (!view.HasPoint(new Vector2(hq.X, hq.Y))) continue;
             var busy = _sim is { WeekRunning: true } ? _sim.CommittedHoods(gang.Id) : new HashSet<int>();
             var men = w.AvailableHoodsOf(gang.Id).Where(h => !busy.Contains(h.Id)).OrderBy(h => h.Id == gang.BossHoodId ? 1 : 0).ThenBy(h => h.Id).Take(4).ToList();
-            var colour = Palette.Gang(w, gang.Id);
+            var (fill, rim) = ManOf(gang.Id);
             for (int i = 0; i < men.Count; i++)
             {
                 var h = men[i];
                 var door = Kerbside(hq);
                 float side = i % 2 == 0 ? -1 : 1;
                 // Either side of the door, clear of the boss's car at the kerb.
-                var at = door + new Vector2(side * (0.3f + 0.2f * (i / 2)), -0.04f * (i / 2));
-                bool boss = h.Id == gang.BossHoodId;
-                var hat = boss ? new Color("e9e0c8") : new Color("1c1a19");
-                DrawFigure(at * _t, new Vector2(-side, 0), r, colour, hat, colour.Lightened(0.25f), false);
-                if (h.Id == SelectedHood) { C = DynAt(at.Y); FlatRing(at * _t, r * 1.4f, Palette.Ink, Px(2)); }
-                _clickables.Add(new Clickable(Pickable.Hood, h.Id, at, r / _t));
+                var at = door + new Vector2(side * (0.4f + 0.2f * (i / 2)), -0.04f * (i / 2));
+                // The boss stands a little larger than his men.
+                float size = h.Id == gang.BossHoodId ? r * 1.25f : r;
+                DrawDot(at * _t, size, fill, rim);
+                if (h.Id == SelectedHood) SelectionRing(at, size);
+                _clickables.Add(new Clickable(Pickable.Hood, h.Id, at, r * 1.6f / _t));
             }
         }
     }

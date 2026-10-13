@@ -324,7 +324,7 @@ public partial class Main : Control
         if (id < 0)
         {
             AddLabel(_businessPanel, "Click a business, a bank or someone on the street.", Palette.InkQuiet);
-            AddLabel(_businessPanel, "The people with signs over their heads can be dealt with: a yellow diamond is a drifter looking for work, a blue badge the beat cop, a white card a reporter, and a red mark a witness. Your men and your rivals' hang about outside their headquarters.", Palette.InkQuiet, wrap: true);
+            AddLabel(_businessPanel, "Everyone on the map is a dot coloured by what he is: grey a citizen (the larger ones are drifters looking for work), bright blue a police officer, dark blue a detective, white a reporter and gold a witness. Gang men are black: a small gang's plain, and a big outfit's with its colour round the rim, yours in brass.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "A shop's rooftop sign is framed, and its awning striped, in the colours of the gang it pays; yours are brass. Plain ones pay nobody yet. A red badge on the roof means a racket in the back room.", Palette.InkQuiet, wrap: true);
             AddLabel(_businessPanel, "Scroll to zoom the map. Drag with the right mouse button to move it.", Palette.InkQuiet, wrap: true);
             return;
