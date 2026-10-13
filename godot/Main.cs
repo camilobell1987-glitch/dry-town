@@ -784,6 +784,9 @@ public partial class Main : Control
         menu.AddItem("New metropolis: a river city of twenty wards, twenty small gangs", 6);
         menu.AddItem("New greater city: thirty wards, thirty-four small gangs", 7);
         menu.AddSeparator();
+        menu.AddCheckItem("Angled view: buildings stand up off the map", AngledMenuId);
+        menu.SetItemChecked(menu.ItemCount - 1, _map.Angled);
+        menu.AddSeparator();
         FillScenarioMenu(menu);
         menu.AddSeparator();
         for (int i = 1; i <= Slots; i++) menu.AddItem($"Save to slot {i}" + (SlotLabel(i) is string l ? $": {l}" : ""), 10 + i);
@@ -803,6 +806,7 @@ public partial class Main : Control
         else if (id is CampaignMenuId or NextChapterMenuId or RetryChapterMenuId) OnCampaignMenu(id);
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
         else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
+        else if (id == AngledMenuId) SetAngled(!_map.Angled);
     }
 
     private void ShowSoundPanel()
@@ -887,6 +891,7 @@ public partial class Main : Control
         var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         left.AddThemeConstantOverride("separation", 6);
         _map = new MapView { SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsStretchRatio = 2.2f, CustomMinimumSize = new Vector2(540, 400) };
+        LoadView();
         _map.BusinessClicked += _ => OnMapSelection();
         _map.PersonClicked += _ => OnMapSelection();
         _map.HoodClicked += _ => OnMapSelection();

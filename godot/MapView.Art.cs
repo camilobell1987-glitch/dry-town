@@ -5,10 +5,11 @@ using DryTown.Core;
 using Godot;
 
 /// <summary>
-/// The city's artwork, drawn from shapes at runtime and seen at an angle: asphalt and pavements
-/// on the ground, buildings standing up with a front wall, a west wall and a roof, lamps, signs on
-/// the rooftops, traffic and passers-by, and the light changing through the day. Everything is in
-/// tile units, with height going up the screen and leaning a little to the east.
+/// The city's artwork, drawn from shapes at runtime: asphalt and pavements on the ground, buildings
+/// with their roofs and the shadows they cast, lamps, signs on the rooftops, traffic and passers-by,
+/// and the light changing through the day. Everything is in tile units. Seen straight down, a
+/// building is its roof; seen at an angle, it stands up with a front wall and a west wall, its
+/// height going up the screen and leaning a little to the east.
 /// </summary>
 public partial class MapView
 {
@@ -32,7 +33,7 @@ public partial class MapView
     private Rect2 R(float x, float y, float w, float h) => new(P(x, y), new Vector2(w, h) * _t);
 
     /// <summary>A point at a height above the ground, as drawn.</summary>
-    private Vector2 Q(float x, float y, float z) => P(x + S * z, y - z);
+    private Vector2 Q(float x, float y, float z) => Angled ? P(x + S * z, y - z) : P(x, y);
 
     /// <summary>A stable pseudo-random number in [0, 1) for a pair of integers, so the city looks the same every frame.</summary>
     private static float Hash(int a, int b = 0)
@@ -257,7 +258,7 @@ public partial class MapView
     {
         var (x0, y0, x1, y1) = Footprint(lot);
         float h = HeightCached(lot);
-        if (h <= 0) return new[] { new Vector2(x0, y0), new Vector2(x1, y0), new Vector2(x1, y1), new Vector2(x0, y1) };
+        if (h <= 0 || !Angled) return new[] { new Vector2(x0, y0), new Vector2(x1, y0), new Vector2(x1, y1), new Vector2(x0, y1) };
         float s = S * h;
         return new[]
         {
@@ -575,6 +576,7 @@ public partial class MapView
         float lower = setback ? h * 0.68f : h;
         bool stone = IsStone(lot);
         float zFrom = groundFloorWindows == 1 ? 0 : 0.2f;
+        if (!Angled) CastShadow(x0, y0, x1, y1, h);
         Box(x0, y0, x1, y1, 0, lower, wall, wall.Lightened(0.12f), roof);
         DressWall(lot, x0, y0, x1, y1, zFrom, lower, wall, stone);
         DressRoof(lot, x0, y0, x1, y1, lower, roof);
@@ -595,6 +597,16 @@ public partial class MapView
                 for (float y = y0 + 0.15f; y < y1 - 0.15f; y += 0.28f)
                     West(x0, y, y + 0.1f, z + 0.03f, z + 0.11f, Glass.Lightened(0.08f));
         }
+    }
+
+    /// <summary>
+    /// Seen from above, a building shows its height by the shadow it throws to the south-west. The
+    /// buildings drawn after it cover what falls on them, so the shadow shows on the street and the yards.
+    /// </summary>
+    private void CastShadow(float x0, float y0, float x1, float y1, float h)
+    {
+        float dx = -h * 0.22f, dy = h * 0.3f;
+        C.DrawColoredPolygon(new[] { P(x0, y0), P(x1, y0), P(x1, y1), P(x1 + dx, y1 + dy), P(x0 + dx, y1 + dy), P(x0 + dx, y0 + dy) }, new Color(0, 0, 0, 0.28f));
     }
 
     /// <summary>Rows of windows on a south wall, a floor every fifth of a tile; some are lit after dark.</summary>
@@ -764,7 +776,7 @@ public partial class MapView
     private Vector2 SignCentre(Lot lot, float h)
     {
         var (_, _, _, y1) = Footprint(lot);
-        return Q(lot.X + 0.5f, y1 - 0.12f, h + 0.19f);
+        return Angled ? Q(lot.X + 0.5f, y1 - 0.12f, h + 0.19f) : P(lot.X + 0.5f, y1 - 0.27f);
     }
 
     /// <summary>
@@ -775,12 +787,22 @@ public partial class MapView
     {
         var (_, _, _, y1) = Footprint(lot);
         float y = y1 - 0.12f, xa = lot.X + 0.24f, xb = lot.X + 0.76f;
+        var paper = open ? new Color("e6dcc2") : new Color("8a826e");
+        if (!Angled)
+        {
+            // Seen from above, the sign lies flat along the front of the roof.
+            float inner = 0.012f * frameWidth;
+            C.DrawRect(new Rect2(P(xa - 0.02f, y1 - 0.42f), new Vector2(xb - xa + 0.04f, 0.3f) * _t), frame);
+            C.DrawRect(new Rect2(P(xa - 0.02f + inner, y1 - 0.42f + inner), new Vector2(xb - xa + 0.04f - inner * 2, 0.3f - inner * 2) * _t), paper);
+            face();
+            return;
+        }
         var post = new Color("2a2622");
         C.DrawLine(Q(xa + 0.06f, y, h), Q(xa + 0.06f, y, h + 0.06f), post, Mathf.Max(1, _t * 0.025f));
         C.DrawLine(Q(xb - 0.06f, y, h), Q(xb - 0.06f, y, h + 0.06f), post, Mathf.Max(1, _t * 0.025f));
         Face(xa - 0.02f, xb + 0.02f, y, h + 0.04f, h + 0.34f, frame);
         float inset = 0.012f * frameWidth;
-        Face(xa - 0.02f + inset, xb + 0.02f - inset, y, h + 0.04f + inset, h + 0.34f - inset, open ? new Color("e6dcc2") : new Color("8a826e"));
+        Face(xa - 0.02f + inset, xb + 0.02f - inset, y, h + 0.04f + inset, h + 0.34f - inset, paper);
         face();
     }
 
