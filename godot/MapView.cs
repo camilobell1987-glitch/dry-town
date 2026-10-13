@@ -47,8 +47,19 @@ public partial class MapView : Control
     private Vector2 _pan;
     private bool _dragging;
 
-    /// <summary>Room above the top street for the tallest buildings, in tiles.</summary>
-    private const float Headroom = 1.6f;
+    /// <summary>Room above the top street for the tallest buildings, in tiles: they only rise up the screen when seen at an angle.</summary>
+    private float Headroom => Angled ? 1.6f : 0.2f;
+
+    /// <summary>
+    /// Whether the city is seen at an angle, with buildings standing up off the map, or straight down
+    /// onto the roofs. Changing it draws the city again.
+    /// </summary>
+    public bool Angled
+    {
+        get => _angled;
+        set { if (_angled == value) return; _angled = value; FreeLayers(); ClampPan(); QueueRedraw(); }
+    }
+    private bool _angled;
 
     private float FitTile => Mathf.Min(Size.X / (Map.Width + 0.6f), Size.Y / (Map.Height + 0.6f + Headroom));
     private float Tile => FitTile * _zoom;
