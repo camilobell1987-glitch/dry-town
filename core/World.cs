@@ -2,13 +2,13 @@ namespace DryTown.Core;
 
 public enum Difficulty { Easy, Normal, Hard }
 
-public enum CitySize { Small, Medium, Large, Huge, Metropolis }
+public enum CitySize { Small, Medium, Large, Huge, Metropolis, Greater }
 
 public sealed class WorldSettings
 {
     public ulong Seed { get; init; } = 1;
 
-    /// <summary>Small is the first district of five blocks by four; Large is nine by seven with six wards; Huge is thirteen by ten with twelve; Metropolis is eighteen by fourteen, split by a river, with twenty.</summary>
+    /// <summary>Small is the first district of five blocks by four; Large is nine by seven with six wards; Huge is thirteen by ten with twelve; Metropolis is eighteen by fourteen, split by a river, with twenty; Greater is twenty-four by eighteen with thirty.</summary>
     public CitySize Size { get; init; } = CitySize.Small;
 
     /// <summary>Businesses and starting gangs, or 0 to fit the city's size.</summary>

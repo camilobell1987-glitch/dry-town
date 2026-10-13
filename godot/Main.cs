@@ -33,7 +33,7 @@ public partial class Main : Control
     private int _selectedWard;
 
     /// <summary>The size of city a new game starts in.</summary>
-    private CitySize _citySize = CitySize.Large;
+    private CitySize _citySize = CitySize.Metropolis;
     private MenuButton _gameMenu = null!;
     private Button _soundButton = null!;
     private ulong _lastCashSound;
@@ -782,6 +782,7 @@ public partial class Main : Control
         menu.AddItem("New large city: six wards, five outfits", 4);
         menu.AddItem("New huge city: twelve wards, seven outfits", 5);
         menu.AddItem("New metropolis: a river city of twenty wards, nine outfits", 6);
+        menu.AddItem("New greater city: thirty wards, twelve outfits", 7);
         menu.AddSeparator();
         FillScenarioMenu(menu);
         menu.AddSeparator();
@@ -797,7 +798,7 @@ public partial class Main : Control
 
     private void OnGameMenu(long id)
     {
-        if (id is >= 2 and <= 6) { _citySize = (CitySize)(id - 2); _scenario = ScenarioKind.None; NewGame(GD.Randi()); }
+        if (id is >= 2 and <= 7) { _citySize = (CitySize)(id - 2); _scenario = ScenarioKind.None; NewGame(GD.Randi()); }
         else if (id >= ScenarioMenuId && id < ScenarioMenuId + Scenarios.All.Length) StartScenario((int)id - ScenarioMenuId);
         else if (id is CampaignMenuId or NextChapterMenuId or RetryChapterMenuId) OnCampaignMenu(id);
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
