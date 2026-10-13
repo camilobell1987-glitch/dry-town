@@ -183,7 +183,7 @@ public class UnionTests
     [Fact]
     public void RivalsRunTheLocals()
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 1, Size = CitySize.Medium });
+        var sim = Simulation.New(new WorldSettings { Seed = 2, Size = CitySize.Medium });
         for (int i = 0; i < 3 * Content.WeeksPerYear; i++) sim.AdvanceWeek(playerAutopilot: true);
         var w = sim.World;
         bool Rival(GameEvent e) => e.GangId >= 0 && !w.GangById(e.GangId).IsPlayer;

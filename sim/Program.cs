@@ -46,6 +46,8 @@ int Soak()
     long localsTaken = 0, localsSeized = 0, strikes = 0, strikesWon = 0, strikesWonFromRivals = 0, localsHeld = 0, localsTotal = 0, docksHeld = 0;
     long warsDeclared = 0, warsOnPlayer = 0, warsCalledOff = 0, warsMadePeace = 0, warsFinished = 0, warsAtEnd = 0;
     long weddings = 0, playerWeddings = 0, marriagesBroken = 0, takenIn = 0, stoodBehind = 0, marriagesAtEnd = 0;
+    long contractWeeks = 0, playerContractWeeks = 0, contractsWon = 0, playerContractsWon = 0, graftStories = 0;
+    long clubWeeks = 0, playerClubWeeks = 0, allWeeks = 0, clubsAtEnd = 0;
     long breweryWeeks = 0, playerBreweryWeeks = 0, prohibitionWeeks = 0, breweriesSmashed = 0, breweriesLegal = 0, breweriesAtEnd = 0;
     long snatches = 0, playerSnatches = 0, playerMenTaken = 0, ransomsPaid = 0, ransomsKilled = 0, ransomsLetGo = 0, ransomsEscaped = 0;
     long fixesTried = 0, fixesWon = 0, playerFixes = 0, fixesCalledOff = 0, fixersTurnedIn = 0, fixWinnings = 0;
@@ -69,6 +71,11 @@ int Soak()
         for (int week = 0; week < years * Content.WeeksPerYear; week++)
         {
             sim.AdvanceWeek(playerAutopilot: true);
+            allWeeks++;
+            contractWeeks += sim.World.Contracts.Count(c => c.GangId >= 0);
+            playerContractWeeks += sim.World.Contracts.Count(c => c.GangId == sim.World.Player.Id);
+            clubWeeks += sim.World.LivingGangs.Count(g => sim.World.ClubOf(g.Id) != null);
+            if (sim.World.ClubOf(sim.World.Player.Id) != null) playerClubWeeks++;
             if (!sim.World.Prohibition) continue;
             prohibitionWeeks++;
             breweryWeeks += sim.World.Businesses.Count(b => b.Racket == RacketKind.Brewery);
@@ -161,6 +168,10 @@ int Soak()
         ransomsKilled += kidnaps.Count(e => e.Text.Contains(" found in the river."));
         ransomsLetGo += kidnaps.Count(e => e.Text.Contains(" let him go anyway."));
         ransomsEscaped += kidnaps.Count(e => e.Text.Contains(" got away from the men "));
+        var cityHall = ev.Where(e => e.Kind == EventKind.Politics).ToList();
+        contractsWon += cityHall.Count(e => e.Text.StartsWith("The aldermen gave "));
+        playerContractsWon += cityHall.Count(e => e.Text.StartsWith("The aldermen gave ") && e.GangId == sim.World.Player.Id);
+        graftStories += cityHall.Count(e => e.Text.Contains(" The city tore up the contract."));
         var fixes = ev.Where(e => e.Kind == EventKind.Fix).ToList();
         fixesTried += fixes.Count;
         fixesWon += fixes.Count(e => e.Text.Contains(" cleared $"));
@@ -172,6 +183,7 @@ int Soak()
         breweriesSmashed += ev.Count(e => e.Kind == EventKind.Untouchables && e.Text.StartsWith("The Untouchables smashed ") && e.Text.Contains("'s brewery at "));
         breweriesLegal += ev.Count(e => e.Kind == EventKind.Era && e.Text.Contains(" took out a licence."));
         breweriesAtEnd += sim.World.Businesses.Count(b => b.Racket == RacketKind.Brewery);
+        clubsAtEnd += sim.World.Businesses.Count(b => b.Racket == RacketKind.Nightclub);
         weddings += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.EndsWith(" The two outfits are family now."));
         playerWeddings += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.EndsWith(" The two outfits are family now.") && e.Text.Contains(sim.World.Player.Name));
         marriagesBroken += ev.Count(e => e.Kind == EventKind.Diplomacy && e.Text.Contains(" went home to her father."));
@@ -267,6 +279,8 @@ int Soak()
     if (squadWeeks > 0)
         Console.WriteLine($"The Untouchables, per city-year with the squad in town ({squadYears / seeds:0.0} a city): outfits gone after {squadNamed / squadYears:0.00} ({squadNamedPlayer} times the player's), places smashed {squadSmashed / squadYears:0.00}, raids that came up empty {squadEmpty / squadYears:0.00}, men taken {squadArrests / squadYears:0.00}, bosses indicted {indictments / squadYears:0.00} ({indictedPlayer} times the player's; out of town {indictedAway}).");
     Console.WriteLine($"Marriages per city-year: weddings {weddings / cy:0.00} (the player's {playerWeddings / cy:0.00}), broken {marriagesBroken / cy:0.00}, outfits taken in by family {takenIn / cy:0.00}, splits stopped by in-laws {stoodBehind / cy:0.00}; marriages at the end {marriagesAtEnd / (double)seeds:0.0} a city.");
+    Console.WriteLine($"City contracts: held by an outfit in an average week {contractWeeks / (double)Math.Max(1, allWeeks):0.00} of 4 (the player's {playerContractWeeks / (double)Math.Max(1, allWeeks):0.00}); won per city-year {contractsWon / cy:0.00} (the player's {playerContractsWon / cy:0.00}); torn up by the papers {graftStories / cy:0.00}.");
+    Console.WriteLine($"Nightclubs: running in an average week {clubWeeks / (double)Math.Max(1, allWeeks):0.00} a city (the player has one {playerClubWeeks / (double)Math.Max(1, allWeeks):0%} of the time); clubs at the end {clubsAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Breweries: running in an average Prohibition week {breweryWeeks / (double)Math.Max(1, prohibitionWeeks):0.00} a city (the player has one {playerBreweryWeeks / (double)Math.Max(1, prohibitionWeeks):0%} of the time); smashed by the Untouchables {breweriesSmashed / cy:0.00} per city-year, gone legal at repeal {breweriesLegal / (double)seeds:0.00} a city; breweries at the end {breweriesAtEnd / (double)seeds:0.0} a city.");
     Console.WriteLine($"Kidnapping per city-year: men snatched {snatches / cy:0.00} (by the player {playerSnatches / cy:0.00}, of the player's {playerMenTaken / cy:0.00}), ransoms paid {ransomsPaid / cy:0.00}, killed when nobody paid {ransomsKilled / cy:0.00}, let go unpaid {ransomsLetGo / cy:0.00}, got away {ransomsEscaped / cy:0.00}.");
     Console.WriteLine($"Fixed fights and races per city-year: tried {fixesTried / cy:0.00}, paid off {fixesWon / cy:0.00} (the player's {playerFixes / cy:0.00}), bets called off {fixesCalledOff / cy:0.00}, fixer turned in {fixersTurnedIn / cy:0.00}; ${fixWinnings / (double)Math.Max(1, fixesWon):N0} cleared on a fix that paid.");

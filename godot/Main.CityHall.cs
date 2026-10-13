@@ -32,6 +32,8 @@ public partial class Main
         AddLabel(_hallPanel, da, hall.DAReform ? Palette.Police : Palette.Ink, wrap: true);
         AddLabel(_hallPanel, $"Public outrage {hall.Outrage}/100. Killings in the papers push it up, and reformers do better at the polls when it's high.",
             hall.Outrage > 50 ? Palette.Bad : Palette.InkQuiet, wrap: true);
+        if (W.ClubOf(Me) is { } club)
+            AddLabel(_hallPanel, $"Aldermen drink on the house at your club at {club.Name}. They take {Content.ClubPayoff:0%} less to go on your payroll, and your money behind a candidate counts for {Content.ClubCampaign:0%} more.", Palette.Player, wrap: true);
 
         var due = Politics.Campaigning(W);
         int nextAld = Politics.NextElection(W, ElectionKind.Alderman), nextMayor = Politics.NextElection(W, ElectionKind.Mayor);
@@ -55,6 +57,7 @@ public partial class Main
             AddLabel(_hallPanel, (mine > 0 ? $"You've put in ${mine:N0}. " : "") + "The biggest backer has the new mayor's ear and the DA's, if they win. Every $400 draws a little heat.", Palette.InkQuiet, wrap: true);
         }
 
+        ContractsSection();
         CourtsSection();
 
         // The selected ward in full.
@@ -73,13 +76,13 @@ public partial class Main
         AddLabel(_hallPanel, status, colour, wrap: true);
         WardPeopleLine(ward);
         int yours = biz.Count(b => b.ProtectorGangId == Me);
-        AddLabel(_hallPanel, $"{biz.Count} businesses, {yours} paying you." + (ward.OwnMan ? "" : $" His envelope is ${Politics.Retainer(W, ward)} a week."), Palette.InkQuiet, wrap: true);
+        AddLabel(_hallPanel, $"{biz.Count} businesses, {yours} paying you." + (ward.OwnMan ? "" : $" His envelope is ${Politics.RetainerFor(W, ward, W.Player)} a week."), Palette.InkQuiet, wrap: true);
 
         if (p.Alive && ward.OwnerGangId != Me && !ward.Reformer && !ward.OwnMan)
         {
             long cost = Politics.PayoffCost(W, ward, p);
             bool queued = _shell.Pending.Any(o => o is PayoffOrder q && q.WardId == ward.Id);
-            var buy = AddButton(_hallPanel, queued ? "Envelope goes out this week" : $"Put him on the payroll (${cost:N0}, then ${Politics.Retainer(W, ward)} a week)",
+            var buy = AddButton(_hallPanel, queued ? "Envelope goes out this week" : $"Put him on the payroll (${cost:N0}, then ${Politics.RetainerFor(W, ward, W.Player)} a week)",
                 () => Give(new PayoffOrder(Me, ward.Id)));
             bool loyal = Politics.StaysBought(W, ward, p);
             buy.Disabled = queued || p.Cash < cost || loyal;

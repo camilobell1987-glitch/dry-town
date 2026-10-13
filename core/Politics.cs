@@ -119,6 +119,8 @@ public static class Politics
             w.Wards.Add(new Ward { Id = i, Name = name, Alderman = NewPolitician(w.Rng, false) });
         }
         w.Hall = new CityHall { Mayor = NewPolitician(w.Rng, false), DA = NewPolitician(w.Rng, false) };
+        w.Contracts.Clear();
+        foreach (var k in Enum.GetValues<ContractKind>()) w.Contracts.Add(new Contract { Kind = k });
     }
 
     public static IEnumerable<Business> BusinessesIn(World w, Ward ward) => w.Businesses.Where(b => w.LotOf(b).WardId == ward.Id);
@@ -130,13 +132,16 @@ public static class Politics
 
     public static int Retainer(World w, Ward ward) => Content.AldermanRetainer(BusinessesIn(w, ward).Count());
 
-    /// <summary>What it costs to put an alderman on the payroll now: double if he's another outfit's man, double again under a reform mayor.</summary>
+    /// <summary>The retainer this outfit pays the ward's alderman each week: a quarter less if he drinks at its club.</summary>
+    public static int RetainerFor(World w, Ward ward, Gang g) => (int)(Retainer(w, ward) * w.PayoffFactor(g));
+
+    /// <summary>What it costs to put an alderman on the payroll now: double if he's another outfit's man, double again under a reform mayor, a quarter less for an outfit with a club.</summary>
     public static long PayoffCost(World w, Ward ward, Gang g)
     {
         long cost = Retainer(w, ward) * Content.PayoffWeeks;
         if (ward.OwnerGangId >= 0 && ward.OwnerGangId != g.Id) cost *= 2;
         if (w.Hall.Reform) cost *= 2;
-        return cost;
+        return (long)(cost * w.PayoffFactor(g));
     }
 
     /// <summary>True while an alderman who has just taken one outfit's money won't hear offers from another.</summary>
@@ -260,6 +265,7 @@ public static class Politics
     {
         if (w.Wards.Count == 0 || !w.Settings.PoliticsEnabled) return;
         PayRetainers(w);
+        Contracts.Step(w);
 
         var hall = w.Hall;
         // Each killing makes the papers; the story fades over a few months.
@@ -280,7 +286,7 @@ public static class Politics
         foreach (var ward in w.Wards.Where(x => x.OwnerGangId >= 0 && !x.OwnMan))
         {
             var g = w.GangById(ward.OwnerGangId);
-            int fee = Retainer(w, ward);
+            int fee = RetainerFor(w, ward, g);
             if (g.Alive && g.Cash >= fee)
             {
                 g.Cash -= fee;
@@ -317,7 +323,7 @@ public static class Politics
                 var man = OnTheBallot(w, g, ward);
                 if (money <= 0 && polls <= 0 && !incumbent && man == null) continue;
                 int turf = BusinessesIn(w, ward).Count(b => b.ProtectorGangId == g.Id);
-                double weight = money * 0.6 + polls + turf * 25
+                double weight = money * 0.6 * w.CampaignWeight(g.Id) + polls + turf * 25
                     + (incumbent ? ward.OwnMan ? Content.OwnManIncumbency : 250 : 0)
                     + (man != null ? CandidateWeight(w, ward, man) : 0);
                 string name = man?.Name ?? (incumbent ? ward.Alderman : NewPolitician(w.Rng, false));
@@ -402,7 +408,7 @@ public static class Politics
     private static void MayorElection(World w)
     {
         var hall = w.Hall;
-        long machineMoney = hall.Campaign.Values.Sum();
+        double machineMoney = hall.Campaign.Sum(kv => kv.Value * w.CampaignWeight(kv.Key));
         int polls = hall.Polls.Values.Sum();
         int turnout = w.Wards.Sum(x => Content.WardTurnout(BusinessesIn(w, x).Count()));
         bool newMachineMan = hall.Reform || w.Rng.Chance(0.4);
@@ -497,5 +503,6 @@ public static class Politics
         }
         if (w.Hall.FriendGangId == g.Id) w.Hall.FriendGangId = -1;
         if (w.Hall.DAFriendGangId == g.Id) w.Hall.DAFriendGangId = -1;
+        Contracts.Forget(w, g);
     }
 }

@@ -13,7 +13,7 @@ public static partial class AiPlanner
     {
         if (Casinos(w, g) >= CasinosWanted(w, g, turf.Count)) return null;
         // One hotel at a time: a hotel already bought waits for its casino.
-        if (w.FrontsOf(g.Id).Any(b => b.Kind == BusinessKind.Hotel && World.Working(b) && b.Racket != RacketKind.Casino && Politics.Covered(w, g, b))) return null;
+        if (w.FrontsOf(g.Id).Any(b => b.Kind == BusinessKind.Hotel && World.Working(b) && b.Racket is not (RacketKind.Casino or RacketKind.Nightclub) && Politics.Covered(w, g, b))) return null;
         int casino = Content.Rackets[RacketKind.Casino].SetupCost;
         // Only where the ward's alderman will see that the police leave it alone: a raid can close it, and $5,000 with it.
         return turf.Where(b => b.Kind == BusinessKind.Hotel && Politics.Covered(w, g, b) && w.CannotBuyFront(g, b) == null && Content.FrontPrice(b) + casino * 2 + 4000 <= cash)
@@ -26,7 +26,8 @@ public static partial class AiPlanner
         if (Casinos(w, g) >= CasinosWanted(w, g, w.TurfOf(g.Id).Count())) return 0;
         var info = Content.Rackets[RacketKind.Casino];
         if (cash < info.SetupCost * 2) return 0;
-        var hotel = w.FrontsOf(g.Id).Where(b => Politics.Covered(w, g, b) && w.CannotOpenRacket(g, b, RacketKind.Casino) == null).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault();
+        // The club stays where it is.
+        var hotel = w.FrontsOf(g.Id).Where(b => b.Racket != RacketKind.Nightclub && Politics.Covered(w, g, b) && w.CannotOpenRacket(g, b, RacketKind.Casino) == null).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault();
         if (hotel == null) return 0;
         var brains = hoods.OrderByDescending(h => h.Brains).First();
         orders.Add(new RacketOrder(g.Id, brains.Id, hotel.Id, RacketKind.Casino));

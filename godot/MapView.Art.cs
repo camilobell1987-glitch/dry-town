@@ -908,6 +908,12 @@ public partial class MapView
                 C.DrawRect(new Rect2(c.X - h * 0.7f, c.Y - h * 0.45f, h * 1.4f, h * 0.18f), new Color("3a3a3a"));
                 C.DrawRect(new Rect2(c.X - h * 0.7f, c.Y + h * 0.27f, h * 1.4f, h * 0.18f), new Color("3a3a3a"));
                 break;
+            case RacketKind.Nightclub: // a gold note on a purple sign
+                C.DrawRect(new Rect2(c.X - h * 0.8f, c.Y - h * 0.85f, h * 1.6f, h * 1.7f), new Color("5a2a7a"));
+                C.DrawCircle(c + new Vector2(-h * 0.2f, h * 0.4f), h * 0.28f, new Color("e8b84a"));
+                C.DrawLine(c + new Vector2(h * 0.06f, h * 0.4f), c + new Vector2(h * 0.06f, -h * 0.6f), new Color("e8b84a"), Mathf.Max(1, h * 0.14f));
+                C.DrawLine(c + new Vector2(h * 0.06f, -h * 0.6f), c + new Vector2(h * 0.45f, -h * 0.3f), new Color("e8b84a"), Mathf.Max(1, h * 0.14f));
+                break;
             case RacketKind.Counterfeit: // a green banknote
                 C.DrawRect(new Rect2(c.X - h * 0.9f, c.Y - h * 0.5f, h * 1.8f, h * 1.0f), new Color("6aa46a"));
                 C.DrawCircle(c, h * 0.3f, new Color("2a5a2a"));

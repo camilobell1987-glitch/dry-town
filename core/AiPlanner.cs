@@ -74,9 +74,12 @@ public static partial class AiPlanner
             cash -= casino;
         else if (g.Heat < 50 && hoods.Count > 0)
         {
-            // An outfit with speakeasies on bathtub gin puts a brewery in a warehouse before anything else.
+            // An outfit with speakeasies on bathtub gin puts a brewery in a warehouse before anything else, and one with an empty back room in a hotel or diner of its own a club.
             var site = (cash > Content.Rackets[RacketKind.Brewery].SetupCost * 2 + 400 && Thirsty(w, g) >= Content.AiBreweryThirst
                     ? turf.Where(b => w.FreeBackRoom(b) && w.CannotOpenRacket(g, b, RacketKind.Brewery) == null).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault()
+                    : null)
+                ?? (cash > Content.Rackets[RacketKind.Nightclub].SetupCost * 2 + 400
+                    ? w.FrontsOf(g.Id).Where(b => w.FreeBackRoom(b) && w.CannotOpenRacket(g, b, RacketKind.Nightclub) == null).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault()
                     : null)
                 ?? turf
                 .Where(b => w.FreeBackRoom(b) && b.IsOpen)
@@ -96,7 +99,9 @@ public static partial class AiPlanner
                         // So does the wire, for a bookie.
                         + (r.Kind == RacketKind.Bookie && w.WireGangId == g.Id ? (int)(r.WeeklyIncome * Content.WireBonus) : 0)
                         // And a brewery for the speakeasies it would keep in beer.
-                        + (r.Kind == RacketKind.Brewery ? (int)(Content.Rackets[RacketKind.Speakeasy].WeeklyIncome * Content.BeerBonus) * Thirsty(w, g) : 0))
+                        + (r.Kind == RacketKind.Brewery ? (int)(Content.Rackets[RacketKind.Speakeasy].WeeklyIncome * Content.BeerBonus) * Thirsty(w, g) : 0)
+                        // And a club for the name it makes and the aldermen it brings.
+                        + (r.Kind == RacketKind.Nightclub ? Content.AiClubWorth : 0))
                     .FirstOrDefault();
                 if (racket != null)
                 {
@@ -244,10 +249,13 @@ public static partial class AiPlanner
             orders.Add(new FrontOrder(g.Id, hotel.Id));
             return Content.FrontPrice(hotel);
         }
-        if (TopDog(w, g) || g.Dirty < Content.TaxCaseDirty) return 0;
-        if (w.FrontsOf(g.Id).Count() >= 1 + turf.Count / 8) return 0;
-        var buy = turf.Where(b => w.CannotBuyFront(g, b) == null && Content.FrontPrice(b) * 2 <= cash - 6000)
-            .OrderByDescending(b => b.Takings).ThenBy(b => b.Id).FirstOrDefault();
+        if (TopDog(w, g) || w.FrontsOf(g.Id).Count() >= 1 + turf.Count / 8) return 0;
+        // An outfit with the aldermen to win a city contract buys a place that can do the work.
+        var wanted = w.Wards.Count > 0 && Contracts.CannotWin(w, g) == null && Contracts.Votes(w, g) >= Contracts.VotesNeeded(w)
+            ? w.Contracts.Where(c => c.GangId < 0 && Contracts.FrontFor(w, g, c.Kind) == null).SelectMany(c => Contracts.Needs(c.Kind)).ToHashSet()
+            : new HashSet<BusinessKind>();
+        var affordable = turf.Where(b => w.CannotBuyFront(g, b) == null && Content.FrontPrice(b) * 2 <= cash - 6000).OrderByDescending(b => b.Takings).ThenBy(b => b.Id).ToList();
+        var buy = affordable.FirstOrDefault(b => wanted.Contains(b.Kind)) ?? (g.Dirty >= Content.TaxCaseDirty ? affordable.FirstOrDefault() : null);
         if (buy == null) return 0;
         orders.Add(new FrontOrder(g.Id, buy.Id));
         return Content.FrontPrice(buy);

@@ -82,10 +82,16 @@ public sealed partial class World
         if (info.NeedsProhibition && !Prohibition) return "Since repeal, anyone can sell a drink.";
         if (info.AfterRepeal && Prohibition) return "Not while Prohibition lasts.";
         if (kind == RacketKind.Brewery && BreweryOf(gang.Id) is { } brewery && brewery.Id != b.Id) return $"{gang.Name} brews at {brewery.Name} already.";
-        if (kind == RacketKind.Casino)
+        if (kind == RacketKind.Nightclub)
         {
-            if (b.Racket == RacketKind.Casino) return "It's a casino already.";
-            if (!Working(b) || b.OwnerGangId != gang.Id) return "A casino needs a hotel you own outright.";
+            if (ClubOf(gang.Id) is { } club) return club.Id == b.Id ? "It's a nightclub already." : $"{gang.Name} has a club at {club.Name} already.";
+            if (!Working(b) || b.OwnerGangId != gang.Id) return $"A nightclub needs a {Label(b)} you own outright.";
+        }
+        // A casino or a club takes over whatever was in the back room.
+        if (kind is RacketKind.Casino or RacketKind.Nightclub)
+        {
+            if (b.Racket == kind) return $"It's a {Content.Rackets[kind].Label} already.";
+            if (kind == RacketKind.Casino && (!Working(b) || b.OwnerGangId != gang.Id)) return "A casino needs a hotel you own outright.";
         }
         // Since repeal a speakeasy is only a bar, and the back room can be put to better use.
         else if (b.Racket != RacketKind.None && !(b.Racket == RacketKind.Speakeasy && !Prohibition)) return "The back room is taken.";

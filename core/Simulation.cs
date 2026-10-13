@@ -597,11 +597,11 @@ public sealed partial class Simulation
             int home = w.PeopleOf(gang) == w.Neighbourhood(biz) ? Content.HomeResentment : 0;
             biz.Resentment = own ? 0 : Math.Clamp(biz.Resentment + (biz.ProtectionRate - 12) / 2 - 1 - home, 0, 100);
 
-            // A casino is its owners' own business. Whoever takes the hotel from them gets the rooms, not the tables.
-            if (biz.Racket == RacketKind.Casino && !World.Working(biz))
+            // A casino or a club is its owners' own business. Whoever takes the place from them gets the rooms, not the tables.
+            if (biz.Racket is RacketKind.Casino or RacketKind.Nightclub && !World.Working(biz))
             {
+                w.Log(EventKind.Lapsed, gang.Id, $"With {(biz.OwnerGangId >= 0 ? w.GangById(biz.OwnerGangId).Name : "its owners")} gone from it, the {Content.Rackets[biz.Racket].Label} at {biz.Name} shut its doors.");
                 biz.Racket = RacketKind.None;
-                w.Log(EventKind.Lapsed, gang.Id, $"With {(biz.OwnerGangId >= 0 ? w.GangById(biz.OwnerGangId).Name : "its owners")} gone from it, the casino at {biz.Name} shut its doors.");
             }
 
             if (biz.Racket != RacketKind.None)
@@ -619,6 +619,13 @@ public sealed partial class Simulation
                 {
                     gang.CleanCash += income;
                     ledger.Legit += income;
+                }
+                else if (biz.Racket == RacketKind.Nightclub && !w.Prohibition)
+                {
+                    // Since repeal a club pours legal liquor and keeps honest books.
+                    gang.CleanCash += income;
+                    ledger.Legit += income;
+                    heat = 0;
                 }
                 else if (biz.Racket == RacketKind.Casino)
                 {
