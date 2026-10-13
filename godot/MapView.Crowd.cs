@@ -99,6 +99,7 @@ void fragment() {
         };
         _crowdMesh.InstanceCount = Population;
         _crowdBlocks = perBlock;
+        _directory = null;
         FillCrowd();
         _crowdItem = RenderingServer.CanvasItemCreate();
         RenderingServer.CanvasItemSetParent(_crowdItem, parent);
@@ -113,6 +114,7 @@ void fragment() {
     }
 
     private int[,] _crowdBlocks = new int[0, 0];
+    private float[,] _crowdDoors = new float[0, 0];
     private const float CrowdW = 4.2f, CrowdH = 2.2f, CrowdPerimeter = 2 * (CrowdW + CrowdH);
 
     /// <summary>How far round a block's pavement a lot's front door is, from its north-west corner.</summary>
@@ -144,6 +146,7 @@ void fragment() {
         var map = World!.Map;
         var perBlock = _crowdBlocks;
         var doors = SpeakeasyDoors();
+        _crowdDoors = doors;
 
         // Per person: a 2D transform (8 floats), a colour (4) and custom data (4).
         var buffer = new float[Population * 16];

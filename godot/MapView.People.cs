@@ -20,8 +20,9 @@ public partial class MapView
     public int SelectedBank { get; private set; } = -1;
 
     /// <summary>Select one thing on the map, and nothing else.</summary>
-    public void Select(int business = -1, int person = -1, int hood = -1, int bank = -1, int shop = -1)
+    public void Select(int business = -1, int person = -1, int hood = -1, int bank = -1, int shop = -1, int citizen = -1)
     {
+        SelectedCitizen = citizen;
         SelectedBusiness = business;
         SelectedPerson = person;
         SelectedHood = hood;
@@ -29,7 +30,7 @@ public partial class MapView
         SelectedShop = shop;
     }
 
-    private enum Pickable { Person, Hood }
+    private enum Pickable { Person, Hood, Citizen }
 
     /// <summary>Someone drawn this frame who can be clicked: where his feet are, in tiles, and how big he's drawn.</summary>
     private readonly record struct Clickable(Pickable Kind, int Id, Vector2 Feet, float Radius);
@@ -199,6 +200,7 @@ public partial class MapView
             var g = w.GangById(h.GangId);
             return $"{h.Name}\n{(g.BossHoodId == h.Id ? "Boss of " : "")}{g.Name} · strength {h.Strength}";
         }
+        if (c.Kind == Pickable.Citizen) return "Someone who lives on the block\nClick to see what you know";
         var p = w.PersonById(c.Id);
         if (p == null) return "";
         return p.Kind switch

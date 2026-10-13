@@ -10,6 +10,7 @@ public partial class Main
     /// <summary>Fill the Selected tab for a person, a hood or a bank. False when a business (or nothing) is selected.</summary>
     private bool RefreshOtherSelection()
     {
+        if (_map.SelectedCitizen >= 0) { CitizenPanel(_map.SelectedCitizen); return true; }
         if (_map.SelectedPerson >= 0) { PersonPanel(W.PersonById(_map.SelectedPerson)); return true; }
         if (_map.SelectedHood >= 0) { HoodPanel(W.HoodById(_map.SelectedHood)); return true; }
         if (_map.SelectedBank >= 0 && W.BankById(_map.SelectedBank) is { } bank) { BankPanel(bank); return true; }
