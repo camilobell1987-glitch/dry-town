@@ -359,6 +359,12 @@ public partial class MapView
             }
         }
 
+        // The pavements of the blocks this cell touches. Each block's pavement spills into the cells to
+        // its east and south, which are drawn after it, so every cell lays down its share of all of them.
+        for (int nx = bx - 1; nx <= bx; nx++)
+            for (int ny = by - 1; ny <= by; ny++)
+                DrawPavement(nx, ny, cell);
+
         // Centre lines, broken at the crossings.
         float dash = 0.32f, gap = 0.28f, lw = Mathf.Max(1, _t * 0.035f);
         var paint = RoadPaint with { A = 0.45f };
@@ -375,7 +381,7 @@ public partial class MapView
             var zebra = RoadPaint with { A = 0.35f };
             for (int s = 0; s < 5; s++)
             {
-                float k = 0.12f + s * 0.17f;
+                float k = 0.24f + s * 0.11f;
                 if (bx > 0) C.DrawRect(R(x0 - 0.16f, y0 + k, 0.12f, 0.08f), zebra);
                 if (bx < Map.BlocksX) C.DrawRect(R(x0 + 1.04f, y0 + k, 0.12f, 0.08f), zebra);
                 if (by > 0) C.DrawRect(R(x0 + k, y0 - 0.16f, 0.08f, 0.12f), zebra);
@@ -387,16 +393,7 @@ public partial class MapView
         if (bx >= Map.BlocksX || by >= Map.BlocksY) return;
         if (by == Map.RiverRow) { DrawRiver(bx, by); return; }
 
-        // The pavement round the block, with a kerb edge and paving joints.
         var block = BlockRect(bx, by);
-        var pave = block.Grow(_t * 0.2f);
-        C.DrawRect(pave, Pavement);
-        C.DrawRect(pave, Kerb, false, Mathf.Max(1, _t * 0.04f));
-        for (float x = pave.Position.X + _t * 0.25f; Fine && x < pave.End.X; x += _t * 0.25f)
-        {
-            C.DrawLine(new Vector2(x, pave.Position.Y), new Vector2(x, block.Position.Y), Kerb with { A = 0.35f }, 1);
-            C.DrawLine(new Vector2(x, block.End.Y), new Vector2(x, pave.End.Y), Kerb with { A = 0.35f }, 1);
-        }
         C.DrawRect(block, Pavement.Darkened(0.3f));
 
         var lots = Map.Lots.Where(l => (l.X - 1) / CityMap.StrideX == bx && (l.Y - 1) / CityMap.StrideY == by).ToList();
@@ -424,6 +421,60 @@ public partial class MapView
             }, Shadow with { A = Fine ? 0.24f : Shadow.A });
         }
         if (Fine) DressStreet(bx, by);
+    }
+
+    /// <summary>
+    /// The part of a block's pavement that lies in one ground cell: the paving, the kerb along its outer
+    /// edge and the joints across it.
+    /// </summary>
+    private void DrawPavement(int bx, int by, Rect2 cell)
+    {
+        if (bx < 0 || by < 0 || bx >= Map.BlocksX || by >= Map.BlocksY || by == Map.RiverRow) return;
+        var block = BlockRect(bx, by);
+        var pave = block.Grow(_t * 0.2f);
+        var part = pave.Intersection(cell);
+        if (part.Size.X <= 0 || part.Size.Y <= 0) return;
+        C.DrawRect(part, Pavement);
+
+        float lw = Mathf.Max(1, _t * 0.04f), half = lw / 2;
+        var kerb = new[]
+        {
+            (new Vector2(pave.Position.X, pave.Position.Y + half), new Vector2(pave.End.X, pave.Position.Y + half)),
+            (new Vector2(pave.Position.X, pave.End.Y - half), new Vector2(pave.End.X, pave.End.Y - half)),
+            (new Vector2(pave.Position.X + half, pave.Position.Y), new Vector2(pave.Position.X + half, pave.End.Y)),
+            (new Vector2(pave.End.X - half, pave.Position.Y), new Vector2(pave.End.X - half, pave.End.Y)),
+        };
+        foreach (var (a, b) in kerb)
+        {
+            var from = new Vector2(Mathf.Max(a.X, part.Position.X), Mathf.Max(a.Y, part.Position.Y));
+            var to = new Vector2(Mathf.Min(b.X, part.End.X), Mathf.Min(b.Y, part.End.Y));
+            if (from.X > to.X || from.Y > to.Y || (from.X == to.X && from.Y == to.Y)) continue;
+            if (a.Y == b.Y ? a.Y < part.Position.Y || a.Y > part.End.Y : a.X < part.Position.X || a.X > part.End.X) continue;
+            C.DrawLine(from, to, Kerb, lw);
+        }
+        if (!Fine) return;
+
+        // Joints across the paving, on all four sides.
+        var joint = Kerb with { A = 0.35f };
+        for (float x = pave.Position.X + _t * 0.25f; x < pave.End.X; x += _t * 0.25f)
+        {
+            if (x < part.Position.X || x > part.End.X) continue;
+            Joint(new Vector2(x, pave.Position.Y), new Vector2(x, block.Position.Y));
+            Joint(new Vector2(x, block.End.Y), new Vector2(x, pave.End.Y));
+        }
+        for (float y = pave.Position.Y + _t * 0.25f; y < pave.End.Y; y += _t * 0.25f)
+        {
+            if (y < part.Position.Y || y > part.End.Y) continue;
+            Joint(new Vector2(pave.Position.X, y), new Vector2(block.Position.X, y));
+            Joint(new Vector2(block.End.X, y), new Vector2(pave.End.X, y));
+        }
+
+        void Joint(Vector2 a, Vector2 b)
+        {
+            a = new Vector2(Mathf.Clamp(a.X, part.Position.X, part.End.X), Mathf.Clamp(a.Y, part.Position.Y, part.End.Y));
+            b = new Vector2(Mathf.Clamp(b.X, part.Position.X, part.End.X), Mathf.Clamp(b.Y, part.Position.Y, part.End.Y));
+            if (a != b) C.DrawLine(a, b, joint, 1);
+        }
     }
 
     private Rect2 BlockRect(int bx, int by) =>
