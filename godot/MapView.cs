@@ -680,75 +680,42 @@ public partial class MapView : Control
     }
 
     /// <summary>
-    /// A standing man, three-quarters on: shadow at his feet, legs, coat, a face and a hat. He leans
-    /// the way he walks, and his legs scissor while he does.
+    /// Someone on the map, seen from above: a dot whose colour says what he is. A gang man is black,
+    /// and a big outfit's men carry its colour round the rim.
     /// </summary>
-    private void DrawFigure(Vector2 ground, Vector2 facing, float r, Color coat, Color hat, Color band, bool walking, Color? skin = null, bool woman = false)
+    private void DrawDot(Vector2 ground, float r, Color fill, Color? rim = null)
     {
-        var pen = DynAt(ground.Y / _t);
         var keep = C;
-        C = pen;
-        float step = walking ? Mathf.Sin(_anim * 10 + ground.X * 0.1f) : 0;
-        float side = facing.X >= 0 ? 1 : -1;
-        var face = skin ?? new Color("d9b48f");
-        var shade = coat.Darkened(0.28f);
-        Ellipse(ground + new Vector2(r * 0.3f, 0), new Vector2(r * 0.85f, r * 0.32f), Shadow);
-        if (woman)
+        C = DynAt(ground.Y / _t);
+        C.DrawCircle(ground + new Vector2(r * 0.25f, r * 0.3f), r, Shadow);
+        if (rim is { } ring)
         {
-            // Stockinged legs under a dropped-waist dress, and a cloche hat pulled down to the brow.
-            var stocking = face.Darkened(0.15f);
-            C.DrawLine(ground + new Vector2(-r * 0.18f, -r * 0.75f), ground + new Vector2(-r * 0.18f + step * r * 0.25f, 0), stocking, r * 0.2f);
-            C.DrawLine(ground + new Vector2(r * 0.18f, -r * 0.75f), ground + new Vector2(r * 0.18f - step * r * 0.25f, 0), stocking, r * 0.2f);
-            var dress = new[]
-            {
-                ground + new Vector2(-r * 0.62f, -r * 0.72f), ground + new Vector2(r * 0.62f, -r * 0.72f),
-                ground + new Vector2(r * 0.42f, -r * 2.0f), ground + new Vector2(-r * 0.42f, -r * 2.0f),
-            };
-            C.DrawColoredPolygon(dress, coat);
-            C.DrawColoredPolygon(new[] { ground + new Vector2(r * 0.05f, -r * 0.72f), dress[1], dress[2], ground + new Vector2(r * 0.05f, -r * 2.0f) }, shade);
-            C.DrawLine(ground + new Vector2(-r * 0.55f, -r * 1.2f), ground + new Vector2(r * 0.55f, -r * 1.2f), coat.Lightened(0.2f), r * 0.1f);
-            C.DrawLine(ground + new Vector2(-r * 0.44f, -r * 1.95f), ground + new Vector2(-r * 0.55f - step * r * 0.15f, -r * 1.15f), shade, r * 0.18f);
-            var head = ground + new Vector2(side * r * 0.04f, -r * 2.33f);
-            C.DrawCircle(head, r * 0.34f, face);
-            Ellipse(head + new Vector2(0, -r * 0.12f), new Vector2(r * 0.44f, r * 0.3f), hat);
-            Ellipse(head + new Vector2(0, r * 0.02f), new Vector2(r * 0.5f, r * 0.09f), hat.Darkened(0.2f));
+            C.DrawCircle(ground, r, ring);
+            C.DrawCircle(ground, r * 0.58f, fill);
         }
         else
         {
-            var legs = coat.Darkened(0.6f);
-            C.DrawLine(ground + new Vector2(-r * 0.22f, -r * 1.0f), ground + new Vector2(-r * 0.22f + step * r * 0.35f, 0), legs, r * 0.32f);
-            C.DrawLine(ground + new Vector2(r * 0.22f, -r * 1.0f), ground + new Vector2(r * 0.22f - step * r * 0.35f, 0), legs, r * 0.32f);
-            var body = new[]
-            {
-                ground + new Vector2(-r * 0.55f, -r * 0.9f), ground + new Vector2(r * 0.55f, -r * 0.9f),
-                ground + new Vector2(r * 0.5f, -r * 2.05f), ground + new Vector2(-r * 0.5f, -r * 2.05f),
-            };
-            C.DrawColoredPolygon(body, coat);
-            // The side away from the light, the shirt and tie at the open collar, and an arm swinging.
-            C.DrawColoredPolygon(new[] { ground + new Vector2(r * 0.08f, -r * 0.9f), body[1], body[2], ground + new Vector2(r * 0.08f, -r * 2.05f) }, shade);
-            C.DrawColoredPolygon(new[] { ground + new Vector2(-r * 0.2f, -r * 2.05f), ground + new Vector2(r * 0.2f, -r * 2.05f), ground + new Vector2(0, -r * 1.6f) }, new Color("e8e2d4"));
-            C.DrawLine(ground + new Vector2(0, -r * 2.0f), ground + new Vector2(0, -r * 1.68f), band.Darkened(0.2f), r * 0.1f);
-            C.DrawLine(body[0], body[3], coat.Darkened(0.35f), r * 0.12f);
-            var shoulder = ground + new Vector2(-r * 0.5f, -r * 1.95f);
-            var hand = ground + new Vector2(-r * 0.62f - step * r * 0.25f, -r * 1.05f);
-            C.DrawLine(shoulder, hand, shade, r * 0.22f);
-            C.DrawCircle(hand, r * 0.12f, face);
-            var head = ground + new Vector2(side * r * 0.04f, -r * 2.38f);
-            C.DrawCircle(head, r * 0.36f, face);
-            Ellipse(head + new Vector2(0, -r * 0.2f), new Vector2(r * 0.6f, r * 0.16f), hat);
-            C.DrawRect(new Rect2(head + new Vector2(-r * 0.36f, -r * 0.6f), new Vector2(r * 0.72f, r * 0.4f)), hat);
-            C.DrawRect(new Rect2(head + new Vector2(-r * 0.36f, -r * 0.3f), new Vector2(r * 0.72f, r * 0.1f)), band);
+            // A pale edge, so a black dot still shows on the asphalt.
+            C.DrawCircle(ground, r, new Color("d8d0c0", 0.55f));
+            C.DrawCircle(ground, r * 0.8f, fill);
         }
         C = keep;
     }
 
-    private float FigureRadius => Mathf.Max(Px(4.5f), _t * 0.15f);
+    /// <summary>How a gang's man is drawn: black, with his outfit's colour round the rim if it's a big one.</summary>
+    private (Color Fill, Color? Rim) ManOf(int gangId)
+    {
+        var gang = World!.GangById(gangId);
+        return gang.IsSmall ? (Palette.SmallGangMan, null) : (Palette.SmallGangMan, Palette.Gang(World, gangId));
+    }
+
+    private float DotRadius => Mathf.Max(Px(3.5f), _t * 0.11f);
 
     private void DrawActors()
     {
         float now = Clock;
         float t = _t;
-        float radius = FigureRadius;
+        float radius = DotRadius;
         foreach (var actor in _actors)
         {
             if (now < actor.Depart || now > actor.Home + 0.01f) continue;
@@ -803,23 +770,23 @@ public partial class MapView : Control
             if (a.Kind is ActionKind.Takeover or ActionKind.Hit && a.DefenderHoodId >= 0 && now >= actor.Arrive - 0.5f && now <= actor.Leave)
             {
                 var defPos = (target + new Vector2(0.3f, -0.15f)) * t;
-                var dc = Palette.Gang(World!, a.DefenderGangId);
-                DrawFigure(defPos, pos - defPos, radius, dc, new Color("1c1a19"), dc, false);
+                var (dFill, dRim) = ManOf(a.DefenderGangId);
+                DrawDot(defPos, radius, dFill, dRim);
                 if (atScene && now - actor.Arrive < 0.8f && Mathf.Sin(_anim * 23 + a.HoodId) > 0.55f)
                     Star(pos.Lerp(defPos, Hash((int)(_anim * 8), a.HoodId) < 0.5f ? 0.3f : 0.7f) - new Vector2(0, radius * 1.6f), radius * 0.7f, new Color("ffe28a"), 6, 0.4f);
             }
 
             // Backup walks a step behind the man in front, and fans out round him on the job.
             int backup = a.Backup.Count - (now >= actor.Arrive && a.CasualtyHoodId >= 0 && a.Backup.Contains(a.CasualtyHoodId) ? 1 : 0);
-            DrawBackup(pos, ahead, radius, actor.Colour, backup, walking);
+            // A raid is led by a detective with uniformed officers behind him.
+            var (fill, rim) = a.Kind == ActionKind.Raid ? (Palette.Detective, (Color?)null) : ManOf(a.GangId);
+            if (a.Kind == ActionKind.Raid) DrawBackup(pos, ahead, radius, Palette.Officer, null, backup, walking);
+            else DrawBackup(pos, ahead, radius, fill, rim, backup, walking);
 
             bool fallen = a.CasualtyHoodId >= 0 && a.CasualtyHoodId == a.HoodId && now >= actor.Arrive;
             if (fallen || (now > actor.Leave && a.Result is ActionResult.Killed or ActionResult.Arrested && a.CasualtyHoodId == a.HoodId)) continue; // drawn below as a cross
 
-            if (a.Kind == ActionKind.Raid)
-                DrawFigure(pos, ahead, radius, Palette.Police, new Color("1b2a4a"), Palette.Police.Lightened(0.3f), walking);
-            else
-                DrawFigure(pos, ahead, radius, actor.Colour, new Color("1c1a19"), actor.Colour.Lightened(0.25f), walking);
+            DrawDot(pos, radius, fill, rim);
             if (a.Kind == ActionKind.Guard && atScene) FlatRing(pos, radius * 1.3f, actor.Colour with { A = 0.7f }, Px(1.5f));
         }
 
@@ -850,15 +817,15 @@ public partial class MapView : Control
         C.DrawPolyline(pts, colour, width);
     }
 
-    private void DrawBackup(Vector2 pos, Vector2 ahead, float radius, Color colour, int count, bool walking)
+    private void DrawBackup(Vector2 pos, Vector2 ahead, float radius, Color fill, Color? rim, int count, bool walking)
     {
         var back = ahead.LengthSquared() > 0.0001f ? -ahead.Normalized() : Vector2.Down;
         for (int i = 0; i < count; i++)
         {
             var at = walking
-                ? pos + back * radius * 1.7f * (i + 1) + back.Orthogonal() * radius * 0.5f * (i % 2 == 0 ? 1 : -1)
-                : pos + back.Rotated(Mathf.Pi / 2 + i * 1.1f - 1.1f) * radius * 1.9f;
-            DrawFigure(at, ahead, radius * 0.92f, colour, new Color("1c1a19"), colour.Lightened(0.25f), walking);
+                ? pos + back * radius * 2.3f * (i + 1) + back.Orthogonal() * radius * 0.7f * (i % 2 == 0 ? 1 : -1)
+                : pos + back.Rotated(Mathf.Pi / 2 + i * 1.1f - 1.1f) * radius * 2.4f;
+            DrawDot(at, radius * 0.92f, fill, rim);
         }
     }
 
@@ -881,8 +848,9 @@ public partial class MapView : Control
             var ahead = Along(path, f + 0.02f) - at;
             var colour = Palette.Gang(World, gang.Id);
             if (CarFor(team) is var car and not Car.None) { DrawGangCar(at, ahead, colour, car); continue; }
-            DrawBackup(pos, ahead, radius, colour, Simulation.TeamOf(job.Order).Count() - 1, true);
-            DrawFigure(pos, ahead, radius, colour, new Color("1c1a19"), colour.Lightened(0.25f), true);
+            var (fill, rim) = ManOf(gang.Id);
+            DrawBackup(pos, ahead, radius, fill, rim, Simulation.TeamOf(job.Order).Count() - 1, true);
+            DrawDot(pos, radius, fill, rim);
         }
     }
 

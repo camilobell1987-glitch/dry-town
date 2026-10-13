@@ -285,15 +285,10 @@ public partial class MapView
         }
     }
 
-    /// <summary>People on the pavements, walking round the blocks. They're scenery, so they're small and muted.</summary>
-    private static readonly Color[] Dresses = { new("8a3a44"), new("4a6680"), new("a88a4a"), new("6a4a7a"), new("3a5a4a"), new("b8a888") };
-    private static readonly Color[] Skins = { new("e0b896"), new("c89870"), new("9a6a48"), new("ecc8a8"), new("b07c58") };
-
+    /// <summary>Ordinary citizens on the pavements, walking round the blocks: small grey dots.</summary>
     private void DrawPassersBy(Rect2 view)
     {
-        var coats = new[] { new Color("6a6258"), new Color("4e4a46"), new Color("7a6a58"), new Color("5a5f66"), new Color("8a7a66") };
-        var hats = new[] { new Color("2c2926"), new Color("2c2926"), new Color("8a6a4a"), new Color("4a3a2a") };
-        float r = Mathf.Max(Px(2.6f), _t * 0.1f);
+        float r = DotRadius * 0.75f;
         if (Tile < 9) return;
         for (int i = 0; i < 26 * Map.BlocksX * Map.BlocksY / 20; i++)
         {
@@ -305,16 +300,13 @@ public partial class MapView
             int dir = Hash(i, 304) < 0.5f ? 1 : -1;
             float d = (Hash(i, 302) * perimeter + _anim * (0.15f + Hash(i, 303) * 0.12f) * dir) % perimeter;
             if (d < 0) d += perimeter;
-            Vector2 at, facing;
-            if (d < w) { at = new Vector2(x0 + d, y0); facing = Vector2.Right; }
-            else if (d < w + h) { at = new Vector2(x0 + w, y0 + d - w); facing = Vector2.Down; }
-            else if (d < 2 * w + h) { at = new Vector2(x0 + w - (d - w - h), y0 + h); facing = Vector2.Left; }
-            else { at = new Vector2(x0, y0 + h - (d - 2 * w - h)); facing = Vector2.Up; }
+            Vector2 at;
+            if (d < w) at = new Vector2(x0 + d, y0);
+            else if (d < w + h) at = new Vector2(x0 + w, y0 + d - w);
+            else if (d < 2 * w + h) at = new Vector2(x0 + w - (d - w - h), y0 + h);
+            else at = new Vector2(x0, y0 + h - (d - 2 * w - h));
             if (!view.HasPoint(at)) continue;
-            bool woman = i % 3 == 0;
-            var coat = woman ? Dresses[i % Dresses.Length] : coats[i % coats.Length];
-            var hat = woman ? Dresses[(i + 2) % Dresses.Length].Darkened(0.2f) : hats[i % hats.Length];
-            DrawFigure(at * _t, facing * dir, r, coat, hat, hat.Lightened(0.2f), true, Skins[i % Skins.Length], woman);
+            DrawDot(at * _t, r, Palette.Citizen);
         }
     }
 

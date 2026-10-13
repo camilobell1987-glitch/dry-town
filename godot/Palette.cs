@@ -23,6 +23,14 @@ public static class Palette
 
     public static readonly Color Player = new("e8b84a");
 
+    // The dots on the map, one colour for each kind of person.
+    public static readonly Color Citizen = new("9a958c");
+    public static readonly Color Officer = new("3fa2ff");
+    public static readonly Color Reporter = new("f4f1ea");
+    public static readonly Color Detective = new("1f3b8a");
+    public static readonly Color Interest = new("f2c230");
+    public static readonly Color SmallGangMan = new("0e0d0d");
+
     private static readonly Color[] Rivals =
     {
         new("c8463c"), // brick
