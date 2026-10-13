@@ -83,11 +83,21 @@ public partial class MapView
             };
             var at = StandingSpot(lot, p.Id * 3 + 1, pace);
             if (!view.HasPoint(at)) continue;
+            if (p.Kind == PersonKind.BeatCop)
+            {
+                // Cops walk their beat in pairs, side by side; the one you deal with is on the street side.
+                var partner = new Vector2(0, r * 2.3f / _t);
+                DrawDot((at - partner / 2) * _t, r, MarkerOf(p.Kind));
+                at += partner / 2;
+            }
             DrawDot(at * _t, r, MarkerOf(p.Kind));
             if (p.Id == SelectedPerson) SelectionRing(at, r);
-            _clickables.Add(new Clickable(Pickable.Person, p.Id, at, r * 1.6f / _t));
+            _clickables.Add(new Clickable(Pickable.Person, p.Id, at, ClickRadius(r)));
         }
     }
+
+    /// <summary>How near a click must land to pick someone, in tiles: a little wider than his dot, so a small dot is still easy to hit.</summary>
+    private float ClickRadius(float r) => Mathf.Max(r * 1.6f / _t, 0.16f);
 
     /// <summary>A ring round whoever is selected, with a glow so he can be found from across the city.</summary>
     private void SelectionRing(Vector2 at, float r)
@@ -123,7 +133,7 @@ public partial class MapView
                 float size = h.Id == gang.BossHoodId ? r * 1.25f : r;
                 DrawDot(at * _t, size, fill, rim);
                 if (h.Id == SelectedHood) SelectionRing(at, size);
-                _clickables.Add(new Clickable(Pickable.Hood, h.Id, at, r * 1.6f / _t));
+                _clickables.Add(new Clickable(Pickable.Hood, h.Id, at, ClickRadius(r)));
             }
         }
     }
