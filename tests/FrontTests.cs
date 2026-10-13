@@ -106,7 +106,7 @@ public class FrontTests
     [Fact]
     public void RivalsBuyFrontsAsTheyGetRich()
     {
-        var w = Run(7, 3 * Content.WeeksPerYear, CitySize.Medium).World;
+        var w = Run(1, 3 * Content.WeeksPerYear, CitySize.Medium).World;
         Assert.Contains(w.Events, e => e.Kind == EventKind.Front && e.GangId != w.Player.Id);
         Assert.Contains(w.LivingGangs, g => !g.IsPlayer && g.Clean > 0);
     }

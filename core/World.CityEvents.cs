@@ -46,6 +46,13 @@ public sealed partial class World
     }
 
     /// <summary>How much heat a racket draws this week, as a multiple of the usual.</summary>
+    /// <summary>The heat a business's back room draws in a week. Out of sight in a tenement court, it draws less.</summary>
+    public int RacketHeat(Business b)
+    {
+        int heat = Content.Rackets[b.Racket].WeeklyHeat * RacketHeatFactor(b.Racket);
+        return b.Kind == BusinessKind.Court ? Math.Max(0, heat - Content.CourtHeatOff) : heat;
+    }
+
     public int RacketHeatFactor(RacketKind kind) => Happening(CityEventKind.DrySquad) && Content.Rackets[kind].NeedsProhibition ? 2 : 1;
 
     /// <summary>How much sooner the police raid: points off the heat a gang can carry before they come.</summary>

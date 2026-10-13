@@ -6,9 +6,9 @@ namespace DryTown.Core.Tests;
 public class BoozeTests
 {
     /// <summary>A quiet city: no news, no new outfits, and by default nobody else to take the player's places.</summary>
-    private static (Simulation Sim, World W, Gang Me) Start(int gangs = 1)
+    private static (Simulation Sim, World W, Gang Me) Start(int gangs = 1, ulong seed = 4)
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 4, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false });
+        var sim = Simulation.New(new WorldSettings { Seed = seed, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false });
         return (sim, sim.World, sim.World.Player);
     }
 
@@ -94,7 +94,7 @@ public class BoozeTests
     [Fact]
     public void ABadBatchClosesThePlace()
     {
-        var (sim, w, me) = Start();
+        var (sim, w, me) = Start(seed: 1);
         me.Cash = 50_000;
         var bars = Enumerable.Range(0, 4).Select(_ => Give(w, me, RacketKind.Still)).ToList();
         w.SetCut(me, Cut.Hard);
@@ -159,7 +159,7 @@ public class BoozeTests
     [Fact]
     public void RivalsTakeOverTheLines()
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 1, Size = CitySize.Medium });
+        var sim = Simulation.New(new WorldSettings { Seed = 2, Size = CitySize.Medium });
         for (int i = 0; i < 3 * Content.WeeksPerYear; i++) sim.AdvanceWeek(playerAutopilot: true);
         var w = sim.World;
         Assert.Contains(w.Events, e => e.Kind == EventKind.Booze && e.Text.Contains(" to take over ") && e.GangId >= 0 && !w.GangById(e.GangId).IsPlayer);

@@ -613,7 +613,7 @@ public sealed partial class Simulation
                 bool legalNow = info.NeedsProhibition && !w.Prohibition && !brewing;
                 if (!supplied.TryGetValue(gang.Id, out var real)) supplied[gang.Id] = real = w.Supplied(gang.Id);
                 int income = (int)((legalNow ? info.WeeklyIncome * 3 / 10 : brewing ? info.WeeklyIncome / 2 : info.WeeklyIncome) * w.RacketFactor(biz.Racket) * w.BoozeFactor(biz, gang, real));
-                int heat = legalNow || brewing ? 0 : info.WeeklyHeat * w.RacketHeatFactor(biz.Racket);
+                int heat = legalNow || brewing ? 0 : w.RacketHeat(biz);
                 if (biz.Racket == RacketKind.Bookie) income = Wire(gang, income);
                 gang.Cash += income;
                 if (brewing)

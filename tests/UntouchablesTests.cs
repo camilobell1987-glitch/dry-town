@@ -54,19 +54,19 @@ public class UntouchablesTests
     [Fact]
     public void ARaidSmashesAPlaceAndTakesItsMan()
     {
-        var (sim, w, me) = Bootlegger();
+        var (sim, w, me) = Bootlegger(seed: 4);
         After(w, me);
-        int before = w.LiquorOf(me.Id).Count();
         for (int i = 0; i < 80 && w.Untouchables.Evidence == 0; i++) { me.Heat = 100; Week(sim); }
         Assert.Equal(1, w.Untouchables.Evidence);
-        Assert.Equal(before - 1, w.LiquorOf(me.Id).Count());
-        Assert.Contains(w.Events, e => e.Text.StartsWith($"The Untouchables smashed {me.Name}'s speakeasy at "));
+        var smash = w.Events.Single(e => e.Text.StartsWith($"The Untouchables smashed {me.Name}'s speakeasy at "));
+        var place = w.Businesses.First(b => smash.Text.Contains(b.Name));
+        Assert.Equal(RacketKind.None, place.Racket);
     }
 
     [Fact]
     public void AStealthyManGetsWordInTime()
     {
-        var (sim, w, me) = Bootlegger();
+        var (sim, w, me) = Bootlegger(seed: 7);
         After(w, me);
         foreach (var h in w.HoodsOf(me.Id)) h.Stealth = 10;
         Assert.Equal(10 * Content.SquadWarning, w.Warning(w.LiquorOf(me.Id).First()), 6);

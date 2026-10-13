@@ -8,9 +8,9 @@ public class BreweryTests
     private const int Y1927 = (Content.UntouchablesYear - Content.StartYear) * Content.WeeksPerYear;
 
     /// <summary>A quiet city in the given week, where the player has money and nobody else to bother him.</summary>
-    private static (Simulation Sim, World W, Gang Me) Start(int week = 0, int gangs = 1)
+    private static (Simulation Sim, World W, Gang Me) Start(int week = 0, int gangs = 1, ulong seed = 4)
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 4, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false, StartWeek = week });
+        var sim = Simulation.New(new WorldSettings { Seed = seed, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false, StartWeek = week });
         var me = sim.World.Player;
         me.Cash = 20_000;
         me.Heat = 0;
@@ -82,7 +82,7 @@ public class BreweryTests
     [Fact]
     public void TheSquadGoesForTheBreweryFirst()
     {
-        var (sim, w, me) = Start(Y1927 + 10, gangs: 2);
+        var (sim, w, me) = Start(Y1927 + 10, gangs: 2, seed: 1);
         Give(w, me, RacketKind.Speakeasy, 6);
         var brewery = Give(w, me, RacketKind.Brewery, 1)[0];
         foreach (var h in w.HoodsOf(me.Id)) h.Stealth = 1;

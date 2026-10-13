@@ -221,6 +221,10 @@ public sealed partial class World
         Map = CityMap.Generate(Rng, shape.BlocksX, shape.BlocksY, shape.River, shape.Parks);
         Map.DrawWards(shape.WardsX, shape.WardsY);
 
+        // The tenement courts are kept for their own people, the way in held back from the shops.
+        var gates = Map.CourtGates().ToList();
+        foreach (var gate in gates) gate.Use = LotUse.Business;
+
         // Precinct houses sit evenly across the city, the first near the middle.
         for (int p = 0; p < shape.Precincts; p++)
         {
@@ -234,7 +238,7 @@ public sealed partial class World
 
         var free = Map.Lots.Where(l => l.IsFree).ToList();
         Rng.Shuffle(free);
-        var kinds = Enum.GetValues<BusinessKind>();
+        var kinds = Enum.GetValues<BusinessKind>().Where(k => k != BusinessKind.Court).ToArray();
         int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs);
         for (int i = 0; i < count; i++)
         {
@@ -252,6 +256,21 @@ public sealed partial class World
                 Takings = Rng.Range(min, max),
                 Toughness = Rng.Range(2, 9),
                 LotId = lot.Id,
+            });
+        }
+
+        foreach (var gate in gates)
+        {
+            var (min, max) = Content.TakingsFor(BusinessKind.Court);
+            gate.BusinessId = Businesses.Count;
+            Businesses.Add(new Business
+            {
+                Id = Businesses.Count,
+                Name = $"{LastName(Neighbourhood(gate.WardId))}'s {Content.Label(BusinessKind.Court)}, {Map.StreetOf(gate)} St",
+                Kind = BusinessKind.Court,
+                Takings = Rng.Range(min, max),
+                Toughness = Rng.Range(1, 4),
+                LotId = gate.Id,
             });
         }
     }

@@ -2,8 +2,11 @@ namespace DryTown.Core;
 
 public enum LotUse { Empty, Business, Headquarters, Precinct, Bank, GunShop, CarDealer }
 
-/// <summary>What the ground under a lot is. Only land can be built on; the river and the parks stay as they are.</summary>
-public enum Terrain { Land, Water, Park }
+/// <summary>
+/// What the ground under a lot is. Only land can be built on; the river, the parks, the graveyards
+/// and the churches stay as they are.
+/// </summary>
+public enum Terrain { Land, Water, Park, Cemetery, Church }
 
 /// <summary>A building plot. Every lot faces one street row, above or below its block.</summary>
 public sealed class Lot
@@ -23,6 +26,12 @@ public sealed class Lot
     public int WardId { get; set; }
 
     public Terrain Terrain { get; set; }
+
+    /// <summary>
+    /// Part of a tenement block built round a court: the buildings stand back from a yard in the middle,
+    /// reached through a passage from the street.
+    /// </summary>
+    public bool Court { get; set; }
 
     /// <summary>Empty land, where a business, a headquarters or a precinct house can go.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
@@ -105,7 +114,9 @@ public sealed class CityMap
             });
         }
         if (river) map.LayRiver(blocksY / 2);
-        map.LayParks(parks);
+        int blocks = blocksX * blocksY;
+        map.LayParks(Math.Max(parks, Math.Max(1, blocks / 30)));
+        map.LayLandmarks(rng);
         return map;
     }
 
@@ -133,6 +144,76 @@ public sealed class CityMap
             foreach (var lot in Lots)
                 if ((lot.X - 1) / StrideX == bx && (lot.Y - 1) / StrideY == by && lot.Terrain == Terrain.Land) lot.Terrain = Terrain.Park;
         }
+    }
+
+    /// <summary>The lots of one block, west to east along the north row and then the south.</summary>
+    public IEnumerable<Lot> LotsOfBlock(int bx, int by) =>
+        Lots.Where(l => (l.X - 1) / StrideX == bx && (l.Y - 1) / StrideY == by).OrderBy(l => l.Y).ThenBy(l => l.X);
+
+    /// <summary>How far a block is from the middle of the city: 0 in the middle, about 1 at the edges.</summary>
+    private double FromMiddle(int bx, int by)
+    {
+        double dx = (bx + 0.5) / BlocksX - 0.5, dy = (by + 0.5) / BlocksY - 0.5;
+        return Math.Sqrt(dx * dx + dy * dy) * 2;
+    }
+
+    /// <summary>
+    /// Graveyards on the edge of town, churches with their churchyards, and tenement blocks built
+    /// round a court. Each takes a block that is still all ordinary land.
+    /// </summary>
+    private void LayLandmarks(Rng rng)
+    {
+        int blocks = BlocksX * BlocksY;
+        var open = new List<(int X, int Y)>();
+        for (int by = 0; by < BlocksY; by++)
+        for (int bx = 0; bx < BlocksX; bx++)
+            if (LotsOfBlock(bx, by).All(l => l.Terrain == Terrain.Land)) open.Add((bx, by));
+        rng.Shuffle(open);
+
+        // The dead are buried out past the houses.
+        int cemeteries = Math.Max(1, blocks / 40);
+        var outskirts = open.OrderByDescending(b => FromMiddle(b.X, b.Y)).Take(Math.Max(cemeteries, open.Count / 4)).ToList();
+        foreach (var b in open.Where(outskirts.Contains).Take(cemeteries).ToList())
+        {
+            foreach (var lot in LotsOfBlock(b.X, b.Y)) lot.Terrain = Terrain.Cemetery;
+            open.Remove(b);
+        }
+
+        // Tenement courts are where the poor live, away from the middle of town.
+        int courts = Math.Max(2, blocks / 7);
+        foreach (var b in open.Where(b => FromMiddle(b.X, b.Y) > 0.35).Take(courts).ToList())
+        {
+            foreach (var lot in LotsOfBlock(b.X, b.Y)) lot.Court = true;
+            open.Remove(b);
+        }
+
+        // A church every few blocks, with its churchyard beside it.
+        int churches = Math.Max(2, blocks / 8);
+        foreach (var b in open.Take(churches))
+        {
+            // On the south side of the block, so its doors face the way the city is seen from.
+            int y = b.Y * StrideY + LotsPerBlockY;
+            var row = LotsOfBlock(b.X, b.Y).Where(l => l.Y == y).ToList();
+            int at = rng.Range(0, row.Count - 2);
+            bool yardWest = rng.Chance(0.5);
+            row[yardWest ? at + 1 : at].Terrain = Terrain.Church;
+            row[yardWest ? at : at + 1].Terrain = Terrain.Cemetery;
+        }
+    }
+
+    /// <summary>The way into a tenement court: a passage through the building on the south side of the block.</summary>
+    public Lot? CourtGate(int bx, int by)
+    {
+        var south = LotsOfBlock(bx, by).Where(l => l.Court && l.FrontY > l.Y).ToList();
+        return south.Count == 0 ? null : south[Math.Min(south.Count - 1, 1 + (bx + by) % 2)];
+    }
+
+    /// <summary>The ways into all the tenement courts in the city.</summary>
+    public IEnumerable<Lot> CourtGates()
+    {
+        for (int by = 0; by < BlocksY; by++)
+        for (int bx = 0; bx < BlocksX; bx++)
+            if (CourtGate(bx, by) is { } gate) yield return gate;
     }
 
     public static CityMap FromSave(List<Lot> lots, string[] streets, string[] avenues, int blocksX, int blocksY, int wardsX, int wardsY)

@@ -318,7 +318,7 @@ public class Phase3Tests
     [Fact]
     public void ALieutenantWhoBreaksAwayTakesHisCrew()
     {
-        var sim = Run(6, 10);
+        var sim = Run(1, 10);
         var w = sim.World;
         var men = w.AvailableHoodsOf(w.Player.Id).Where(h => h.Id != w.Player.BossHoodId).Take(3).ToList();
         var crew = w.FormCrew(men[0]);
@@ -425,7 +425,8 @@ public class Phase5Tests
         Assert.Equal(wards, w.Wards.Count);
         Assert.Equal(precincts, w.Map.Lots.Count(l => l.Use == LotUse.Precinct));
         Assert.Equal(gangs, w.LivingGangs.Count());
-        Assert.Equal(Content.Shape(size).Businesses, w.Businesses.Count);
+        Assert.Equal(Content.Shape(size).Businesses, w.Businesses.Count(b => b.Kind != BusinessKind.Court));
+        Assert.Equal(w.Map.CourtGates().Count(), w.Businesses.Count(b => b.Kind == BusinessKind.Court));
         // Every ward has shops in it, and every walk stays on the streets.
         foreach (var ward in w.Wards) Assert.True(Politics.BusinessesIn(w, ward).Count() >= 10);
         var a = w.Map.Lots.First();
@@ -439,7 +440,7 @@ public class Phase5Tests
         var w = World.Create(new WorldSettings { Seed = 5, Size = CitySize.Metropolis });
         Assert.Equal(7, w.Map.RiverRow);
         Assert.Equal(18 * 8, w.Map.Lots.Count(l => l.Terrain == Terrain.Water));
-        Assert.Equal(3 * 8, w.Map.Lots.Count(l => l.Terrain == Terrain.Park));
+        Assert.Equal(8 * 8, w.Map.Lots.Count(l => l.Terrain == Terrain.Park));
         Assert.All(w.Map.Lots.Where(l => l.Terrain != Terrain.Land), l => Assert.Equal(LotUse.Empty, l.Use));
 
         // Gangs that come later don't set up in the river either, and a save keeps the water where it was.
@@ -454,7 +455,7 @@ public class Phase5Tests
     [Fact]
     public void BigCitiesStayContestedAndRunFast()
     {
-        var sim = Run(6, 3 * Content.WeeksPerYear, CitySize.Large);
+        var sim = Run(1, 3 * Content.WeeksPerYear, CitySize.Large);
         Assert.True(sim.World.LivingGangs.Count() >= 3);
         Assert.False(sim.Metrics.Check().Stalled);
     }

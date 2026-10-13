@@ -14,6 +14,7 @@ public sealed partial class World
     /// <summary>Why the gang can't buy this business, or null if it can.</summary>
     public string? CannotBuyFront(Gang gang, Business b)
     {
+        if (b.Kind == BusinessKind.Court) return "Nobody owns a court to sell it.";
         if (b.OwnerGangId == gang.Id) return "It's already yours.";
         if (b.IsFront) return $"It's a front for {GangById(b.OwnerGangId).Name}.";
         if (b.ProtectorGangId != gang.Id) return "The owner only sells to the outfit he already pays.";

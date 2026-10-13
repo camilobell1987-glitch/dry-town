@@ -138,12 +138,14 @@ public static partial class Content
         BusinessKind.Barber => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Bookie, RacketKind.Slots },
         BusinessKind.Grocer or BusinessKind.Pharmacy => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Slots },
         BusinessKind.Tailor => new[] { RacketKind.LoanShark, RacketKind.Bookie },
+        BusinessKind.Court => new[] { RacketKind.Speakeasy, RacketKind.Still, RacketKind.Numbers, RacketKind.GamblingDen, RacketKind.LoanShark },
         _ => new[] { RacketKind.LoanShark, RacketKind.Slots },
     };
 
     public static (int min, int max) TakingsFor(BusinessKind kind) => kind switch
     {
         BusinessKind.Hotel => (380, 640),
+        BusinessKind.Court => (60, 120),
         BusinessKind.Warehouse => (300, 520),
         BusinessKind.Garage => (220, 400),
         BusinessKind.Diner => (180, 340),
@@ -257,6 +259,9 @@ public static partial class Content
 
     /// <summary>Sunday night: the police and the gangs settle the week's accounts.</summary>
     public const int ReckoningTick = 6 * 24 + 21;
+
+    /// <summary>Heat a racket in a tenement court draws less each week: the beat cop can't see it from the street.</summary>
+    public const int CourtHeatOff = 1;
 
     public static string Label(BusinessKind kind) => kind switch
     {
