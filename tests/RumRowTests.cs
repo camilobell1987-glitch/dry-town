@@ -8,9 +8,9 @@ public class RumRowTests
     private const int Spring1923 = 3 * Content.WeeksPerYear + 15;
 
     /// <summary>A quiet city in the given week, where the player has money and nobody else to bother him.</summary>
-    private static (Simulation Sim, World W, Gang Me) Start(int week = Spring1923, int gangs = 1)
+    private static (Simulation Sim, World W, Gang Me) Start(int week = Spring1923, int gangs = 1, ulong seed = 4)
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 4, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false, StartWeek = week });
+        var sim = Simulation.New(new WorldSettings { Seed = seed, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false, StartWeek = week });
         var me = sim.World.Player;
         me.Cash = 20_000;
         me.Heat = 0;
@@ -113,7 +113,7 @@ public class RumRowTests
     [Fact]
     public void ABoatCanBeLostAtSea()
     {
-        var (sim, w, me) = Start(3 * Content.WeeksPerYear + 33);
+        var (sim, w, me) = Start(3 * Content.WeeksPerYear + 33, seed: 1);
         var boats = new List<Boat>();
         for (int i = 0; i < 300 && !w.Events.Any(e => e.Text.Contains(" went down in the hurricanes ")); i++)
         {

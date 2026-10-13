@@ -19,7 +19,7 @@ public class ReputationTests
     {
         var (sim, w, me) = City();
         var man = w.AvailableHoodsOf(me.Id).First(h => h.Id != me.BossHoodId);
-        var shop = w.Businesses.First(b => b.IsOpen && b.ProtectorGangId < 0);
+        var shop = w.Businesses.First(b => b.IsOpen && b.ProtectorGangId < 0 && Simulation.ExtortChance(w, me, man, b) is > 0.1 and < 0.5);
         double shake = Simulation.ExtortChance(w, me, man, shop);
         sim.Jail(man, 60, "with assault", strength: 0.7);
         double jury = Simulation.ConvictionChance(w, man);

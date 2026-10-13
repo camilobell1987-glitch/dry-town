@@ -143,6 +143,14 @@ Rival outfits buy fronts too, once they hold enough dirty money for a tax case: 
 ![A front, with its banknote on the roof](docs/screenshots/front.png)
 ![The week's books after laundering](docs/screenshots/laundering.png)
 
+## Tenement courts
+
+Some blocks are built round a court: a cobbled yard in the middle of the block, with the tall tenements at the back and lower houses on the street, and the only way in an arched passage through the house in the middle of the south side. The way in shows on the map with a washing line on its roof sign, and you treat it like any business: lean on it, and the block pays you protection, though only $60 to $120 a week and the people there are easy to lean on.
+
+What a court is for is the back room. A court can hold a speakeasy in a cellar, a still, a numbers game, a gambling den or a loan book, and the beat cop can't see any of it from the street, so a racket in a court draws 1 less heat a week than the same racket in a shop. A numbers game or a loan book in a court draws none at all. Nobody owns a court, so it can't be bought as a front, and it has no books to wash money through. Rival outfits want the courts as much as you do.
+
+![A tenement court: the yard, the washing and the way in](docs/screenshots/court.png)
+
 ## Rum-running
 
 While Prohibition lasts, a speakeasy's liquor comes from one of two places. Without a supply line it sells bathtub gin, and a back-room still makes its own rotgut. A supply line brings the real stuff in from outside the city. Click one of your speakeasies or stills to see the lines on the **Selected** tab.
@@ -481,7 +489,7 @@ The rest come at random, two or three a year, never more than two at once, and n
 | Huge | 13 × 10 | 12 | 5 | 300 | 7 / 14 |
 | Metropolis | 18 × 14 | 20 | 8 | 600 | 9 / 20 |
 
-The metropolis has a river through the middle, crossed by every avenue on a bridge, with factories along the waterfront. Nobody builds on the river or in the city parks; huge cities have two parks and the metropolis three. Police answer a raid from the nearest precinct house. In a big city that thins out to a few outfits, newcomers move in sooner. Fitted whole on the screen, a big city leaves out the smallest details, such as windows, trade-sign pictures and paving joints, and they come back as you zoom in. Saves from earlier versions load as a small city split into two wards; saves from before the street get their banks when they load.
+The metropolis has a river through the middle, crossed by every avenue on a bridge, with factories along the waterfront. Nobody builds on the river, in the city parks, in the graveyards or on church ground. Every city has at least one park, and one more for about every thirty blocks, so the metropolis has eight. Police answer a raid from the nearest precinct house. In a big city that thins out to a few outfits, newcomers move in sooner. Fitted whole on the screen, a big city leaves out the smallest details, such as windows, trade-sign pictures and paving joints, and they come back as you zoom in. Saves from earlier versions load as a small city split into two wards; saves from before the street get their banks when they load.
 
 ![A large city](docs/screenshots/large-city.png)
 ![A huge city, all of it on screen](docs/screenshots/huge-city.png)
@@ -550,11 +558,15 @@ All of it is synthesised by `tools/make_audio.py` (Python and numpy) into `godot
 
 ## The map
 
-The map is drawn in code from simple shapes, so it uses no image files. It is seen at an angle, the way Gangsters: Organized Crime showed its city: streets and pavements lie flat, and buildings stand up with their front and west walls showing, so a tall building hides what is behind it and people walk behind it too. Downtown has stone office towers, which are taller in the big cities. Elsewhere, the lots that aren't businesses are brick tenements with fire escapes, churches, factories with smoking chimneys, parks, parking lots and vacant ground.
+The map is drawn in code from simple shapes, so it uses no image files. It is seen at an angle, the way Gangsters: Organized Crime showed its city: streets and pavements lie flat, and buildings stand up with their front and west walls showing, so a tall building hides what is behind it and people walk behind it too. Downtown has stone office towers, which are taller in the big cities. Elsewhere, the lots that aren't businesses are brick tenements with fire escapes, factories with smoking chimneys, little parks, parking lots and vacant ground.
+
+No two blocks look quite alike. About half the ordinary blocks have an alley cut through them, cobbled, with ash cans, crates and washing strung across from window to window, and some of those have a second alley along the middle where the backs of the buildings meet. Every city has a graveyard out on its edge, a whole block of headstones, crosses and dark yews behind iron railings, with a chapel and a pair of gates. Every eight blocks or so there is a stone church with buttresses, tall stained-glass windows that glow after dark and a spire with a gilt cross, and its churchyard beside it. Whole blocks are city parks, with lawns, crossing paths, a fountain and sometimes a pond. And about one block in seven is a tenement court (see below): low houses on the street, tall tenements at the back, and a cobbled yard between them with a pump and lines of washing.
 
 Zoomed all the way in, a lot fills about a fifth of the screen and the buildings show their brickwork. Walls are laid in courses of brick, or of stone downtown with quoins at the corners, and soot darkens them toward the street. Each floor has a stone band, and a cornice with dentils runs along the top. The windows are sashes with stone lintels and sills; some have curtains or a window box, and their panes catch the sky. Tenements and some shops have iron fire escapes with railed landings, stairs and a drop ladder. A shop has a sign board with gilt lettering over a scalloped awning. Roofs have a coping round the parapet, tar seams, skylights, brick chimneys with pots and a bulkhead over the stairs. Water towers are bound with iron hoops. Out on the street there are cast-iron lamp posts with glass lanterns, fire hydrants, mailboxes, ash cans, drain grates and manholes, and buildings cast soft-edged shadows. Cars have chrome trim, running boards, hubcaps and a grille. The passers-by include women in dresses and cloche hats, the men wear collars and ties and swing their arms, and lamplight fades smoothly into the dark. This detail is drawn only when zoomed in.
 
 ![Brickwork, fire escapes and a shop's sign board, close up](docs/screenshots/brickwork.png)
+![A church and its churchyard](docs/screenshots/church.png)
+![The graveyard on the edge of town](docs/screenshots/cemetery.png)
 
 Each business has a sign on its roof showing its trade, such as a barber pole, a coffee cup or a tyre for a garage. The sign is framed in the colours of the gang it pays, and shops facing the viewer have an awning striped in the same colours. A red badge on the roof marks a racket in the back room: a bottle for a speakeasy, a copper pot for a still, a die for numbers, a coin for loans, a horseshoe for a bookie, a playing card for a gambling den and a banknote for a counterfeiting press. Banks have columns and a coin on their sign, gun shops have crossed rifles and a green awning, motor dealers have a glass showroom and cars on the forecourt, and a business that has been burned out stands as a blackened shell, with flames the week it caught. Each gang headquarters has a neon sign and the boss's car parked outside, and the precinct house has columns, blue lamps and patrol cars at the kerb. Cities of five block rows or more have an elevated railway with trains running along it. Traffic, barges on the river and people on the pavements keep the city moving. During the live week the light follows the clock, so streetlamps and windows come on at dusk.
 

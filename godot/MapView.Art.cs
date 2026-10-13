@@ -167,7 +167,7 @@ public partial class MapView
     // ---- What stands where -----------------------------------------------------
 
     /// <summary>What a lot nobody does business on has on it.</summary>
-    private enum Filler { None, Tenement, Office, Church, Factory, Vacant, Parking, PocketPark }
+    private enum Filler { None, Tenement, Office, Factory, Vacant, Parking, PocketPark }
 
     /// <summary>
     /// How far a point is into downtown, from 0 at the edge of it to 1 in the middle. Big cities have one;
@@ -187,8 +187,9 @@ public partial class MapView
     private Filler FillerOf(Lot lot)
     {
         if (lot.Use != LotUse.Empty || lot.Terrain != Terrain.Land) return Filler.None;
+        if (lot.Court) return Filler.Tenement;
         float h = Hash(lot.Id, 11);
-        if (Downtown(lot.X + 0.5f, lot.Y + 0.5f) > 0.3f) return h < 0.82f ? Filler.Office : h < 0.92f ? Filler.Parking : Filler.Church;
+        if (Downtown(lot.X + 0.5f, lot.Y + 0.5f) > 0.3f) return h < 0.88f ? Filler.Office : Filler.Parking;
         if (Waterfront(lot)) return h < 0.45f ? Filler.Factory : h < 0.65f ? Filler.Vacant : h < 0.8f ? Filler.Parking : Filler.Tenement;
         return h switch
         {
@@ -196,17 +197,15 @@ public partial class MapView
             < 0.62f => Filler.Vacant,
             < 0.72f => Filler.Parking,
             < 0.84f => Filler.PocketPark,
-            < 0.87f => Filler.Church,
-            < 0.92f => Filler.Factory,
+            < 0.9f => Filler.Factory,
             _ => Filler.Tenement,
         };
     }
 
-    private string FillerName(Lot lot) => lot.Terrain == Terrain.Park ? "City park" : FillerOf(lot) switch
+    private string FillerName(Lot lot) => lot.Terrain != Terrain.Land ? LandmarkName(lot) : FillerOf(lot) switch
     {
-        Filler.Tenement => "Tenement",
+        Filler.Tenement => lot.Court ? "Tenement round a court" : "Tenement",
         Filler.Office => "Office building",
-        Filler.Church => $"St. {Content.LastNames[lot.Id % Content.LastNames.Length]}'s Church",
         Filler.Factory => "Factory",
         Filler.Vacant => "Vacant lot",
         Filler.Parking => "Parking lot",
@@ -217,7 +216,10 @@ public partial class MapView
     /// <summary>How tall a lot's building stands, in tiles.</summary>
     private float HeightOf(Lot lot)
     {
+        if (lot.Terrain == Terrain.Church) return 0.55f;
         if (lot.Terrain != Terrain.Land || World == null) return 0;
+        // Round a court the houses on the street are low, and the tall tenements stand at the back.
+        if (lot.Court && FacesSouth(lot)) return 0.36f + 0.08f * Hash(lot.Id, 7);
         float d = Downtown(lot.X + 0.5f, lot.Y + 0.5f);
         float h = Hash(lot.Id, 7);
         switch (lot.Use)
@@ -233,6 +235,7 @@ public partial class MapView
                     BusinessKind.Hotel => (1.0f + 0.3f * h) * (1 + 0.8f * d),
                     BusinessKind.Warehouse => 0.45f,
                     BusinessKind.Garage => 0.28f,
+                    BusinessKind.Court => (0.6f + 0.25f * h) * (1 + 1.2f * d),
                     _ => (0.4f + 0.25f * h) * (1 + 1.3f * d),
                 };
         }
@@ -240,7 +243,6 @@ public partial class MapView
         {
             Filler.Tenement => (0.55f + 0.3f * h) * (1 + 1.2f * d),
             Filler.Office => (0.8f + 0.6f * h) * (1 + 0.5f * d),
-            Filler.Church => 0.45f,
             Filler.Factory => 0.4f,
             _ => 0,
         };
@@ -249,7 +251,6 @@ public partial class MapView
     private float HeightCached(Lot lot) => lot.Id < _height.Length ? _height[lot.Id] : HeightOf(lot);
 
     /// <summary>A building's footprint on its lot, in tiles: west, north, east, south.</summary>
-    private static (float X0, float Y0, float X1, float Y1) Footprint(Lot lot) => (lot.X + 0.07f, lot.Y + 0.1f, lot.X + 0.93f, lot.Y + 0.9f);
 
     /// <summary>The outline of a lot's building as drawn, in tiles: its walls and roof together.</summary>
     private Vector2[] Silhouette(Lot lot)
@@ -278,6 +279,7 @@ public partial class MapView
 
     private void IndexCity()
     {
+        IndexBlocks();
         _lotsAt = Map.Lots.GroupBy(l => (l.Y, Column(l.X))).ToDictionary(g => g.Key, g => g.OrderByDescending(l => l.X).ToList());
         _lampsAt = LampPosts().GroupBy(l => ((int)l.Y, Column(l.X))).ToDictionary(g => g.Key, g => g.OrderByDescending(l => l.X).ToList());
         FindFactories();
@@ -399,6 +401,7 @@ public partial class MapView
         var lots = Map.Lots.Where(l => (l.X - 1) / CityMap.StrideX == bx && (l.Y - 1) / CityMap.StrideY == by).ToList();
         if (lots.Count > 0 && lots[0].Terrain == Terrain.Park) DrawParkGround(bx, by);
         else foreach (var lot in lots) DrawLotGround(lot);
+        DrawBackGround(bx, by);
 
         // Shadows fall to the east, away from the afternoon sun.
         foreach (var lot in lots)
@@ -429,6 +432,7 @@ public partial class MapView
     private void DrawLotGround(Lot lot)
     {
         var r = R(lot.X, lot.Y, 1, 1).Grow(-_t * 0.02f);
+        if (lot.Terrain == Terrain.Cemetery) { DrawCemeteryGround(lot); return; }
         switch (FillerOf(lot))
         {
             case Filler.Vacant:
@@ -522,6 +526,10 @@ public partial class MapView
         var w = World!;
         if (lot.Terrain == Terrain.Water) { DrawMooring(lot); return; }
         if (lot.Terrain == Terrain.Park) { DrawParkLot(lot); return; }
+        if (lot.Terrain == Terrain.Cemetery) { DrawCemeteryLot(lot); return; }
+        if (lot.Terrain == Terrain.Church) { DrawChurch(lot); return; }
+        if (lot.Court) DrawCourtYard(lot);
+        DrawAlleyClutter(lot);
         switch (lot.Use)
         {
             case LotUse.Business:
@@ -629,10 +637,14 @@ public partial class MapView
                 C.DrawLine(Q(x, y0, h), Q(x, y1, h), roof.Darkened(0.2f), 1);
         if (b.Kind == BusinessKind.Hotel) DrawWaterTower(x1 - 0.22f, y0 + 0.25f, h);
         else if (Fine) DrawRoofClutter(lot, h, roof);
-        if (h >= 0.55f && b.Kind is not (BusinessKind.Warehouse or BusinessKind.Garage) && Hash(lot.Id, 660) < 0.4f)
+        if (h >= 0.55f && b.Kind is not (BusinessKind.Warehouse or BusinessKind.Garage or BusinessKind.Court) && Hash(lot.Id, 660) < 0.4f)
             DrawFireEscape(Hash(lot.Id, 4) < 0.5f ? x0 + 0.08f : x1 - 0.4f, y1, 0.2f, h);
 
-        if (FacesSouth(lot)) DrawShopfront(lot, b, gang, open);
+        if (b.Kind == BusinessKind.Court)
+        {
+            if (FacesSouth(lot)) DrawCourtPassage(lot, h, wall, open);
+        }
+        else if (FacesSouth(lot)) DrawShopfront(lot, b, gang, open);
         DrawBillboard(lot, h, gang ?? new Color("3a332b"), gang.HasValue ? 3 : 1, open, () => { if (Fine) DrawTradeIcon(b.Kind, SignCentre(lot, h), _t * 0.11f); });
         if (racket != RacketKind.None) DrawRacketBadge(Q(x0 + 0.2f, (y0 + y1) / 2, h), racket);
         if (b.IsFront) DrawFrontBadge(Q(x1 - 0.2f, (y0 + y1) / 2, h), Palette.Gang(World!, b.OwnerGangId));
@@ -866,6 +878,15 @@ public partial class MapView
                 C.DrawCircle(c + new Vector2(-h * 0.12f, -h * 0.12f), h * 0.4f, Colors.White);
                 C.DrawCircle(c + new Vector2(-h * 0.12f, -h * 0.12f), h * 0.16f, ink);
                 break;
+            case BusinessKind.Court:
+            {
+                // A washing line with a shirt and a sheet on it.
+                C.DrawLine(c + new Vector2(-h * 0.9f, -h * 0.6f), c + new Vector2(h * 0.9f, -h * 0.45f), ink, lw * 0.6f);
+                C.DrawRect(new Rect2(c.X - h * 0.7f, c.Y - h * 0.58f, h * 0.6f, h * 1.1f), new Color("5d8fd6"));
+                C.DrawRect(new Rect2(c.X + h * 0.05f, c.Y - h * 0.5f, h * 0.7f, h * 0.8f), new Color("e8e0cc"));
+                C.DrawRect(new Rect2(c.X + h * 0.05f, c.Y - h * 0.5f, h * 0.7f, h * 0.8f), ink with { A = 0.5f }, false, 1);
+                break;
+            }
             case BusinessKind.Warehouse:
                 foreach (var (dx, dy) in new[] { (-0.85f, 0.0f), (0.0f, 0.0f), (-0.42f, -0.8f) })
                 {
@@ -1024,8 +1045,8 @@ public partial class MapView
                 DrawBlock(lot, h, WallFor(lot), RoofFor(lot), 1);
                 if (Fine)
                 {
-                    DrawFireEscape(Hash(lot.Id, 4) < 0.5f ? x0 + 0.08f : x1 - 0.4f, y1, 0.2f, h);
-                    if (Hash(lot.Id, 5) < 0.35f) DrawWaterTower(x0 + 0.15f, y0 + 0.2f, h);
+                    if (h >= 0.5f) DrawFireEscape(Hash(lot.Id, 4) < 0.5f ? x0 + 0.08f : x1 - 0.4f, y1, 0.2f, h);
+                    if (Hash(lot.Id, 5) < 0.35f && h >= 0.5f) DrawWaterTower(x0 + 0.15f, y0 + 0.2f, h);
                     else DrawRoofClutter(lot, h, RoofFor(lot));
                 }
                 break;
@@ -1039,25 +1060,6 @@ public partial class MapView
                     C.DrawLine(top, top - new Vector2(0, _t * 0.35f), new Color("3a3632"), Mathf.Max(1, _t * 0.02f));
                     Lit(() => C.DrawCircle(top - new Vector2(0, _t * 0.35f), _t * 0.03f, new Color("ff5040")));
                 }
-                break;
-            }
-            case Filler.Church:
-            {
-                var stone = Stones[(int)(Hash(lot.Id, 2) * Stones.Length)];
-                Box(x0 + 0.25f, y0, x1, y1, 0, h, stone, stone.Lightened(0.12f), new Color("4a4a52"));
-                // The gable, a rose window, and the steeple on the west end.
-                C.DrawColoredPolygon(new[] { Q(x0 + 0.25f, y1, h), Q(x1, y1, h), Q((x0 + 0.25f + x1) / 2, y1, h + 0.22f) }, stone.Darkened(0.06f));
-                var rose = Q((x0 + 0.25f + x1) / 2, y1, h * 0.62f);
-                C.DrawCircle(rose, _t * 0.08f, new Color("3a4a6a"));
-                Lit(() => C.DrawCircle(rose, _t * 0.07f, new Color("ffb85a")));
-                Face((x0 + 0.25f + x1) / 2 - 0.05f, (x0 + 0.25f + x1) / 2 + 0.05f, y1, 0, 0.14f, new Color("3e2c20"));
-                float tx0 = x0, tx1 = x0 + 0.25f, ty0 = y1 - 0.28f;
-                Box(tx0, ty0, tx1, y1, 0, 1.0f, stone.Lightened(0.05f), stone.Lightened(0.17f), stone);
-                C.DrawColoredPolygon(new[] { Q(tx0, y1, 1.0f), Q(tx1, y1, 1.0f), Q((tx0 + tx1) / 2, (ty0 + y1) / 2, 1.5f) }, new Color("4a4a52"));
-                C.DrawColoredPolygon(new[] { Q(tx0, y1, 1.0f), Q(tx0, ty0, 1.0f), Q((tx0 + tx1) / 2, (ty0 + y1) / 2, 1.5f) }, new Color("5a5a62"));
-                var cross = Q((tx0 + tx1) / 2, (ty0 + y1) / 2, 1.5f);
-                C.DrawLine(cross, cross - new Vector2(0, _t * 0.12f), new Color("c9a24a"), Mathf.Max(1, _t * 0.02f));
-                C.DrawLine(cross - new Vector2(_t * 0.04f, _t * 0.08f), cross - new Vector2(-_t * 0.04f, _t * 0.08f), new Color("c9a24a"), Mathf.Max(1, _t * 0.02f));
                 break;
             }
             case Filler.Factory:

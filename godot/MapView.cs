@@ -331,7 +331,8 @@ public partial class MapView : Control
                 string racket = b.Racket != RacketKind.None ? $"\nBack room: {Content.Rackets[b.Racket].Label}" : "";
                 string shut = b.IsOpen ? "" : $"\nClosed by police for {b.ShutWeeks} more weeks";
                 string front = b.IsFront ? $"\nA front for {World.GangById(b.OwnerGangId).Name}" : "";
-                return $"{b.Name}\nTakes ${b.Takings} a week · owner toughness {b.Toughness}/10\n{owner}{front}{racket}{shut}{WardLine(lot)}";
+                string takes = b.Kind == BusinessKind.Court ? $"A tenement court · the block pays ${b.Takings} a week" : $"Takes ${b.Takings} a week · owner toughness {b.Toughness}/10";
+                return $"{b.Name}\n{takes}\n{owner}{front}{racket}{shut}{WardLine(lot)}";
             case LotUse.Headquarters:
                 var g = World.Gangs.First(x => x.Id == lot.GangId);
                 return $"Headquarters of {g.Name}";
@@ -343,7 +344,7 @@ public partial class MapView : Control
             case LotUse.GunShop or LotUse.CarDealer:
                 return ShopTooltip(lot);
             default:
-                return lot.Terrain == Terrain.Land ? FillerName(lot) : "";
+                return lot.Terrain == Terrain.Water ? "" : FillerName(lot);
         }
     }
 

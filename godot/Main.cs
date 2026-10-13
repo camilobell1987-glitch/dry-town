@@ -330,7 +330,12 @@ public partial class Main : Control
         var b = W.BusinessById(id);
         var lot = W.LotOf(b);
         AddLabel(_businessPanel, b.Name, Palette.Ink, 18);
-        AddLabel(_businessPanel, $"{Content.Label(b.Kind)} · takes ${b.Takings} a week · owner toughness {b.Toughness}/10", Palette.InkQuiet);
+        if (b.Kind == BusinessKind.Court)
+        {
+            AddLabel(_businessPanel, $"Tenement court · the block pays ${b.Takings} a week · toughness {b.Toughness}/10", Palette.InkQuiet);
+            AddLabel(_businessPanel, $"Out of sight of the street: a racket here draws {Content.CourtHeatOff} less heat a week. Nobody owns it, so nobody can sell it.", Palette.InkQuiet, wrap: true);
+        }
+        else AddLabel(_businessPanel, $"{Content.Label(b.Kind)} · takes ${b.Takings} a week · owner toughness {b.Toughness}/10", Palette.InkQuiet);
         AddLabel(_businessPanel, $"{W.BlocksFromHq(W.Player, b):0.#} blocks from your HQ", Palette.InkQuiet);
         if (lot.WardId < W.Wards.Count)
         {
@@ -1279,6 +1284,7 @@ public partial class Main : Control
                 : W.FrontsOf(Me).First()).Id;
         if (Arg("--select") is string sel) { _map.SelectedBusiness = int.Parse(sel); }
         if (Flag("--select-mine")) _map.SelectedBusiness = W.TurfOf(Me).First().Id;
+        if (Flag("--select-court")) _map.SelectedBusiness = W.Businesses.Where(b => b.Kind == BusinessKind.Court).OrderBy(b => W.BlocksFromHq(W.Player, b)).First().Id;
         if (Flag("--select-rival"))
             _map.SelectedBusiness = W.Businesses.Where(b => b.IsProtected && b.ProtectorGangId != Me && b.IsOpen)
                 .OrderByDescending(b => Simulation.CanHijack(W, W.Player, b)).ThenBy(b => W.BlocksFromHq(W.Player, b)).First().Id;
@@ -1444,6 +1450,9 @@ public partial class Main : Control
                     "fire" => W.Businesses.Where(b => b.BurnedWeek >= W.Week - 1).Select(W.LotOf).FirstOrDefault() ?? hq,
                     "person" => W.PersonById(_map.SelectedPerson) is { } p ? W.Map.LotAt(p.LotId) : hq,
                     "shop" => _map.SelectedShop >= 0 ? W.Map.LotAt(_map.SelectedShop) : hq,
+                    "court" => W.Businesses.Where(b => b.Kind == BusinessKind.Court).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).First(),
+                    "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
+                    "cemetery" => W.Map.Lots.Where(l => l.Terrain == Terrain.Cemetery).OrderByDescending(l => W.Map.LotsOfBlock((l.X - 1) / CityMap.StrideX, (l.Y - 1) / CityMap.StrideY).Count(x => x.Terrain == Terrain.Cemetery)).ThenBy(l => l.Id).First(),
                     "biz" => _map.SelectedBusiness >= 0 ? W.LotOf(W.BusinessById(_map.SelectedBusiness)) : hq,
                     "job" => _shell.Sim.Upcoming.FirstOrDefault(j => j.GangId == Me && Simulation.TeamOf(j.Order).Any()) is { } job
                         ? W.Map.LotAt(Simulation.TargetLot(W, job.Order)) : hq,

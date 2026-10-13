@@ -51,7 +51,7 @@ public class ElectionTests
     [Fact]
     public void YourOwnManTakesTheSeatForGood()
     {
-        var (sim, w) = ToCampaign();
+        var (sim, w) = ToCampaign(2);
         var me = w.Player;
         var man = Candidate(w);
         var ward = w.Wards[0];
@@ -120,7 +120,7 @@ public class ElectionTests
     [Fact]
     public void MenAtThePollsTurnOutVotesOrGetCharged()
     {
-        var (sim, w) = ToCampaign(7);
+        var (sim, w) = ToCampaign(1);
         var ward = w.Wards[0];
         var shell = new CommandShell(sim);
         while (Politics.PollsOpen(w) == null) sim.AdvanceWeek();

@@ -22,7 +22,7 @@ public partial class Main
     /// <summary>The offer to buy one of your businesses outright.</summary>
     private void FrontOffer(Business b)
     {
-        if (b.IsFront || !b.IsOpen) return;
+        if (b.IsFront || !b.IsOpen || b.Kind == BusinessKind.Court) return;
         int price = Content.FrontPrice(b);
         _businessPanel.AddChild(new HSeparator());
         AddLabel(_businessPanel, "Buy it outright", Palette.Ink);
