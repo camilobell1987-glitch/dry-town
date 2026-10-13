@@ -633,6 +633,7 @@ public partial class MapView : Control
         DrawHeadquartersSigns(font, view);
         DrawCornerSigns(font, view);
         DrawWards(font);
+        DrawChatNames(font);
         foreach (var pen in _dyn) pen.Flush();
         _frameGlow.Flush();
         _marks.Flush();

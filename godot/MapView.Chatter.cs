@@ -12,16 +12,16 @@ using Godot;
 /// </summary>
 public partial class MapView
 {
-    private enum Topic { Language, Murder, Arrest, Booze, Money, Paper }
+    private enum Topic { Language, Murder, Arrest, Booze, Money, Paper, Broke, Grumble, Praise, Crime }
 
     /// <summary>Seconds one conversation cycle takes, and how much of it the pair spend talking.</summary>
     private const float ChatCycle = 15, ChatTalk = 9, ChatTurn = 1.7f;
 
     /// <summary>What happened in each ward this week as far as the street has heard: killings, arrests and shakedowns.</summary>
-    private (int Murders, int Arrests, int Payoffs)[] WardGossip()
+    private (int Murders, int Arrests, int Payoffs, int Crimes)[] WardGossip()
     {
         var w = World!;
-        var gossip = new (int, int, int)[Math.Max(1, w.Map.WardCount)];
+        var gossip = new (int, int, int, int)[Math.Max(1, w.Map.WardCount)];
         foreach (var a in w.Script)
         {
             if (Live && a.Tick > Clock) continue;
@@ -30,6 +30,7 @@ public partial class MapView
             int ward = w.Map.LotAt(lot).WardId;
             if (ward < 0 || ward >= gossip.Length) continue;
             ref var g = ref gossip[ward];
+            g.Item4++;
             if (a.Result == ActionResult.Killed || a is { Kind: ActionKind.Hit, Result: ActionResult.Success }) g.Item1++;
             else if (a.Result == ActionResult.Arrested || a.Kind == ActionKind.Raid) g.Item2++;
             else if (a is { Kind: ActionKind.Extort, Result: ActionResult.Success }) g.Item3++;
@@ -38,7 +39,7 @@ public partial class MapView
     }
 
     /// <summary>Pick what a pair are talking about, weighted by what's going on round them.</summary>
-    private Topic PickTopic(float roll, int ward, (int Murders, int Arrests, int Payoffs) news, bool speakeasy)
+    private Topic PickTopic(float roll, int ward, (int Murders, int Arrests, int Payoffs, int Crimes) news, bool speakeasy, Gang? boss, float resentment)
     {
         var weights = new (Topic Topic, float Weight)[]
         {
@@ -49,6 +50,13 @@ public partial class MapView
             (Topic.Booze, speakeasy ? (HourOfDay >= 20 || HourOfDay < 2 ? 6 : 2) : 0.3f),
             (Topic.Money, Mathf.Min(news.Payoffs, 4) * 0.5f),
             (Topic.Paper, 0.8f),
+            // Money's tight, and tighter where the shops are paying protection.
+            (Topic.Broke, 0.7f + Mathf.Min(news.Payoffs, 4) * 0.3f),
+            // The boss whose turf this is: cursed where the shops resent him or he's feared, praised where he's respected.
+            (Topic.Grumble, boss == null ? 0 : resentment * 3 + (float)boss.Fear / 100 * 1.5f),
+            (Topic.Praise, boss == null ? 0 : (float)boss.Respect / 100 * 3 * (1 - resentment)),
+            // A week with a lot going on in the ward has everyone saying the streets aren't safe.
+            (Topic.Crime, Mathf.Min(news.Crimes * 0.4f, 3)),
         };
         float total = weights.Sum(x => x.Weight), at = roll * total;
         foreach (var (topic, weight) in weights)
@@ -62,12 +70,13 @@ public partial class MapView
     /// <summary>Pairs of citizens stopped to talk on the blocks in view.</summary>
     private void DrawChatter(Rect2 view)
     {
-                if (Tile < 12) return;
+        if (Tile < 12) return;
         var w = World!;
         var map = w.Map;
         float outside = OutsideAt(HourOfDay);
         var gossip = WardGossip();
         var drinking = SpeakeasyDoors();
+        var turf = BlockBosses();
         float r = DotRadius;
         int bx0 = Math.Max(0, (int)(view.Position.X / CityMap.StrideX)), bx1 = Math.Min(map.BlocksX - 1, (int)(view.End.X / CityMap.StrideX));
         int by0 = Math.Max(0, (int)(view.Position.Y / CityMap.StrideY)), by1 = Math.Min(map.BlocksY - 1, (int)(view.End.Y / CityMap.StrideY));
@@ -96,7 +105,8 @@ public partial class MapView
                 DrawDot(a * _t, r, Palette.Citizen);
                 DrawDot(b * _t, r, Palette.Citizen);
 
-                var topic = PickTopic(Hash(seed, 943), ward, ward < gossip.Length ? gossip[ward] : default, drinking[bx, by] > 0);
+                var (boss, resentment) = turf[bx, by];
+                var topic = PickTopic(Hash(seed, 943), ward, ward < gossip.Length ? gossip[ward] : default, drinking[bx, by] > 0, boss, resentment);
                 // They take turns, with a breath between.
                 int turn = (int)(local / ChatTurn);
                 float into = local - turn * ChatTurn;
@@ -104,7 +114,7 @@ public partial class MapView
                 var speaker = turn % 2 == 0 ? a : b;
                 float pop = Mathf.Min(1, into / 0.18f);
                 pop = 1 + (1 - pop) * -0.6f + Mathf.Sin(Mathf.Min(1, into / 0.3f) * Mathf.Pi) * 0.12f;
-                DrawBubble(speaker, turn % 2 == 0 ? -1 : 1, topic, ward, pop);
+                DrawBubble(speaker, turn % 2 == 0 ? -1 : 1, topic, ward, pop, boss);
             }
         }
     }
@@ -121,7 +131,7 @@ public partial class MapView
     }
 
     /// <summary>A speech bubble over someone's head, its tail pointing down at him, with the topic drawn inside.</summary>
-    private void DrawBubble(Vector2 speaker, int lean, Topic topic, int ward, float scale)
+    private void DrawBubble(Vector2 speaker, int lean, Topic topic, int ward, float scale, Gang? boss)
     {
         var keep = C;
         C = _marks;
@@ -129,6 +139,17 @@ public partial class MapView
         var foot = speaker * _t;
         var centre = foot + new Vector2(lean * s * 0.35f, -s * 1.05f);
         var size = new Vector2(s * 1.5f, s * 1.1f);
+        // The boss's name is written in the bubble, which widens to hold it. Letters are drawn on the screen, so they stay sharp.
+        if (topic is Topic.Grumble or Topic.Praise && boss != null)
+        {
+            var font = ThemeDB.FallbackFont;
+            string name = World!.HoodById(boss.BossHoodId).Name.Split(' ')[^1];
+            int px = Mathf.Max(8, (int)(s / Px(1) * 0.5f));
+            float wide = Px(font.GetStringSize(name, HorizontalAlignment.Left, -1, px).X);
+            size.X = Mathf.Max(size.X, wide + s * 0.5f);
+            centre.X = foot.X + lean * Mathf.Max(s * 0.35f, size.X / 2 - s * 0.4f);
+            _chatNames.Add((centre / U * Tile + Origin, name, px, topic == Topic.Praise ? new Color("2f8a4a") : new Color("c8382e")));
+        }
         var paper = new Color("f3eddf");
         var ink = new Color("1a1716");
         var box = new Rect2(centre - size / 2, size);
@@ -139,8 +160,44 @@ public partial class MapView
         C.DrawColoredPolygon(new[] { tailTop + new Vector2(-s * 0.2f, 0), tailTop + new Vector2(s * 0.2f, 0), tip }, ink);
         C.DrawColoredPolygon(new[] { tailTop + new Vector2(-s * 0.12f, -s * 0.02f), tailTop + new Vector2(s * 0.12f, -s * 0.02f), tip + new Vector2(0, -s * 0.1f) }, paper);
         RoundBox(box, s * 0.25f, paper);
-        DrawTopic(topic, ward, centre, s * 0.48f, ink);
+        if (topic is not (Topic.Grumble or Topic.Praise)) DrawTopic(topic, ward, centre, s * 0.48f, ink);
         C = keep;
+    }
+
+    private readonly List<(Vector2 At, string Name, int Size, Color Colour)> _chatNames = new();
+
+    /// <summary>The bosses' names in this frame's bubbles, written over them on the screen.</summary>
+    private void DrawChatNames(Font font)
+    {
+        foreach (var (at, name, size, colour) in _chatNames)
+            C.DrawString(font, at + new Vector2(-200, size * 0.36f), name, HorizontalAlignment.Center, 400, size, colour);
+        _chatNames.Clear();
+    }
+
+    /// <summary>On each block, the gang most of its shops pay, and how much the shops there resent paying (0 to 1).</summary>
+    private (Gang? Boss, float Resentment)[,] BlockBosses()
+    {
+        var w = World!;
+        var map = w.Map;
+        var counts = new Dictionary<(int, int, int), (int Shops, int Resentment)>();
+        foreach (var b in w.Businesses)
+        {
+            int gang = ShownState(b).Gang;
+            if (!b.IsOpen || gang < 0) continue;
+            var lot = w.LotOf(b);
+            var key = ((lot.X - 1) / CityMap.StrideX, (lot.Y - 1) / CityMap.StrideY, gang);
+            counts.TryGetValue(key, out var c);
+            counts[key] = (c.Shops + 1, c.Resentment + b.Resentment);
+        }
+        var bosses = new (Gang?, float)[map.BlocksX, map.BlocksY];
+        foreach (var group in counts.GroupBy(kv => (kv.Key.Item1, kv.Key.Item2)))
+        {
+            var top = group.OrderByDescending(kv => kv.Value.Shops).ThenBy(kv => kv.Key.Item3).First();
+            var gang = w.Gangs.FirstOrDefault(g => g.Id == top.Key.Item3);
+            if (gang is not { Alive: true } || gang.BossHoodId < 0) continue;
+            bosses[group.Key.Item1, group.Key.Item2] = (gang, Mathf.Clamp(top.Value.Resentment / (float)top.Value.Shops / 100f, 0, 1));
+        }
+        return bosses;
     }
 
     private void RoundBox(Rect2 box, float radius, Color colour)
@@ -156,6 +213,7 @@ public partial class MapView
     private void DrawTopic(Topic topic, int ward, Vector2 c, float m, Color ink)
     {
         float line = Mathf.Max(1, m * 0.16f);
+        var paperRim = new Color("f3eddf");
         switch (topic)
         {
             case Topic.Language:
@@ -209,6 +267,31 @@ public partial class MapView
                 C.DrawRect(bill.Grow(-m * 0.14f), new Color("a9cf9a"), false, Mathf.Max(1, m * 0.08f));
                 C.DrawCircle(c, m * 0.34f, new Color("2c5a2e"));
                 C.DrawCircle(c, m * 0.18f, new Color("a9cf9a"));
+                break;
+            }
+            case Topic.Broke:
+            {
+                // The dollar bill again, struck through in red: they're short.
+                DrawTopic(Topic.Money, ward, c, m, ink);
+                var red = new Color("c8382e");
+                float w = Mathf.Max(1.5f, m * 0.2f);
+                C.DrawLine(c + new Vector2(-m * 1.0f, m * 0.75f), c + new Vector2(m * 1.0f, -m * 0.75f), paperRim, w * 1.6f);
+                C.DrawLine(c + new Vector2(-m * 1.0f, m * 0.75f), c + new Vector2(m * 1.0f, -m * 0.75f), red, w);
+                break;
+            }
+            case Topic.Crime:
+            {
+                // A pistol, with a red arrow climbing beside it: crime's going up.
+                var gun = new Color("2a2826");
+                var p = c + new Vector2(-m * 0.35f, 0);
+                C.DrawRect(new Rect2(p + new Vector2(-m * 0.7f, -m * 0.42f), new Vector2(m * 1.15f, m * 0.3f)), gun);
+                C.DrawColoredPolygon(new[] { p + new Vector2(-m * 0.7f, -m * 0.15f), p + new Vector2(-m * 0.25f, -m * 0.15f), p + new Vector2(-m * 0.4f, m * 0.6f), p + new Vector2(-m * 0.82f, m * 0.6f) }, gun);
+                C.DrawArc(p + new Vector2(-m * 0.12f, -m * 0.08f), m * 0.16f, 0, Mathf.Pi, 6, gun, Mathf.Max(1, m * 0.08f));
+                var red = new Color("c8382e");
+                var foot = c + new Vector2(m * 0.75f, m * 0.6f);
+                var head = c + new Vector2(m * 0.75f, -m * 0.65f);
+                C.DrawLine(foot, head + new Vector2(0, m * 0.3f), red, Mathf.Max(1.5f, m * 0.2f));
+                C.DrawColoredPolygon(new[] { head, head + new Vector2(-m * 0.3f, m * 0.38f), head + new Vector2(m * 0.3f, m * 0.38f) }, red);
                 break;
             }
             default:
