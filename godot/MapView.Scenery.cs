@@ -110,7 +110,9 @@ public partial class MapView
             C.DrawLine(Q(x, y + 0.25f, 0), Q(x, y + 0.25f, 0.62f), iron.Lightened(0.1f), lw);
             C.DrawLine(Q(x, y + 0.75f, 0), Q(x, y + 0.75f, 0.62f), iron, lw);
         }
-        Box(xa, y + 0.2f, xb, y + 0.8f, 0.6f, 0.68f, iron, iron.Lightened(0.15f), new Color("4a443e"));
+        // The deck in tile-long spans, so it follows the street where the street bends.
+        for (float x = xa; x < xb; x += 1)
+            Box(x, y + 0.2f, Mathf.Min(x + 1.02f, xb), y + 0.8f, 0.6f, 0.68f, iron, iron.Lightened(0.15f), new Color("4a443e"));
         if (!Fine) return;
         for (float x = xa; x < xb; x += 0.25f)
         {
@@ -118,8 +120,12 @@ public partial class MapView
             C.DrawLine(Q(x + 0.125f, y + 0.8f, 0.68f), Q(x + 0.25f, y + 0.8f, 0.6f), iron.Lightened(0.25f), 1);
             C.DrawLine(Q(x, y + 0.3f, 0.68f), Q(x, y + 0.7f, 0.68f), new Color("5a4a3a"), 1);
         }
-        C.DrawLine(Q(xa, y + 0.4f, 0.69f), Q(xb, y + 0.4f, 0.69f), new Color("9a9a9e"), 1);
-        C.DrawLine(Q(xa, y + 0.6f, 0.69f), Q(xb, y + 0.6f, 0.69f), new Color("9a9a9e"), 1);
+        for (float x = xa; x < xb; x += 1)
+        {
+            float to = Mathf.Min(x + 1, xb);
+            C.DrawLine(Q(x, y + 0.4f, 0.69f), Q(to, y + 0.4f, 0.69f), new Color("9a9a9e"), 1);
+            C.DrawLine(Q(x, y + 0.6f, 0.69f), Q(to, y + 0.6f, 0.69f), new Color("9a9a9e"), 1);
+        }
     }
 
     /// <summary>A train of four cars running along the El, its windows lit after dark.</summary>

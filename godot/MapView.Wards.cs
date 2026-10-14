@@ -59,7 +59,14 @@ public partial class MapView
                 var b = c[(i + 1) % 4];
                 bool edge = (a.X == b.X && (a.X <= 0.5f || a.X >= Map.Width - 0.5f)) || (a.Y == b.Y && (a.Y <= 0.5f || a.Y >= Map.Height - 0.5f));
                 if (edge && !ShowWards) continue;
-                C.DrawDashedLine(P(a.X, a.Y), P(b.X, b.Y), (ShowWards ? colour : Palette.Ink) with { A = alpha }, lw, Mathf.Max(4, _t * 0.4f));
+                // In pieces a couple of tiles long, so the boundary follows the street where it bends.
+                int pieces = Mathf.Max(1, Mathf.CeilToInt(a.DistanceTo(b) / 2));
+                for (int k = 0; k < pieces; k++)
+                {
+                    var from = a.Lerp(b, (float)k / pieces);
+                    var to = a.Lerp(b, (float)(k + 1) / pieces);
+                    C.DrawDashedLine(P(from.X, from.Y), P(to.X, to.Y), (ShowWards ? colour : Palette.Ink) with { A = alpha }, lw, Mathf.Max(4, _t * 0.4f));
+                }
             }
 
             // The ward's name in the middle, with its alderman underneath when wards are shown.

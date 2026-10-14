@@ -32,12 +32,12 @@ uniform vec4 shade : source_color = vec4(1.0);
 const float W = 4.2;
 const float H = 2.2;
 varying vec2 uv;
-" + RoadShader + PlanShader + @"
+" + RoadShader + BendShader + PlanShader + @"
 void vertex() {
     vec4 day = planned(INSTANCE_ID);
     if (day.w > -0.5) {
         // Someone with somewhere to be: out on the street only on the way, or at a door.
-        VERTEX = VERTEX * (day.z > 0.5 && COLOR.g < 1.5 ? radius * 2.0 : 0.0) + widen2(day.xy);
+        VERTEX = VERTEX * (day.z > 0.5 && COLOR.g < 1.5 ? radius * 2.0 : 0.0) + drawn(day.xy);
         uv = UV;
     } else {
     // x, y: the block's north-west corner; z: how far round the block he starts; w: his pace, signed.
@@ -57,7 +57,7 @@ void vertex() {
     else if (d < W + H) p = vec2(W - across, d - W);
     else if (d < 2.0 * W + H) p = vec2(W - (d - W - H), H - across);
     else p = vec2(across, H - (d - 2.0 * W - H));
-    VERTEX = VERTEX * size + widen2(c.xy + p);
+    VERTEX = VERTEX * size + drawn(c.xy + p);
     uv = UV;
     }
 }
@@ -123,6 +123,7 @@ void fragment() {
         RenderingServer.CanvasItemSetMaterial(_crowdItem, _crowdMaterial.GetRid());
         RenderingServer.CanvasItemAddMultimesh(_crowdItem, _crowdMesh.GetRid());
         _crowdMaterial.SetShaderParameter("fill", Palette.Citizen);
+        BendCrowd(_crowdMaterial);
         _crowdMaterial.SetShaderParameter("edge", new Color("d8d0c0", 0.55f));
     }
 

@@ -52,10 +52,10 @@ public partial class MapView
     private static float Across(int line, int stride, float share) => line * stride + PaveWidth + Roadway * share;
 
     /// <summary>A screen point as a tile of the plan.</summary>
-    private Vector2 TileUnder(Vector2 screen) => Narrow((screen - Origin) / Tile);
+    private Vector2 TileUnder(Vector2 screen) => Undrawn((screen - Origin) / Tile);
 
     /// <summary>A tile of the plan as a point on screen.</summary>
-    private Vector2 OnScreen(Vector2 tile) => Origin + Widen(tile) * Tile;
+    private Vector2 OnScreen(Vector2 tile) => Origin + Drawn(tile) * Tile;
 
     /// <summary>The same stretch, for the crowd shader.</summary>
     private const string RoadShader = @"

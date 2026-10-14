@@ -458,6 +458,10 @@ Rival outfits with a third of the aldermen buy a place that can do the work when
 
 ![The city's contracts on the City Hall tab](docs/screenshots/contracts.png)
 
+## Crooked streets
+
+The streets don't run ruler-straight. The whole map is drawn through a gentle bend, so streets and avenues curve and the blocks between them lean at odd angles: a little all over town, and a lot in the old town around downtown and the waterfront below it, where the lanes were laid out long before anyone drew a grid. The river bends with them and the El follows its street. Underneath, the plan is still the grid, so walking, driving and every block's lots work just as before, and clicking on the map bends back the same way to find what's under the cursor. The bend comes from the street names, so a city always looks the same when it's opened again.
+
 ## Zoning
 
 The city is laid out the way New York had grown by 1920. Downtown, in the middle of town or north of the river, office towers stand over the streets, and at its heart the city's own buildings face each other in stone: City Hall under its copper dome, the county courthouse, and in a bigger city the Municipal Building's gilt tower, the Hall of Records, the Public Library with its lions, the Museum of Art, the Opera House and the Palace Theatre. Factories, warehouses, gasholders and coal yards line the waterfront and spread out along one edge of town. Packed in round them and round downtown, where the work is, are the immigrant tenements, and the tenement courts are all here; hovering over a building there tells you whose they are, the Italian tenements or the Polish. Further out come the brownstone rows with their stoops, beside the parks the fashionable district of mansions and grand apartment houses, and at the edge of town the suburbs, wooden houses on lawns behind picket fences.

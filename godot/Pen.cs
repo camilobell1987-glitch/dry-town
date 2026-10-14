@@ -99,6 +99,36 @@ public sealed class Pen
         DrawPolyline(new[] { p, new Vector2(e.X, p.Y), e, new Vector2(p.X, e.Y), p }, c, width);
     }
 
+    /// <summary>A rectangle of the plan, in pieces small enough to follow the bend in the streets.</summary>
+    public void DrawRect(Area a, Color c, bool filled = true, float width = -1)
+    {
+        var (nx, ny) = a.Pieces;
+        if (!filled)
+        {
+            var edge = new List<Vector2>();
+            for (int i = 0; i < nx; i++) edge.Add(a.Corner((float)i / nx, 0));
+            for (int j = 0; j < ny; j++) edge.Add(a.Corner(1, (float)j / ny));
+            for (int i = nx; i > 0; i--) edge.Add(a.Corner((float)i / nx, 1));
+            for (int j = ny; j >= 0; j--) edge.Add(a.Corner(0, (float)j / ny));
+            DrawPolyline(edge.ToArray(), c, width);
+            return;
+        }
+        if (nx == 1 && ny == 1)
+        {
+            Quad(a.Corner(0, 0), a.Corner(1, 0), a.Corner(1, 1), a.Corner(0, 1), c);
+            return;
+        }
+        var row = new Vector2[nx + 1];
+        var next = new Vector2[nx + 1];
+        for (int i = 0; i <= nx; i++) row[i] = a.Corner((float)i / nx, 0);
+        for (int j = 1; j <= ny; j++)
+        {
+            for (int i = 0; i <= nx; i++) next[i] = a.Corner((float)i / nx, (float)j / ny);
+            for (int i = 0; i < nx; i++) Quad(row[i], row[i + 1], next[i + 1], next[i], c);
+            (row, next) = (next, row);
+        }
+    }
+
     public void DrawCircle(Vector2 centre, float radius, Color c)
     {
         if (radius <= 0) return;

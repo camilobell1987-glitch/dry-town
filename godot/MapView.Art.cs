@@ -36,16 +36,17 @@ public partial class MapView
     private Vector2? _pin;
 
     /// <summary>A point of the plan, in tiles, as drawn.</summary>
-    private Vector2 P(float x, float y) =>
-        _pin is { } pin ? _o + (Widen(pin) + new Vector2(x, y) - pin) * _t : _o + Widen(new Vector2(x, y)) * _t;
+    private Vector2 P(float x, float y)
+    {
+        if (_pin is not { } pin) return _o + Drawn(new Vector2(x, y)) * _t;
+        // Turned and leant with the street under it, so it lines up with the kerb.
+        var (ax, ay) = BendAxes(pin);
+        return _o + (Drawn(pin) + ax * (x - pin.X) + ay * (y - pin.Y)) * _t;
+    }
 
     private Vector2 P(Vector2 at) => P(at.X, at.Y);
 
-    private Rect2 R(float x, float y, float w, float h)
-    {
-        var from = P(x, y);
-        return new(from, P(x + w, y + h) - from);
-    }
+    private Area R(float x, float y, float w, float h) => new(this, x, y, w, h);
 
     /// <summary>A point at a height above the ground, as drawn.</summary>
     private Vector2 Q(float x, float y, float z) => Angled ? P(x, y) + new Vector2(S * z, -z) * _t : P(x, y);
@@ -286,9 +287,9 @@ public partial class MapView
     {
         var (x0, y0, x1, y1) = Footprint(lot);
         float h = HeightCached(lot);
-        if (h <= 0 || !Angled) return new[] { Widen(new Vector2(x0, y0)), Widen(new Vector2(x1, y0)), Widen(new Vector2(x1, y1)), Widen(new Vector2(x0, y1)) };
+        if (h <= 0 || !Angled) return new[] { Drawn(new Vector2(x0, y0)), Drawn(new Vector2(x1, y0)), Drawn(new Vector2(x1, y1)), Drawn(new Vector2(x0, y1)) };
         var up = new Vector2(S * h, -h);
-        Vector2 a = Widen(new Vector2(x0, y0)), b = Widen(new Vector2(x1, y0)), c = Widen(new Vector2(x1, y1)), d = Widen(new Vector2(x0, y1));
+        Vector2 a = Drawn(new Vector2(x0, y0)), b = Drawn(new Vector2(x1, y0)), c = Drawn(new Vector2(x1, y1)), d = Drawn(new Vector2(x0, y1));
         return new[] { a, a + up, b + up, c + up, c, d };
     }
 
@@ -370,7 +371,7 @@ public partial class MapView
         if (by == 0) grown = grown.GrowSide(Side.Top, _t * (0.3f + Headroom));
         if (bx == Map.BlocksX) grown = grown.GrowSide(Side.Right, _t * 0.3f);
         if (by == Map.BlocksY) grown = grown.GrowSide(Side.Bottom, _t * 0.3f);
-        if (grown != cell) C.DrawRect(grown, Pavement.Darkened(0.35f));
+        if (!grown.Same(cell)) C.DrawRect(grown, Pavement.Darkened(0.35f));
         C.DrawRect(cell, Asphalt);
 
         if (Fine)
@@ -455,57 +456,58 @@ public partial class MapView
     /// The part of a block's pavement that lies in one ground cell: the paving, the kerb along its outer
     /// edge and the joints across it.
     /// </summary>
-    private void DrawPavement(int bx, int by, Rect2 cell)
+    private void DrawPavement(int bx, int by, Area cell)
     {
         if (bx < 0 || by < 0 || bx >= Map.BlocksX || by >= Map.BlocksY || by == Map.RiverRow) return;
-        var block = BlockRect(bx, by);
-        var pave = block.Grow(_t * 0.2f);
-        var part = pave.Intersection(cell);
-        if (part.Size.X <= 0 || part.Size.Y <= 0) return;
-        C.DrawRect(part, Pavement);
+        // Worked out on the plan, so the paving follows the bend in the street.
+        float bx0 = bx * CityMap.StrideX + 1, by0 = by * CityMap.StrideY + 1;
+        float bx1 = bx0 + CityMap.LotsPerBlockX, by1 = by0 + CityMap.LotsPerBlockY;
+        float px0 = bx0 - PaveWidth, py0 = by0 - PaveWidth, px1 = bx1 + PaveWidth, py1 = by1 + PaveWidth;
+        float cx0 = Mathf.Max(px0, cell.X), cy0 = Mathf.Max(py0, cell.Y), cx1 = Mathf.Min(px1, cell.X + cell.W), cy1 = Mathf.Min(py1, cell.Y + cell.H);
+        if (cx1 <= cx0 || cy1 <= cy0) return;
+        C.DrawRect(R(cx0, cy0, cx1 - cx0, cy1 - cy0), Pavement);
 
-        float lw = Mathf.Max(1, _t * 0.04f), half = lw / 2;
-        var kerb = new[]
+        float lw = Mathf.Max(1, _t * 0.04f), inset = lw / 2 / _t;
+        void Edge(float ax, float ay, float bx2, float by2)
         {
-            (new Vector2(pave.Position.X, pave.Position.Y + half), new Vector2(pave.End.X, pave.Position.Y + half)),
-            (new Vector2(pave.Position.X, pave.End.Y - half), new Vector2(pave.End.X, pave.End.Y - half)),
-            (new Vector2(pave.Position.X + half, pave.Position.Y), new Vector2(pave.Position.X + half, pave.End.Y)),
-            (new Vector2(pave.End.X - half, pave.Position.Y), new Vector2(pave.End.X - half, pave.End.Y)),
-        };
-        foreach (var (a, b) in kerb)
-        {
-            var from = new Vector2(Mathf.Max(a.X, part.Position.X), Mathf.Max(a.Y, part.Position.Y));
-            var to = new Vector2(Mathf.Min(b.X, part.End.X), Mathf.Min(b.Y, part.End.Y));
-            if (from.X > to.X || from.Y > to.Y || (from.X == to.X && from.Y == to.Y)) continue;
-            if (a.Y == b.Y ? a.Y < part.Position.Y || a.Y > part.End.Y : a.X < part.Position.X || a.X > part.End.X) continue;
-            C.DrawLine(from, to, Kerb, lw);
+            // Clipped to this cell, and drawn in short pieces so it curves with the street.
+            ax = Mathf.Clamp(ax, cx0, cx1); bx2 = Mathf.Clamp(bx2, cx0, cx1);
+            ay = Mathf.Clamp(ay, cy0, cy1); by2 = Mathf.Clamp(by2, cy0, cy1);
+            float len = Mathf.Abs(bx2 - ax) + Mathf.Abs(by2 - ay);
+            if (len <= 0) return;
+            int n = Mathf.Max(1, Mathf.CeilToInt(len / 1.2f));
+            for (int i = 0; i < n; i++)
+                C.DrawLine(P(ax + (bx2 - ax) * i / n, ay + (by2 - ay) * i / n), P(ax + (bx2 - ax) * (i + 1) / n, ay + (by2 - ay) * (i + 1) / n), Kerb, lw);
         }
+        if (py0 + inset >= cy0 && py0 + inset <= cy1) Edge(px0, py0 + inset, px1, py0 + inset);
+        if (py1 - inset >= cy0 && py1 - inset <= cy1) Edge(px0, py1 - inset, px1, py1 - inset);
+        if (px0 + inset >= cx0 && px0 + inset <= cx1) Edge(px0 + inset, py0, px0 + inset, py1);
+        if (px1 - inset >= cx0 && px1 - inset <= cx1) Edge(px1 - inset, py0, px1 - inset, py1);
         if (!Fine) return;
 
         // Joints across the paving, on all four sides.
         var joint = Kerb with { A = 0.35f };
-        for (float x = pave.Position.X + _t * 0.25f; x < pave.End.X; x += _t * 0.25f)
+        void Joint(float ax, float ay, float bx2, float by2)
         {
-            if (x < part.Position.X || x > part.End.X) continue;
-            Joint(new Vector2(x, pave.Position.Y), new Vector2(x, block.Position.Y));
-            Joint(new Vector2(x, block.End.Y), new Vector2(x, pave.End.Y));
+            ax = Mathf.Clamp(ax, cx0, cx1); bx2 = Mathf.Clamp(bx2, cx0, cx1);
+            ay = Mathf.Clamp(ay, cy0, cy1); by2 = Mathf.Clamp(by2, cy0, cy1);
+            if (ax != bx2 || ay != by2) C.DrawLine(P(ax, ay), P(bx2, by2), joint, 1);
         }
-        for (float y = pave.Position.Y + _t * 0.25f; y < pave.End.Y; y += _t * 0.25f)
+        for (float x = px0 + 0.25f; x < px1; x += 0.25f)
         {
-            if (y < part.Position.Y || y > part.End.Y) continue;
-            Joint(new Vector2(pave.Position.X, y), new Vector2(block.Position.X, y));
-            Joint(new Vector2(block.End.X, y), new Vector2(pave.End.X, y));
+            if (x < cx0 || x > cx1) continue;
+            Joint(x, py0, x, by0);
+            Joint(x, by1, x, py1);
         }
-
-        void Joint(Vector2 a, Vector2 b)
+        for (float y = py0 + 0.25f; y < py1; y += 0.25f)
         {
-            a = new Vector2(Mathf.Clamp(a.X, part.Position.X, part.End.X), Mathf.Clamp(a.Y, part.Position.Y, part.End.Y));
-            b = new Vector2(Mathf.Clamp(b.X, part.Position.X, part.End.X), Mathf.Clamp(b.Y, part.Position.Y, part.End.Y));
-            if (a != b) C.DrawLine(a, b, joint, 1);
+            if (y < cy0 || y > cy1) continue;
+            Joint(px0, y, bx0, y);
+            Joint(bx1, y, px1, y);
         }
     }
 
-    private Rect2 BlockRect(int bx, int by) =>
+    private Area BlockRect(int bx, int by) =>
         R(bx * CityMap.StrideX + 1, by * CityMap.StrideY + 1, CityMap.LotsPerBlockX, CityMap.LotsPerBlockY);
 
     /// <summary>The ground on a lot: a yard behind a building, a vacant lot, a parking lot or a little park.</summary>

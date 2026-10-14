@@ -384,8 +384,8 @@ public partial class MapView : Control
         int best = -1;
         foreach (var lot in World.Map.Lots)
         {
-            var drawn = Widen(new Vector2(lot.X, lot.Y));
-            if (drawn.X > tile.X + 0.2f || drawn.X + 1 + S * 3 < tile.X || drawn.Y + 1 < tile.Y || drawn.Y - 3 > tile.Y) continue;
+            var drawn = Drawn(new Vector2(lot.X, lot.Y));
+            if (drawn.X > tile.X + 0.4f || drawn.X + 1.4f + S * 3 < tile.X || drawn.Y + 1.4f < tile.Y || drawn.Y - 3.2f > tile.Y) continue;
             if (!Geometry2D.IsPointInPolygon(tile, Silhouette(lot))) continue;
             if (best < 0 || InFront(lot, World.Map.LotAt(best))) best = lot.Id;
         }
@@ -772,7 +772,7 @@ public partial class MapView : Control
     private void DrawDot(Vector2 ground, float r, Color fill, Color? rim = null)
     {
         var keep = C;
-        C = DynAt(Narrow((ground.Y - _o.Y) / _t, CityMap.StrideY));
+        C = DynAt(Undrawn((ground - _o) / _t).Y);
         C.DrawCircle(ground + new Vector2(r * 0.25f, r * 0.3f), r, Shadow);
         if (rim is { } ring)
         {

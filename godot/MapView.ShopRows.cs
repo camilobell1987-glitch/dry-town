@@ -23,7 +23,7 @@ public partial class MapView
         var (_, y0, _, y1) = Footprint(lot);
         var (x0, x1) = UnitSpan(lot, unit, units);
         float h = HeightCached(lot);
-        Vector2 a = Widen(new Vector2(x0, y0)), b = Widen(new Vector2(x1, y0)), c = Widen(new Vector2(x1, y1)), d = Widen(new Vector2(x0, y1));
+        Vector2 a = Drawn(new Vector2(x0, y0)), b = Drawn(new Vector2(x1, y0)), c = Drawn(new Vector2(x1, y1)), d = Drawn(new Vector2(x0, y1));
         if (h <= 0 || !Angled) return new[] { a, b, c, d };
         var up = new Vector2(S * h, -h);
         return new[] { a + up, b + up, c + up, c, d, d + up };
