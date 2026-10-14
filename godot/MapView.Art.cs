@@ -182,40 +182,13 @@ public partial class MapView
 
     // ---- What stands where -----------------------------------------------------
 
-    /// <summary>What a lot nobody does business on has on it.</summary>
-    private enum Filler { None, Tenement, Office, Factory, Vacant, Parking, PocketPark, Rowhouse, House, Mansion, Apartment, Warehouse, Gasworks, Yard }
-
     /// <summary>How far a point is into downtown, from 0 outside it, through 0.4 at its edge, to 1 at its heart.</summary>
     private float Downtown(float x, float y) =>
         Map.CoreOf(Mathf.Clamp(((int)x - 1) / CityMap.StrideX, 0, Map.BlocksX - 1), Mathf.Clamp(((int)y - 1) / CityMap.StrideY, 0, Map.BlocksY - 1));
 
-    private Filler FillerOf(Lot lot)
-    {
-        if (lot.Use != LotUse.Empty || lot.Terrain != Terrain.Land) return Filler.None;
-        if (lot.Court) return Filler.Tenement;
-        float h = Hash(lot.Id, 11);
-        return Map.ZoneOf(lot) switch
-        {
-            Zone.Downtown => h < 0.88f ? Filler.Office : Filler.Parking,
-            Zone.Industrial => h switch
-            {
-                < 0.4f => Filler.Factory,
-                < 0.6f => Filler.Warehouse,
-                < 0.68f => Filler.Gasworks,
-                < 0.8f => Filler.Yard,
-                < 0.9f => Filler.Vacant,
-                _ => Filler.Parking,
-            },
-            Zone.Tenements => h switch { < 0.84f => Filler.Tenement, < 0.92f => Filler.Vacant, _ => Filler.PocketPark },
-            Zone.Rowhouses => h switch { < 0.8f => Filler.Rowhouse, < 0.88f => Filler.Tenement, < 0.94f => Filler.PocketPark, _ => Filler.Vacant },
-            Zone.GoldCoast => h switch { < 0.55f => Filler.Mansion, < 0.9f => Filler.Apartment, _ => Filler.PocketPark },
-            Zone.Suburbs => h < 0.9f ? Filler.House : Filler.Vacant,
-            _ => Filler.Tenement,
-        };
-    }
+    private Filler FillerOf(Lot lot) => Map.FillerOf(lot);
 
-    /// <summary>Whether people live in a building of this sort, rather than work in it.</summary>
-    private static bool IsHome(Filler f) => f is Filler.Tenement or Filler.Rowhouse or Filler.House or Filler.Mansion or Filler.Apartment;
+    private static bool IsHome(Filler f) => CityMap.IsHome(f);
 
     private string FillerName(Lot lot) => lot.Terrain != Terrain.Land ? LandmarkName(lot) : FillerOf(lot) switch
     {

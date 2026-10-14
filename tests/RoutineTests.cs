@@ -89,4 +89,38 @@ public class RoutineTests
         Assert.Equal(d.RoutineOf(id).Stops, again.RoutineOf(id).Stops);
         Assert.Equal(d.RoutineOf(id).LeaveHome, again.RoutineOf(id).LeaveHome);
     }
+
+    /// <summary>A city peopled the way the map peoples it: homes on the residential lots, a few over the shops.</summary>
+    private static (World W, CityDirectory D) Zoned(ulong seed, CitySize size)
+    {
+        var w = Simulation.New(new WorldSettings { Seed = seed, Size = size, CityEventsEnabled = false, DirectorEnabled = false }).World;
+        bool Home(Lot l) => CityMap.IsHome(w.Map.FillerOf(l));
+        int People(Lot l) => l.Terrain != Terrain.Land ? 0 : l.Use == LotUse.Business ? 20 : Home(l) ? 30 : 0;
+        return (w, new CityDirectory(w, People, Home));
+    }
+
+    [Fact]
+    public void FactoryHandsGoToTheFactoriesAndClerksDowntown()
+    {
+        var (w, d) = Zoned(7, CitySize.Huge);
+        var workers = Everyone(w, d).Where(c => c.WorkBusinessId < 0 && d.RoutineOf(c.Id).Kind == RoutineKind.Worker).ToList();
+        Filler At(Citizen c) => w.Map.FillerOf(w.Map.LotAt(d.RoutineOf(c.Id).Stops[0].LotId));
+        var hands = workers.Where(c => c.Job is "Factory hand" or "Garment worker").ToList();
+        Assert.True(hands.Count(c => At(c) is Filler.Factory or Filler.Gasworks) > hands.Count / 2);
+        var clerks = workers.Where(c => c.Job is "Typist" or "Insurance man").ToList();
+        Assert.True(clerks.Count(c => At(c) == Filler.Office) > clerks.Count / 3);
+        Assert.Contains(clerks, c => w.Map.LotAt(d.RoutineOf(c.Id).Stops[0].LotId).Terrain == Terrain.Civic);
+        Assert.Contains(workers, c => At(c) is Filler.Warehouse or Filler.Yard);
+    }
+
+    [Fact]
+    public void NobodyWorksInSomebodysHouseOrAnEmptyLot()
+    {
+        var (w, d) = Zoned(7, CitySize.Huge);
+        foreach (var c in Everyone(w, d).Where(c => d.RoutineOf(c.Id).Kind is RoutineKind.Worker or RoutineKind.NightShift))
+        {
+            var f = w.Map.FillerOf(w.Map.LotAt(d.RoutineOf(c.Id).Stops[0].LotId));
+            Assert.False(CityMap.IsHome(f) || f is Filler.Vacant or Filler.Parking or Filler.PocketPark, $"{c.Job} works at a {f}");
+        }
+    }
 }

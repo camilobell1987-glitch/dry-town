@@ -163,16 +163,58 @@ public sealed partial class CityDirectory
         return best;
     }
 
-    /// <summary>Where someone works: the business he's on the books of, or a place for his trade near home.</summary>
+    /// <summary>
+    /// Where someone works: the business he's on the books of, or a place for his trade. Factory hands and garment
+    /// workers go to the factories, teamsters and railroad men to the warehouses and yards, clerks and typists to the
+    /// office towers and the city's own buildings downtown, and the longshoremen to the docks. Anyone whose trade has
+    /// no such place near enough, a carpenter or a schoolteacher, works at some business in his own ward.
+    /// </summary>
     private Lot? Workplace(Citizen c, Lot home)
     {
         if (c.WorkBusinessId >= 0) return _w.LotOf(_w.BusinessById(c.WorkBusinessId));
-        // The docks for a longshoreman, the river for a railroad man or teamster; a warehouse, a bank or any business otherwise.
-        if (c.Job is "Longshoreman" or "Teamster" or "Railroad man" && Nearest(home, "dock", 40) is { } dock) return dock;
+        if (c.Job is "Longshoreman" && Nearest(home, "dock", 40) is { } dock) return dock;
         if (c.Job is "Bank clerk" && Nearest(home, "bank", 40) is { } bank) return bank;
+        // A quarter of the clerks work for the city.
+        var places = c.Job switch
+        {
+            "Factory hand" => new[] { Filler.Factory, Filler.Gasworks },
+            "Ironworker" or "Garment worker" or "Cigar roller" or "Seamstress" => new[] { Filler.Factory },
+            "Teamster" or "Longshoreman" => new[] { Filler.Warehouse, Filler.Yard },
+            "Railroad man" => new[] { Filler.Yard, Filler.Warehouse },
+            "Night watchman" => new[] { Filler.Factory, Filler.Warehouse, Filler.Office },
+            "Typist" or "Telephone operator" or "Insurance man" or "Bank clerk" => Roll(c.Id, 656) < 0.25 ? new[] { Filler.None } : new[] { Filler.Office },
+            _ => null,
+        };
+        if (places != null && Commute(home, places, c.Id) is { } place) return place;
+        if (c.Job is "Railroad man" && Nearest(home, "dock", 40) is { } wharf) return wharf;
         var nearby = _businessesInWard.GetValueOrDefault(home.WardId);
         if (nearby is not { Count: > 0 }) return null;
         return _w.LotOf(_w.BusinessById(nearby[(int)(Roll(c.Id, 655) * nearby.Count)]));
+    }
+
+    /// <summary>How far anyone walks to work, in tiles along the streets; further than that he finds work nearer home.</summary>
+    private const int Commutable = 36;
+
+    private readonly Dictionary<(int Home, string Places), List<int>> _commutes = new();
+
+    /// <summary>
+    /// One of the few nearest buildings of these sorts to a home, so a street's men go to the same few factories and
+    /// not all to the one nearest. Filler.None stands for the city's own buildings.
+    /// </summary>
+    private Lot? Commute(Lot home, Filler[] places, int id)
+    {
+        var key = (home.Id, string.Join(",", places));
+        if (!_commutes.TryGetValue(key, out var near))
+        {
+            near = _w.Map.Lots
+                .Where(l => l.Terrain == Terrain.Civic ? places.Contains(Filler.None) : _w.Map.FillerOf(l) is var f && f != Filler.None && places.Contains(f))
+                .Select(l => (l.Id, Distance: Math.Abs(l.X - home.X) + Math.Abs(l.Y - home.Y)))
+                .Where(l => l.Distance <= Commutable)
+                .OrderBy(l => l.Distance).ThenBy(l => l.Id)
+                .Take(6).Select(l => l.Id).ToList();
+            _commutes[key] = near;
+        }
+        return near.Count == 0 ? null : _w.Map.LotAt(near[(int)(Roll(id, 657) * near.Count)]);
     }
 
     /// <summary>One or two shops or a diner in the ward to go to, in the order she'll go round them.</summary>
