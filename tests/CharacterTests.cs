@@ -199,12 +199,16 @@ public class CharacterTests
         Assert.Equal("They've no wish to join an outfit.", w.CannotLean(me, who, Lean.Recruit));
         w.Introduce(who + 1, 1, Array.Empty<Tie>(), Array.Empty<Secret>(), Of(Background.Orphan, Trait.WannabeTorpedo));
         Assert.Null(w.CannotLean(me, who + 1, Lean.Recruit));
+        w.Acquaintances[who + 1].Traits.Add(Trait.Hothead);
         int men = w.HoodsOf(me.Id).Count();
         var order = new LeanOrder(me.Id, man.Id, who + 1, w.HqOf(me).Id, "Vito Russo", Lean.Recruit, 10) { Origin = Ethnicity.Italian, Age = 19 };
         sim.AdvanceWeek(new Dictionary<int, List<Order>> { [me.Id] = new() { order } });
         if (w.StandingOf(who + 1) != Standing.Joined) return;
         var recruit = w.HoodsOf(me.Id).Single(h => h.Name == "Vito Russo");
         Assert.Equal(Ethnicity.Italian, recruit.Origin);
+        // He brings the sort he is with him, though he's no longer just wanting in.
+        Assert.Equal(Background.Orphan, recruit.Background);
+        Assert.Equal(new[] { Trait.Hothead }, recruit.Traits);
         Assert.Equal("They're one of yours now.", w.CannotLean(me, who + 1, Lean.Kill));
         Assert.True(w.HoodsOf(me.Id).Count() > men);
     }

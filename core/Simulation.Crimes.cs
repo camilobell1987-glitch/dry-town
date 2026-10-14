@@ -22,7 +22,8 @@ public sealed partial class Simulation
             - (IsGuardedBoss(w, target) ? 0.25 : 0) - (target.Car == Car.Cadillac ? Content.ArmouredCar : 0)
             + Inside(w, hood.GangId, target.GangId, w.GangById(target.GangId).BossHoodId == target.Id ? Content.InsideBossHit : Content.InsideHit)
             + (w.AtWar(hood.GangId, target.GangId) ? Content.WarHit : 0)
-            + (w.Mourning(target.GangId) ? Content.FuneralHit : 0), 0.05, 0.9);
+            + (w.Mourning(target.GangId) ? Content.FuneralHit : 0)
+            - Content.HardToKill(target) + (w.Wants(hood, target) ? Content.Wanted * (hood.Traits.Contains(Trait.Hothead) ? 2 : 1) : 0), 0.05, 0.9);
 
     /// <summary>What men planted on either side do to a job's chances: help their own side's, spoil the other's.</summary>
     public static double Inside(World w, int gangId, int targetGangId, double help) =>
@@ -141,7 +142,7 @@ public sealed partial class Simulation
         if (w.Rng.Chance(HitChance(w, hood, backup, target)))
         {
             bool boss = rival.BossHoodId == target.Id;
-            Kill(target, boss ? $"in a hit ordered by {gang.Name}" : $"on the street, in a hit ordered by {gang.Name}");
+            Kill(target, boss ? $"in a hit ordered by {gang.Name}" : $"on the street, in a hit ordered by {gang.Name}", gang, hood);
             hood.Deeds.Kills++;
             // In a war the police write it off as gangland business, and look a little less hard.
             gang.Heat = Math.Min(100, gang.Heat + (w.AtWar(gang.Id, rival.Id) ? 5 : 10) + GunHeat(backup.Prepend(hood)));
@@ -162,7 +163,7 @@ public sealed partial class Simulation
         if (w.Rng.Chance(0.35 * (1 - Getaway(backup.Prepend(hood)))))
         {
             var fallen = backup.Count > 0 && w.Rng.Chance(0.5) ? w.Rng.Pick(backup) : hood;
-            Kill(fallen, $"trying to kill {target.Name}");
+            Kill(fallen, $"trying to kill {target.Name}", rival, target);
             casualty = fallen.Id;
             fail = $"{target.Name} of {rival.Name} shot first: {fallen.Name} of {gang.Name} is dead.";
         }

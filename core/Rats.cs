@@ -10,7 +10,7 @@ public static partial class Content
     public const int RatLoyalty = 35;
 
     public static int RatLine(Hood man) =>
-        RatLoyalty + (man.Case is { Life: true } ? 25 : Math.Min(25, (man.Case?.Sentence ?? man.JailWeeks) / 4));
+        Math.Max(0, RatLoyalty + (man.Case is { Life: true } ? 25 : Math.Min(25, (man.Case?.Sentence ?? man.JailWeeks) / 4)) - Steadfast(man));
 
     /// <summary>Below this loyalty a man on the street may start telling the police what his outfit is up to. Above <see cref="InformerQuits"/> he stops.</summary>
     public const int InformerLoyalty = 30, InformerQuits = 50;

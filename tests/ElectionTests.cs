@@ -89,7 +89,9 @@ public class ElectionTests
         while (w.Week < Content.AldermanElectionWeek - Content.CampaignWeeks) sim.AdvanceWeek(playerAutopilot: true);
         if (!man.IsAvailable || man.GangId != w.Player.Id) man = Candidate(w);
         Assert.Null(Politics.CannotStand(w, w.Player, man, w.Wards[0]));
-        Assert.Contains("boss", Politics.CannotStand(w, w.Player, w.HoodById(w.Player.BossHoodId), w.Wards[0]));
+        var boss = w.HoodById(w.Player.BossHoodId);
+        boss.State = HoodState.Free;
+        Assert.Contains("boss", Politics.CannotStand(w, w.Player, boss, w.Wards[0]));
         man.Brains = Content.CandidateBrains - 1;
         Assert.Contains("brains", Politics.CannotStand(w, w.Player, man, w.Wards[0]));
         man.Brains = 8;

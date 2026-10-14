@@ -1340,6 +1340,14 @@ public partial class Main : Control
         if (Arg("--select-bank") is string bankArg)
             _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));
         if (Flag("--select-hood")) _map.Select(hood: W.Hoods.First(h => h.IsAvailable && h.GangId != Me && W.GangById(h.GangId).Alive).Id);
+        // A man of yours or another outfit's, whoever has the most bad blood about him, for the gangster's card.
+        if (Arg("--select-man") is string side)
+        {
+            var men = W.Hoods.Where(h => h.IsActive && (side == "mine" ? h.GangId == Me : h.GangId != Me && W.GangById(h.GangId).Alive)).ToList();
+            var man = men.OrderByDescending(h => W.HeldBy(Party.Hood, h.Id).Count() + W.HeldAgainst(Party.Hood, h.Id).Count()).ThenBy(h => h.Id).First();
+            _map.Select(hood: man.Id);
+            if (side == "mine") { RefreshAll(); _rolodex.Show(man.Id); }
+        }
         if (Arg("--card") is string card) { RefreshAll(); _rolodex.Show(W.HoodsOf(Me).OrderBy(h => h.Id).ElementAt(int.Parse(card)).Id); }
         if (Flag("--sheet"))
         {

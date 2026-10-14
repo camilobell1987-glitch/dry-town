@@ -56,6 +56,10 @@ public sealed class Hood
 
     public int Age(int week) => (week - BornWeek) / Content.WeeksPerYear;
 
+    /// <summary>Where he came from and what sort he is. Everyone in the outfit knows; the street knows about other outfits' men.</summary>
+    public Background Background { get; set; }
+    public List<Trait> Traits { get; set; } = new();
+
     public Weapon Weapon { get; set; }
     public Car Car { get; set; }
 

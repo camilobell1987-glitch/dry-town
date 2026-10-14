@@ -124,6 +124,8 @@ public class SmallGangTests
         var man = w.HoodsOf(small.Id).First(h => h.Id != small.BossHoodId);
         Assert.Contains("runs", w.CannotPoach(me, w.HoodById(small.BossHoodId)));
         man.Loyalty = 0;
+        // Leave aside the sort he is: a two-timer is easier to buy, a stand-up guy harder.
+        man.Traits.Clear();
         Assert.Equal(0.9, w.PoachChance(me, man), 2);
         for (int i = 0; i < 10 && man.GangId == small.Id; i++)
         {

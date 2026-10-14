@@ -471,7 +471,7 @@ public sealed partial class Simulation
             if (w.Rng.Chance(backup.Prepend(hood).Any(h => h.Weapon == Weapon.TommyGun) ? 0.45 : 0.3))
             {
                 var victim = defender ?? PickVictim(rival);
-                if (victim != null) { Kill(victim, $"in a fight over {biz.Name}"); casualty = victim.Id; hood.Deeds.Kills++; }
+                if (victim != null) { Kill(victim, $"in a fight over {biz.Name}", gang, hood); casualty = victim.Id; hood.Deeds.Kills++; }
             }
             w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Takeover, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Won, text,
                 rival.Id, defender?.Id ?? -1, casualty)));
@@ -485,7 +485,7 @@ public sealed partial class Simulation
             {
                 // Whoever is in front takes the bullet; with backup along, it may be one of them.
                 var fallen = backup.Count > 0 && w.Rng.Chance(0.5) ? w.Rng.Pick(backup) : hood;
-                Kill(fallen, $"trying to take {biz.Name}");
+                Kill(fallen, $"trying to take {biz.Name}", rival, guarded ? guard.Hood : defender);
                 casualty = fallen.Id;
                 // Whoever answered the door gets the credit.
                 if (guarded) guard.Hood!.Deeds.Kills++;
@@ -830,7 +830,7 @@ public sealed partial class Simulation
             hood.LookedAfter = false;
             hood.Loyalty = Math.Max(0, hood.Loyalty - 10);
             // The detectives had weeks to work on him.
-            if (hood.Loyalty < Content.InformerLoyalty && !hood.Family && w.Rng.Chance(0.15)) hood.Informer = true;
+            if (hood.Loyalty < Content.InformerLoyalty && !hood.Family && w.Rng.Chance(0.15 * Content.Leaky(hood))) hood.Informer = true;
             w.Log(EventKind.HoodReleased, hood.GangId, $"{hood.Name} is out of jail.");
         }
     }
@@ -1065,7 +1065,7 @@ public sealed partial class Simulation
         return soldiers.Count > 0 && !World.Rng.Chance(0.08) ? World.Rng.Pick(soldiers) : World.Rng.Pick(victims);
     }
 
-    private void Kill(Hood hood, string where)
+    private void Kill(Hood hood, string where, Gang? by = null, Hood? killer = null)
     {
         hood.State = HoodState.Dead;
         hood.Weapon = Weapon.None;
@@ -1073,6 +1073,7 @@ public sealed partial class Simulation
         var gang = World.GangById(hood.GangId);
         gang.Heat = Math.Min(100, gang.Heat + 3);
         World.Log(EventKind.HoodKilled, gang.Id, $"{hood.Name} of {gang.Name} was killed {where}.");
+        if (by != null) World.Mourn(hood, by, killer);
     }
 
 }
