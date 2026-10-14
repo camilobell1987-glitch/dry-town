@@ -362,6 +362,7 @@ public partial class Main : Control
         if (W.OwnerInPocket(W.Player, b)) AddLabel(_businessPanel, "The owner is in your pocket.", Palette.Good);
         if (!b.IsFront || b.OwnerGangId != b.ProtectorGangId) AddLabel(_businessPanel, $"Resentment {b.Resentment}/100" + (b.Resentment > 60 ? " · may talk to the police" : ""), b.Resentment > 60 ? Palette.Bad : Palette.InkQuiet);
         NeighbourhoodLine(b);
+        ShopRowLine(b);
         FrontLines(b);
         if (b.Racket != RacketKind.None) AddLabel(_businessPanel, $"Back room: {RacketLabel(b)}", Palette.Bad);
         BoozeLine(b);
@@ -1298,6 +1299,16 @@ public partial class Main : Control
                 : W.FrontsOf(Me).First()).Id;
         if (Arg("--select") is string sel) { _map.SelectedBusiness = int.Parse(sel); }
         if (Flag("--select-mine")) _map.SelectedBusiness = W.TurfOf(Me).First().Id;
+        if (Flag("--select-row") && ShopRowNearHq() is { } row)
+        {
+            // The middle shop of a row picked out, yours to the west of it and a burnt-out one to the east.
+            W.BusinessById(row.Shops[0]).ProtectorGangId = Me;
+            var burnt = W.BusinessById(row.Shops[2]);
+            burnt.ShutWeeks = 4;
+            burnt.BurnedWeek = W.Week - 1;
+            _map.SelectedBusiness = row.Shops[1];
+            RefreshBusiness();
+        }
         // A small gang to deal with: the nearest of the kind asked for, or the nearest of any.
         if (Arg("--select-corner") is string corner
             && W.SmallGangs.Where(g => corner == "any" || g.Kind.ToString().Equals(corner, StringComparison.OrdinalIgnoreCase))
@@ -1544,6 +1555,7 @@ public partial class Main : Control
                     "speakeasy" => W.Businesses.Where(b => b.IsOpen && b.Racket == RacketKind.Speakeasy).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "raid" => W.Script.LastOrDefault(x => x.Kind == ActionKind.Raid) is { } raid ? W.Map.LotAt(raid.ToLot) : hq,
+                    "row" => ShopRowNearHq() ?? hq,
                     "garage" => W.Garages.Where(g => !g.Police).Select(g => W.Map.LotAt(g.LotId)).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     _ when int.TryParse(focus, out int lotId) => W.Map.LotAt(lotId),
                     "precinct" => W.Map.Lots.Where(l => l.Use == LotUse.Precinct).OrderBy(l => W.Map.Distance(hq, l)).First(),
@@ -1572,6 +1584,22 @@ public partial class Main : Control
             GetViewport().GetTexture().GetImage().SavePng(shot);
             GetTree().Quit();
         }
+    }
+
+    /// <summary>Who else keeps shop in the same building, for one of a row of shops.</summary>
+    private void ShopRowLine(Business b)
+    {
+        var others = W.ShopsAt(W.LotOf(b)).Where(x => x.Id != b.Id).ToList();
+        if (others.Count == 0) return;
+        AddLabel(_businessPanel, "One of a row of shops, next to " + string.Join(" and ", others.Select(x => x.Name.Split(", ")[0])) + ".", Palette.InkQuiet, wrap: true);
+    }
+
+    /// <summary>For screenshots: the nearest row of three shops to HQ that faces the viewer, off the street the el runs over.</summary>
+    private Lot? ShopRowNearHq()
+    {
+        var hq = W.HqOf(W.Player);
+        return W.Map.Lots.Where(l => l.Shops.Count == 3 && l.FrontY > l.Y && l.FrontY != W.Map.BlocksY / 3 * CityMap.StrideY)
+            .OrderBy(l => W.Map.Distance(hq, l)).ThenBy(l => l.Id).FirstOrDefault();
     }
 
     /// <summary>For screenshots: bad blood all round a resident, as if the city had been at it for a while.</summary>

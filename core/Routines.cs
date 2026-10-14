@@ -180,7 +180,7 @@ public sealed partial class CityDirectory
     {
         var shops = (_businessesInWard.GetValueOrDefault(home.WardId) ?? new List<int>())
             .Select(_w.BusinessById)
-            .Where(b => b.Kind is BusinessKind.Grocer or BusinessKind.Diner or BusinessKind.Pharmacy or BusinessKind.Tailor or BusinessKind.Laundry)
+            .Where(b => b.Kind is BusinessKind.Grocer or BusinessKind.Diner or BusinessKind.Pharmacy or BusinessKind.Tailor or BusinessKind.Laundry or BusinessKind.Hardware or BusinessKind.Haberdasher)
             .Select(b => b.LotId).Distinct().ToList();
         if (shops.Count == 0) return shops;
         int count = Roll(c.Id, 660) < 0.4 ? 2 : 1;

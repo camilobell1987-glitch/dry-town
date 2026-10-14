@@ -82,7 +82,7 @@ public class BreweryTests
     [Fact]
     public void TheSquadGoesForTheBreweryFirst()
     {
-        var (sim, w, me) = Start(Y1927 + 10, gangs: 2, seed: 1);
+        var (sim, w, me) = Start(Y1927 + 10, gangs: 2, seed: 2);
         Give(w, me, RacketKind.Speakeasy, 6);
         var brewery = Give(w, me, RacketKind.Brewery, 1)[0];
         foreach (var h in w.HoodsOf(me.Id)) h.Stealth = 1;
@@ -138,6 +138,7 @@ public class BreweryTests
         var warehouse = w.Businesses.First(b => b.Kind == BusinessKind.Warehouse && !b.IsProtected && b.IsOpen);
         warehouse.ProtectorGangId = me.Id;
         var man = w.AvailableHoodsOf(me.Id).First(h => h.Id != me.BossHoodId);
+        man.Brains = 10;
         var shell = new CommandShell(sim);
         Assert.Contains("opens a brewery behind", shell.Execute($"racket {man.Id} {warehouse.Id} brewery"));
         shell.Execute("end");

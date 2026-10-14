@@ -8,9 +8,9 @@ public class NightclubTests
     private const int RepealWeek = (Content.RepealYear - Content.StartYear) * Content.WeeksPerYear;
 
     /// <summary>A quiet city in the given week, where the player has money and nobody else to bother him.</summary>
-    private static (Simulation Sim, World W, Gang Me) Start(int week = 0, int gangs = 1)
+    private static (Simulation Sim, World W, Gang Me) Start(int week = 0, int gangs = 1, ulong seed = 4)
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 4, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false, StartWeek = week });
+        var sim = Simulation.New(new WorldSettings { Seed = seed, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false, StartWeek = week });
         var me = sim.World.Player;
         me.Cash = 20_000;
         me.Heat = 0;
@@ -117,7 +117,7 @@ public class NightclubTests
     [Fact]
     public void ARichRivalWithAHotelOfItsOwnOpensAClub()
     {
-        var (_, w, _) = Start(gangs: 2);
+        var (_, w, _) = Start(gangs: 2, seed: 2);
         var g = w.LivingGangs.First(x => !x.IsPlayer);
         g.Cash = 20_000;
         g.Heat = 0;

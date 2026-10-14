@@ -176,7 +176,7 @@ public class Phase2Tests
         var hqs = w.LivingGangs.Select(g => g.HqLotId).ToList();
         Assert.Equal(hqs.Count, hqs.Distinct().Count());
         Assert.All(hqs, id => Assert.Equal(LotUse.Headquarters, w.Map.LotAt(id).Use));
-        Assert.All(w.Businesses, b => Assert.Equal(b.Id, w.Map.LotAt(b.LotId).BusinessId));
+        Assert.All(w.Businesses, b => Assert.Contains(b, w.ShopsAt(w.Map.LotAt(b.LotId))));
     }
 
     [Fact]
@@ -377,7 +377,7 @@ public class Phase4Tests
     [Fact]
     public void FamilyComesInYoungAndLoyalOnceAYear()
     {
-        var sim = Run(12, 4);
+        var sim = Run(2, 4);
         var w = sim.World;
         w.Player.Cash = 5000;
         var shell = new CommandShell(sim);

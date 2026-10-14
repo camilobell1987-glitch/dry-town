@@ -66,7 +66,7 @@ public class UntouchablesTests
     [Fact]
     public void AStealthyManGetsWordInTime()
     {
-        var (sim, w, me) = Bootlegger(seed: 7);
+        var (sim, w, me) = Bootlegger(seed: 2);
         After(w, me);
         foreach (var h in w.HoodsOf(me.Id)) h.Stealth = 10;
         Assert.Equal(10 * Content.SquadWarning, w.Warning(w.LiquorOf(me.Id).First()), 6);

@@ -123,6 +123,18 @@ public sealed partial class World
     // Ids are handed out in order and nothing is ever removed, so an id is usually its index.
     public Gang GangById(int id) => id >= 0 && id < Gangs.Count && Gangs[id].Id == id ? Gangs[id] : Gangs.First(g => g.Id == id);
     public Hood HoodById(int id) => id >= 0 && id < Hoods.Count && Hoods[id].Id == id ? Hoods[id] : Hoods.First(h => h.Id == id);
+    /// <summary>The businesses in a lot's building, west to east along its front.</summary>
+    public IReadOnlyList<Business> ShopsAt(Lot lot) =>
+        lot.Shops.Count > 0 ? lot.Shops.Select(BusinessById).ToList()
+        : lot.BusinessId >= 0 ? new[] { BusinessById(lot.BusinessId) } : Array.Empty<Business>();
+
+    /// <summary>Which shop along its building's front a business is, from the west, and how many share it.</summary>
+    public (int Unit, int Units) UnitOf(Business b)
+    {
+        var lot = LotOf(b);
+        return lot.Shops.Count > 0 ? (lot.Shops.IndexOf(b.Id), lot.Shops.Count) : (0, 1);
+    }
+
     public Business BusinessById(int id) => id >= 0 && id < Businesses.Count && Businesses[id].Id == id ? Businesses[id] : Businesses.First(b => b.Id == id);
 
     public StreetPerson? PersonById(int id) => People.FirstOrDefault(p => p.Id == id);
@@ -246,14 +258,41 @@ public sealed partial class World
         Rng.Shuffle(free);
         var kinds = Enum.GetValues<BusinessKind>().Where(k => k != BusinessKind.Court).ToArray();
         int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs - Settings.SmallGangCount);
+        // Small shops often share a building, two or three in a row along the ground floor with flats above. A hotel,
+        // a warehouse or a motor garage has a building to itself, and so do some of the small shops.
+        // Every trade is in town at least once before the rest are drawn at random.
+        var firsts = kinds.ToList();
+        Rng.Shuffle(firsts);
+        Lot? row = null;
+        int rowSize = 0, next = 0, first = 0;
         for (int i = 0; i < count; i++)
         {
-            var lot = free[i];
-            var kind = kinds[Rng.Range(0, kinds.Length - 1)];
+            Lot lot;
+            BusinessKind kind;
+            if (row != null && row.Shops.Count < rowSize)
+            {
+                lot = row;
+                var taken = row.Shops.Select(id => Businesses[id].Kind).ToList();
+                var options = Content.ShopRowKinds.Where(k => !taken.Contains(k)).ToArray();
+                kind = options[Rng.Range(0, options.Length - 1)];
+                lot.Shops.Add(i);
+            }
+            else
+            {
+                lot = free[next++];
+                kind = first < firsts.Count ? firsts[first++] : kinds[Rng.Range(0, kinds.Length - 1)];
+                row = null;
+                if (Content.ShopRowKinds.Contains(kind) && Rng.Chance(Content.ShopRowChance))
+                {
+                    row = lot;
+                    rowSize = Rng.Chance(0.5) ? 2 : 3;
+                    lot.Shops.Add(i);
+                }
+                lot.BusinessId = i;
+            }
             var (min, max) = Content.TakingsFor(kind);
             string owner = LastName(Neighbourhood(lot.WardId));
             lot.Use = LotUse.Business;
-            lot.BusinessId = i;
             Businesses.Add(new Business
             {
                 Id = i,

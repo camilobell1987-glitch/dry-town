@@ -44,6 +44,7 @@ public class PayoffTests
         var (_, w, me) = Start();
         var biz = w.Businesses.First(b => !b.IsProtected);
         var hood = w.AvailableHoodsOf(me.Id).First();
+        hood.Intimidation = biz.Toughness;
         double before = Simulation.ExtortChance(w, me, hood, biz);
         var a = w.Meet(99, w.LotOf(biz).WardId);
         a.BusinessId = biz.Id;

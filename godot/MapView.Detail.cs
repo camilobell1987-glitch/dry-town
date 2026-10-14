@@ -229,34 +229,44 @@ public partial class MapView
     /// A shopfront's trimmings: a painted sign board with gilt lettering over the awning, a mullion and a
     /// kick plate on the plate glass with goods set out behind it, and a glazed door with a brass knob.
     /// </summary>
-    private void DressShopfront(Lot lot, float x0, float x1, float y1)
+    private void DressShopfront(Lot lot, float x0, float x1, float y1, int salt = 0)
     {
-        var board = SignBoards[(int)(Hash(lot.Id, 670) * SignBoards.Length)];
+        var (gx0, gx1, dx0, dx1) = ShopfrontBays(x0, x1);
+        int id = lot.Id + salt * 7919;
+        var board = SignBoards[(int)(Hash(id, 670) * SignBoards.Length)];
         Face(x0 + 0.02f, x1 - 0.02f, y1, 0.172f, 0.2f, board);
         C.DrawLine(Q(x0 + 0.03f, y1, 0.176f), Q(x1 - 0.03f, y1, 0.176f), Gilt with { A = 0.7f }, Hair(0.003f));
         C.DrawLine(Q(x0 + 0.03f, y1, 0.196f), Q(x1 - 0.03f, y1, 0.196f), Gilt with { A = 0.7f }, Hair(0.003f));
         // Gilt letters, suggested rather than spelled.
-        float lx = x0 + 0.08f + Hash(lot.Id, 671) * 0.06f;
+        float lx = x0 + 0.08f + Hash(id, 671) * 0.06f;
         for (int k = 0; lx < x1 - 0.1f; k++)
         {
-            float lw = 0.012f + Hash(lot.Id * 7 + k, 672) * 0.016f;
-            if (Hash(lot.Id * 7 + k, 673) < 0.15f) { lx += 0.025f; continue; }
+            float lw = 0.012f + Hash(id * 7 + k, 672) * 0.016f;
+            if (Hash(id * 7 + k, 673) < 0.15f) { lx += 0.025f; continue; }
             Face(lx, lx + lw, y1, 0.18f, 0.192f, Gilt);
             lx += lw + 0.007f;
         }
-        float gx0 = x0 + 0.08f, gx1 = x1 - 0.3f;
         Face(gx0, gx1, y1, 0, 0.02f, board.Darkened(0.3f));
         for (int k = 0; k < (int)((gx1 - gx0) / 0.04f); k++)
         {
             float px = gx0 + 0.01f + k * 0.04f;
-            Face(px, px + 0.026f, y1, 0.024f, 0.024f + 0.02f + Hash(lot.Id * 3 + k, 674) * 0.025f, WindowGoods[(int)(Hash(lot.Id * 3 + k, 675) * WindowGoods.Length)]);
+            Face(px, px + 0.026f, y1, 0.024f, 0.024f + 0.02f + Hash(id * 3 + k, 674) * 0.025f, WindowGoods[(int)(Hash(id * 3 + k, 675) * WindowGoods.Length)]);
         }
         C.DrawLine(Q((gx0 + gx1) / 2, y1, 0.02f), Q((gx0 + gx1) / 2, y1, 0.13f), Sash.Darkened(0.4f), Hair(0.006f));
-        C.DrawColoredPolygon(new[] { Q(gx0 + 0.01f, y1, 0.03f), Q(gx0 + 0.09f, y1, 0.125f), Q(gx0 + 0.13f, y1, 0.125f), Q(gx0 + 0.05f, y1, 0.03f) }, Glass.Lightened(0.45f) with { A = 0.35f });
-        Face(x1 - 0.22f, x1 - 0.12f, y1, 0.07f, 0.125f, Glass);
-        C.DrawCircle(Q(x1 - 0.135f, y1, 0.065f), _t * 0.006f, Gilt);
-        Face(x1 - 0.25f, x1 - 0.09f, y1, 0.14f, 0.152f, Dressing);
+        if (gx1 - gx0 > 0.15f) C.DrawColoredPolygon(new[] { Q(gx0 + 0.01f, y1, 0.03f), Q(gx0 + 0.09f, y1, 0.125f), Q(gx0 + 0.13f, y1, 0.125f), Q(gx0 + 0.05f, y1, 0.03f) }, Glass.Lightened(0.45f) with { A = 0.35f });
+        Face(dx0 + 0.02f, dx1 - 0.02f, y1, 0.07f, 0.125f, Glass);
+        C.DrawCircle(Q(dx1 - 0.035f, y1, 0.065f), _t * 0.006f, Gilt);
+        Face(dx0 - 0.01f, dx1 + 0.01f, y1, 0.14f, 0.152f, Dressing);
     }
+
+    /// <summary>Where a shopfront's plate glass and its door go: a narrow shop in a row has a narrower door, close to its corner.</summary>
+    private static (float Gx0, float Gx1, float Dx0, float Dx1) ShopfrontBays(float x0, float x1)
+    {
+        if (x1 - x0 >= 0.5f) return (x0 + 0.08f, x1 - 0.3f, x1 - 0.24f, x1 - 0.1f);
+        float dx1 = x1 - 0.03f, dx0 = dx1 - 0.075f;
+        return (x0 + 0.03f, dx0 - 0.03f, dx0, dx1);
+    }
+
     private static readonly Color LampIron = new("23272a");
     private static readonly Color HydrantRed = new("a8332c");
     private static readonly Color MailboxGreen = new("3c5a3a");
