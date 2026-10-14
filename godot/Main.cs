@@ -1327,6 +1327,7 @@ public partial class Main : Control
             _map.Select(citizen: pick);
         }
         _revealCitizens = Flag("--reveal");
+        _characterTab = Flag("--character-tab");
         if (Arg("--select-bank") is string bankArg)
             _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));
         if (Flag("--select-hood")) _map.Select(hood: W.Hoods.First(h => h.IsAvailable && h.GangId != Me && W.GangById(h.GangId).Alive).Id);

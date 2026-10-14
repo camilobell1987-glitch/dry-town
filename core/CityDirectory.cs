@@ -31,7 +31,7 @@ public readonly record struct Tie(int Id, Kin Kin);
 /// How many live in each building is the map's business, since only the map knows which empty lots
 /// have tenements on them; it hands the directory a count per lot and which lots are tenements.
 /// </remarks>
-public sealed class CityDirectory
+public sealed partial class CityDirectory
 {
     /// <summary>Room for this many residents on one block, so (block, number) packs into one id.</summary>
     public const int PerBlock = 4096;
@@ -217,8 +217,11 @@ public sealed class CityDirectory
     {
         if (_secrets.TryGetValue(id, out var known)) return known;
         var c = Get(id);
+        var character = CharacterOf(id);
         var secrets = new List<Secret>();
-        if (c.Age >= 18 && Roll(id, 400) < 0.35)
+        // The pious have less to hide, and a jailbird more.
+        double hiding = 0.35 * (character.Traits.Contains(Trait.Pious) ? 0.4 : 1) * (character.Background == Background.Jailbird ? 1.6 : 1);
+        if (c.Age >= 18 && Roll(id, 400) < hiding)
         {
             int count = Roll(id, 401) < 0.25 ? 2 : 1;
             var ward = _w.Map.LotAt(c.HomeLotId).WardId;
@@ -226,6 +229,7 @@ public sealed class CityDirectory
             for (int k = 0; k < count; k++)
             {
                 double r = Roll(id, 402 + k);
+                if (character.Background == Background.Jailbird && r >= 0.5) r = 0.8 + (r - 0.5) * 0.4;
                 var vice = r < 0.25 ? Vice.Lover : r < 0.5 ? Vice.Drink : r < 0.7 ? Vice.Gambling : r < 0.8 ? Vice.Debt : r < 0.9 ? Vice.Thief : Vice.Wanted;
                 int other = vice switch
                 {
@@ -240,6 +244,10 @@ public sealed class CityDirectory
                 secrets.Add(new Secret(vice, other));
             }
         }
+        // A souse drinks somewhere, and it's no secret to anyone who follows him.
+        var bars = _businessesInWard.GetValueOrDefault(_w.Map.LotAt(c.HomeLotId).WardId);
+        if (c.Age >= 18 && character.Traits.Contains(Trait.Souse) && !secrets.Any(x => x.Vice == Vice.Drink) && bars is { Count: > 0 })
+            secrets.Add(new Secret(Vice.Drink, bars[(int)(Roll(id, 430) * bars.Count)]));
         _secrets[id] = secrets;
         return secrets;
     }
@@ -398,5 +406,6 @@ public enum Fact
     Home = 32,
     Landlord = 64,
     Owns = 128,
-    All = Name | Age | Origin | Job | Work | Home | Landlord | Owns,
+    Past = 256,
+    All = Name | Age | Origin | Job | Work | Home | Landlord | Owns | Past,
 }
