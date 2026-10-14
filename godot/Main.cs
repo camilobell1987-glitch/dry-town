@@ -790,6 +790,8 @@ public partial class Main : Control
         menu.AddSeparator();
         menu.AddCheckItem("Angled view: buildings stand up off the map", AngledMenuId);
         menu.SetItemChecked(menu.ItemCount - 1, _map.Angled);
+        menu.AddCheckItem("Film look: the colours and grain of an old photograph", FilmMenuId);
+        menu.SetItemChecked(menu.ItemCount - 1, _map.FilmLook);
         menu.AddSeparator();
         FillScenarioMenu(menu);
         menu.AddSeparator();
@@ -811,6 +813,7 @@ public partial class Main : Control
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
         else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
         else if (id == AngledMenuId) SetAngled(!_map.Angled);
+        else if (id == FilmMenuId) SetFilmLook(!_map.FilmLook);
     }
 
     private void ShowSoundPanel()
