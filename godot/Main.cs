@@ -358,6 +358,7 @@ public partial class Main : Control
             if (handler != null) AddLabel(_businessPanel, $"Handled by {handler.Name}", Palette.InkQuiet);
         }
         else AddLabel(_businessPanel, "Pays nobody.", Palette.InkQuiet);
+        if (W.OwnerInPocket(W.Player, b)) AddLabel(_businessPanel, "The owner is in your pocket.", Palette.Good);
         if (!b.IsFront || b.OwnerGangId != b.ProtectorGangId) AddLabel(_businessPanel, $"Resentment {b.Resentment}/100" + (b.Resentment > 60 ? " · may talk to the police" : ""), b.Resentment > 60 ? Palette.Bad : Palette.InkQuiet);
         NeighbourhoodLine(b);
         FrontLines(b);

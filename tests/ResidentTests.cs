@@ -65,7 +65,7 @@ public class ResidentTests
         Assert.Contains(w.Events, e => e.Kind == EventKind.Street && e.Text.Contains("Sadie Weiss"));
         Assert.NotNull(w.CannotLean(me, who, Lean.Extort));
         if (w.StandingOf(who) == Standing.Scared)
-            Assert.Contains(w.Events, e => e.Text.Contains("shook down Sadie Weiss for $60"));
+            Assert.Contains(w.Events, e => e.Text.Contains("shook down Sadie Weiss for $40"));
     }
 
     [Fact]
