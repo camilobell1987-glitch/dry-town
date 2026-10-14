@@ -3,7 +3,7 @@ namespace DryTown.Core;
 /// <summary>Finding out what people are hiding, and making them pay for it.</summary>
 public static partial class Content
 {
-    public static readonly string[] WantedFor = { "robbery", "manslaughter", "fraud", "arson", "bigamy", "forgery" };
+    public static readonly string[] WantedFor = { "robbery", "manslaughter", "fraud", "arson", "bigamy", "forgery", "car theft", "burglary" };
     public static readonly string[] WantedIn = { "Chicago", "Detroit", "Boston", "Philadelphia", "Cleveland", "Pittsburgh" };
 
     /// <summary>The chance asking around turns up each secret, and the chance the week's gossip about someone is one of them.</summary>
@@ -16,8 +16,45 @@ public static partial class Content
     public const int HushWeeks = 8;
     public const double HushSnaps = 0.04;
 
-    /// <summary>Weeks someone you turn in spends inside, the heat the police take off you for it, and how long his shop stays shut.</summary>
-    public const int TurnedInWeeks = 12, TipHeat = 4, ShutForOwner = 4;
+    /// <summary>The heat the police take off you for a tip that sticks, and how long a shop stays shut while the family sorts things out.</summary>
+    public const int TipHeat = 4, ShutForOwner = 4;
+
+    /// <summary>
+    /// What a court of the day could give for each crime, in years, least to most: car theft under the Dyer Act and the
+    /// state laws, manslaughter up to fifteen, armed robbery up to twenty, and so on.
+    /// </summary>
+    public static (double Least, double Most) Penalty(string crime) => crime switch
+    {
+        "robbery" => (5, 20),
+        "manslaughter" => (5, 15),
+        "fraud" => (1, 7),
+        "arson" => (2, 20),
+        "bigamy" => (1, 5),
+        "forgery" => (2, 10),
+        "car theft" => (2, 4),
+        "burglary" => (2, 10),
+        "receiving stolen goods" => (1, 3),
+        _ => (1, 5),
+    };
+
+    /// <summary>How a trial can go: a plea for a light term, an ordinary sentence, or a hanging judge.</summary>
+    public enum Verdict { Deal, Fair, Harsh }
+
+    /// <summary>
+    /// The chance of a deal and of a hanging judge. Money buys a lawyer who can strike a deal; a reform administration
+    /// wants examples made.
+    /// </summary>
+    public static (double Deal, double Harsh) VerdictOdds(int worth, bool reform) =>
+        (Math.Clamp(0.25 + worth / 200.0 - (reform ? 0.1 : 0), 0.1, 0.6), reform ? 0.3 : 0.15);
+
+    /// <summary>A term in years, as a judge would read it out: "18 months", "7 years", "3 years and 6 months".</summary>
+    public static string Term(int months) => (months / 12, months % 12) switch
+    {
+        (1, 0) => "a year",
+        (< 2, _) => $"{months} months",
+        (var y, 0) => $"{y} years",
+        (var y, var m) => $"{y} years and {m} months",
+    };
 
     /// <summary>How bad it would be if it came out, 1 to 3.</summary>
     public static int Shame(Vice vice) => vice switch
@@ -42,8 +79,12 @@ public static partial class Content
 
     /// <summary>What he's wanted for, in a few words.</summary>
     public static string Crime(Secret s) => s.Vice == Vice.Wanted
-        ? $"{WantedFor[s.Other / 16 % WantedFor.Length]} in {WantedIn[s.Other % 16 % WantedIn.Length]}"
-        : "theft";
+        ? $"{Offence(s)} in {WantedIn[s.Other % 16 % WantedIn.Length]}"
+        : Offence(s);
+
+    /// <summary>The crime itself, without where.</summary>
+    public static string Offence(Secret s) => s.Vice == Vice.Wanted ? WantedFor[s.Other / 16 % WantedFor.Length]
+        : s.Other >= 0 ? "theft" : "receiving stolen goods";
 }
 
 public sealed partial class Acquaintance

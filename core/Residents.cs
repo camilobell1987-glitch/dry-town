@@ -267,15 +267,23 @@ public sealed partial class Simulation
                 break;
             case Lean.TurnIn when ok:
                 var crime = w.KnownCrime(o.CitizenId)!.Value;
+                var (months, verdict) = Sentence(crime, o.Worth);
                 a.Standing = Standing.Jailed;
                 a.GangId = gang.Id;
-                a.UntilWeek = w.Week + Content.TurnedInWeeks;
-                a.Note = $"In jail for {Content.Crime(crime)}.";
+                a.UntilWeek = w.Week + Math.Max(1, months * Content.WeeksPerYear / 12);
+                int outYear = Content.StartYear + a.UntilWeek / Content.WeeksPerYear;
+                a.Note = $"Serving {Content.Term(months)} for {Content.Crime(crime)}. Due out in {outYear}.";
+                string trial = verdict switch
+                {
+                    Content.Verdict.Deal => "pleaded guilty for a lighter term and got",
+                    Content.Verdict.Harsh => "drew a hanging judge and got",
+                    _ => "got",
+                };
                 gang.Heat = Math.Max(0, gang.Heat - Content.TipHeat);
                 var shop = o.BusinessId >= 0 ? w.Businesses.FirstOrDefault(b => b.Id == o.BusinessId) : null;
                 if (shop != null) shop.ShutWeeks = Math.Max(shop.ShutWeeks, Content.ShutForOwner);
                 kind = ActionKind.Hire;
-                text = $"{man.Name} tipped off the precinct, and {o.Who} was taken in for {Content.Crime(crime)}.{(shop != null ? $" {shop.Name} is shut while they're inside." : "")} The police owe you one.";
+                text = $"{man.Name} tipped off the precinct, and {o.Who} was taken in for {Content.Crime(crime)}. They {trial} {Content.Term(months)}.{(shop != null ? $" {shop.Name} is shut for a month while the family sorts things out." : "")} The police owe you one.";
                 break;
             case Lean.TurnIn:
                 kind = ActionKind.Hire;
@@ -291,6 +299,24 @@ public sealed partial class Simulation
         w.Log(EventKind.Street, gang.Id, text);
         w.Act(new ScriptAction(kind, gang.Id, man.Id, gang.HqLotId, o.LotId, -1, result, text));
         MaybeWitness(gang, man, lot, $"{man.Name} {Content.Label(o.Lean)} {o.Who}", WitnessChance(o.Lean, ok));
+    }
+
+    /// <summary>What the court gives someone for a crime, in months, and how the trial went.</summary>
+    private (int Months, Content.Verdict Verdict) Sentence(Secret crime, int worth)
+    {
+        var (least, most) = Content.Penalty(Content.Offence(crime));
+        var (deal, harsh) = Content.VerdictOdds(worth, World.Hall.Reform);
+        double roll = World.Rng.NextDouble();
+        var verdict = roll < deal ? Content.Verdict.Deal : roll < deal + harsh ? Content.Verdict.Harsh : Content.Verdict.Fair;
+        // A deal lands in the bottom third of the range, a hanging judge in the top third, anyone else in the middle.
+        double third = (most - least) / 3, at = World.Rng.NextDouble();
+        double years = verdict switch
+        {
+            Content.Verdict.Deal => least + at * third,
+            Content.Verdict.Harsh => most - third + at * third,
+            _ => least + third + at * third,
+        };
+        return ((int)Math.Round(years * 12), verdict);
     }
 
     private void Scare(int citizen, Acquaintance a, Gang gang)

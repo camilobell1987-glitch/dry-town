@@ -194,7 +194,7 @@ public partial class Main
         Act(Lean.Kidnap, () => $"Snatch them for ransom ({Money(Math.Max(50, family * Content.RansomOfWorth))})");
         Act(Lean.Kill, () => "Have them killed");
         Act(Lean.Blackmail, () => $"Blackmail them ({Money(World.HushMoney(c.Worth))} a week)");
-        if (W.KnownCrime(id) is { } crime) Act(Lean.TurnIn, () => $"Turn them in for {Content.Crime(crime)}");
+        if (W.KnownCrime(id) is { } crime) Act(Lean.TurnIn, () => $"Turn them in for {Content.Crime(crime)} ({Content.Penalty(Content.Offence(crime)).Least:0} to {Content.Penalty(Content.Offence(crime)).Most:0} years)");
         void Odds()
         {
             var hood = W.HoodById(man.GetSelectedId());
@@ -212,7 +212,7 @@ public partial class Main
             AddLabel(panel, $"You're holding their {Content.Label(W.KnownTiesOf(id).First(t => t.Id == held).Kin, directory.Get(held).Woman).ToLowerInvariant()}. They'll do as they're told.", Palette.Good, wrap: true);
         else if (leverage > 0) AddLabel(panel, "You know who their family are, which makes a threat or a shakedown likelier to work. Snatch one of them and they'll do as they're told.", Palette.InkQuiet, wrap: true);
         if (!reads) AddLabel(panel, $"You can't tell yet how much nerve they have, so the odds are a guess. Learn {Content.NerveFacts} things about them to know for sure.", Palette.InkQuiet, wrap: true);
-        AddLabel(panel, "Anything they're hiding makes a threat likelier to work, and is grounds for blackmail. A crime you know of can be handed to the police, which cools them on you; a shopkeeper taken in leaves his shop shut.", Palette.InkQuiet, wrap: true);
+        AddLabel(panel, "Anything they're hiding makes a threat likelier to work, and is grounds for blackmail. A crime you know of can be handed to the police, which cools them on you. The term fits the crime and how the trial goes: money buys a deal, and reformers want examples made. A shopkeeper taken in leaves his shop shut for a while.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Knowing where they live makes a threat or a snatch likelier to work, and knowing where they work helps with everything else. A shopkeeper in your pocket takes your protection gladly and resents it less, and anyone you've bought or scared keeps the block quiet when there are witnesses.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "A bribed man tells you what he hears, and so does a frightened one for a while. Shaking someone down pays now; a snatch pays if the family comes up with the money. Every one but a bribe brings heat, and anyone can be seen doing it. A killing makes you feared and the neighbourhood talks of murder.", Palette.InkQuiet, wrap: true);
     }

@@ -92,6 +92,31 @@ public class SecretTests
         Assert.True(shop.ShutWeeks > 0);
         Assert.Equal("They're in jail.", w.CannotLean(me, who, Lean.Kill));
         Assert.Contains(w.Events, e => e.Text.Contains("taken in for robbery in Chicago"));
+        // Robbery carries five to twenty years, so he's gone for a long while.
+        Assert.InRange(w.Acquaintances[who].UntilWeek - w.Week, 5 * Content.WeeksPerYear - 2, 20 * Content.WeeksPerYear);
+        Assert.Contains("Due out in", w.Acquaintances[who].Note);
+    }
+
+    [Fact]
+    public void ThePunishmentFitsTheCrime()
+    {
+        Assert.Equal((2.0, 4.0), Content.Penalty("car theft"));
+        Assert.Equal((5.0, 15.0), Content.Penalty("manslaughter"));
+        Assert.True(Content.Penalty("robbery").Most > Content.Penalty("fraud").Most);
+        Assert.Equal("car theft", Content.Offence(new Secret(Vice.Wanted, 6 * 16 + 2)));
+        Assert.Equal("receiving stolen goods", Content.Offence(new Secret(Vice.Thief, -1)));
+        Assert.Equal("18 months", Content.Term(18));
+        Assert.Equal("7 years", Content.Term(84));
+        Assert.Equal("3 years and 6 months", Content.Term(42));
+        Assert.Equal("a year", Content.Term(12));
+    }
+
+    [Fact]
+    public void MoneyBuysADealAndReformersWantExamplesMade()
+    {
+        Assert.True(Content.VerdictOdds(150, false).Deal > Content.VerdictOdds(5, false).Deal);
+        Assert.True(Content.VerdictOdds(20, true).Harsh > Content.VerdictOdds(20, false).Harsh);
+        Assert.True(Content.VerdictOdds(20, true).Deal < Content.VerdictOdds(20, false).Deal);
     }
 
     [Fact]
