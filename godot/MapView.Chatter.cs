@@ -5,10 +5,11 @@ using DryTown.Core;
 using Godot;
 
 /// <summary>
-/// Now and then two citizens stop on the pavement to talk, and speech bubbles pop up over them. What's
-/// in the bubble is what they're talking about, and it comes from what's going on round them: the
-/// old country's language in their own neighbourhood, a killing or an arrest in the ward this week,
-/// the speakeasy on the block, a shopkeeper who paid up, or the morning paper.
+/// Now and then two citizens stop on the pavement to talk, and a speech bubble no bigger than a man pops up
+/// over them. You only hear it by word of mouth: the bubble shows when one of your men, or someone on your
+/// payroll, is close enough to overhear. What's in it is what they're talking about, and it comes from what's
+/// going on round them: the old country's language in their own neighbourhood, a killing or an arrest in the
+/// ward this week, the speakeasy on the block, a shopkeeper who paid up, or the morning paper.
 /// </summary>
 public partial class MapView
 {
@@ -16,6 +17,41 @@ public partial class MapView
 
     /// <summary>Seconds one conversation cycle takes, and how much of it the pair spend talking.</summary>
     private const float ChatCycle = 15, ChatTalk = 9, ChatTurn = 1.7f;
+
+    /// <summary>How near, in tiles, one of yours has to be to overhear a conversation.</summary>
+    private const float Earshot = 3;
+
+    /// <summary>
+    /// Where you have ears on the street: your headquarters and the men outside it, your men out on a job, cops
+    /// you pay, and everyone on your payroll, out on the street or at home and work.
+    /// </summary>
+    private List<Vector2> Ears()
+    {
+        var w = World!;
+        var me = w.Player;
+        var ears = new List<Vector2>();
+        if (!me.Alive) return ears;
+        ears.Add(Kerbside(w.HqOf(me)));
+        foreach (var c in _clickables)
+        {
+            if (c.Kind == Pickable.Hood && w.HoodById(c.Id).GangId == me.Id) ears.Add(c.Feet);
+            else if (c.Kind == Pickable.Person && w.PersonById(c.Id) is { } p && p.PaidByGangId == me.Id) ears.Add(c.Feet);
+        }
+        if (Live)
+            foreach (var actor in _actors)
+                if (actor.Action.GangId == me.Id && ActorAt(actor, Clock) is { } at) ears.Add(at);
+        if (Directory != null)
+            foreach (var (id, a) in w.Acquaintances)
+            {
+                if (a is not { Standing: Standing.Bought } || a.GangId != me.Id || !Directory.Exists(id)) continue;
+                var c = Directory.Get(id);
+                if (WhereIs(id) is { } seen) ears.Add(seen);
+                ears.Add(Kerbside(w.Map.LotAt(c.HomeLotId)));
+                int work = c.WorkBusinessId >= 0 ? c.WorkBusinessId : c.OwnsBusinessId;
+                if (work >= 0) ears.Add(Kerbside(w.LotOf(w.BusinessById(work))));
+            }
+        return ears;
+    }
 
     /// <summary>What happened in each ward this week as far as the street has heard: killings, arrests and shakedowns.</summary>
     private (int Murders, int Arrests, int Payoffs, int Crimes)[] WardGossip()
@@ -79,6 +115,8 @@ public partial class MapView
         var gossip = WardGossip();
         var drinking = SpeakeasyDoors();
         var turf = BlockBosses();
+        var ears = Ears();
+        bool Overheard(Vector2 at) => ears.Any(e => e.DistanceSquaredTo(at) <= Earshot * Earshot);
         float r = DotRadius;
         int bx0 = Math.Max(0, (int)(view.Position.X / CityMap.StrideX)), bx1 = Math.Min(map.BlocksX - 1, (int)(view.End.X / CityMap.StrideX));
         int by0 = Math.Max(0, (int)(view.Position.Y / CityMap.StrideY)), by1 = Math.Min(map.BlocksY - 1, (int)(view.End.Y / CityMap.StrideY));
@@ -115,6 +153,8 @@ public partial class MapView
                 _clickables.Add(new Clickable(Pickable.Citizen, first, a, ClickRadius(r)));
                 _clickables.Add(new Clickable(Pickable.Citizen, second, b, ClickRadius(r)));
 
+                // Nobody of yours is near enough to hear what they're saying.
+                if (!Overheard(spot)) continue;
                 var (boss, resentment) = turf[bx, by];
                 var topic = PickTopic(Hash(seed, 943), ward, ward < gossip.Length ? gossip[ward] : default, drinking[bx, by] > 0, boss, resentment);
                 // They take turns, with a breath between.
@@ -140,26 +180,18 @@ public partial class MapView
         return (new Vector2(x0, y0 + h - (d - 2 * w - h)), Vector2.Up);
     }
 
-    /// <summary>A speech bubble over someone's head, its tail pointing down at him, with the topic drawn inside.</summary>
+    /// <summary>
+    /// A speech bubble over someone's head, about as wide as he is, its tail pointing down at him, with the topic
+    /// drawn inside.
+    /// </summary>
     private void DrawBubble(Vector2 speaker, int lean, Topic topic, int ward, float scale, Gang? boss)
     {
         var keep = C;
         C = _marks;
-        float s = Mathf.Max(Px(20), _t * 0.28f) * scale;
+        float s = DotRadius * 1.5f * scale;
         var foot = speaker * _t;
         var centre = foot + new Vector2(lean * s * 0.35f, -s * 1.05f);
         var size = new Vector2(s * 1.5f, s * 1.1f);
-        // The boss's name is written in the bubble, which widens to hold it. Letters are drawn on the screen, so they stay sharp.
-        if (topic is Topic.Grumble or Topic.Praise && boss != null)
-        {
-            var font = ThemeDB.FallbackFont;
-            string name = World!.HoodById(boss.BossHoodId).Name.Split(' ')[^1];
-            int px = Mathf.Max(8, (int)(s / Px(1) * 0.5f));
-            float wide = Px(font.GetStringSize(name, HorizontalAlignment.Left, -1, px).X);
-            size.X = Mathf.Max(size.X, wide + s * 0.5f);
-            centre.X = foot.X + lean * Mathf.Max(s * 0.35f, size.X / 2 - s * 0.4f);
-            _chatNames.Add((centre / U * Tile + Origin, name, px, topic == Topic.Praise ? new Color("2f8a4a") : new Color("c8382e")));
-        }
         var paper = new Color("f3eddf");
         var ink = new Color("1a1716");
         var box = new Rect2(centre - size / 2, size);
@@ -170,18 +202,10 @@ public partial class MapView
         C.DrawColoredPolygon(new[] { tailTop + new Vector2(-s * 0.2f, 0), tailTop + new Vector2(s * 0.2f, 0), tip }, ink);
         C.DrawColoredPolygon(new[] { tailTop + new Vector2(-s * 0.12f, -s * 0.02f), tailTop + new Vector2(s * 0.12f, -s * 0.02f), tip + new Vector2(0, -s * 0.1f) }, paper);
         RoundBox(box, s * 0.25f, paper);
-        if (topic is not (Topic.Grumble or Topic.Praise)) DrawTopic(topic, ward, centre, s * 0.48f, ink);
+        // Talk about the boss whose turf it is: green when they speak well of him, red when they curse him.
+        if (topic is Topic.Grumble or Topic.Praise) C.DrawCircle(centre, s * 0.3f, topic == Topic.Praise ? new Color("2f8a4a") : new Color("c8382e"));
+        else DrawTopic(topic, ward, centre, s * 0.48f, ink);
         C = keep;
-    }
-
-    private readonly List<(Vector2 At, string Name, int Size, Color Colour)> _chatNames = new();
-
-    /// <summary>The bosses' names in this frame's bubbles, written over them on the screen.</summary>
-    private void DrawChatNames(Font font)
-    {
-        foreach (var (at, name, size, colour) in _chatNames)
-            C.DrawString(font, at + new Vector2(-200, size * 0.36f), name, HorizontalAlignment.Center, 400, size, colour);
-        _chatNames.Clear();
     }
 
     /// <summary>On each block, the gang most of its shops pay, and how much the shops there resent paying (0 to 1).</summary>

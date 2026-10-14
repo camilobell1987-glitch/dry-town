@@ -675,7 +675,6 @@ public partial class MapView : Control
         DrawHeadquartersSigns(font, view);
         DrawCornerSigns(font, view);
         DrawWards(font);
-        DrawChatNames(font);
         foreach (var pen in _dyn) pen.Flush();
         _frameGlow.Flush();
         _marks.Flush();
@@ -759,6 +758,15 @@ public partial class MapView : Control
 
     /// <summary>A person's dot: small enough that two fit side by side on a pavement.</summary>
     private float DotRadius => Mathf.Max(Px(2.5f), _t * 0.05f);
+
+    /// <summary>Where a man on a job is at this moment, or null when he's at headquarters.</summary>
+    private Vector2? ActorAt(Actor actor, float now)
+    {
+        if (now < actor.Depart || now > actor.Home + 0.01f) return null;
+        if (now < actor.Arrive) return Along(actor.Path, (now - actor.Depart) / (actor.Arrive - actor.Depart));
+        if (now <= actor.Leave) return actor.Path[^1];
+        return Along(actor.Path, 1 - (now - actor.Leave) / Mathf.Max(0.01f, actor.Home - actor.Leave));
+    }
 
     private void DrawActors()
     {
