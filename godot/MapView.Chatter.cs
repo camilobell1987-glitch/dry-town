@@ -142,8 +142,8 @@ public partial class MapView
                 var gap = dir * (r * 1.3f / _t);
                 var a = spot - gap;
                 var b = spot + gap;
-                DrawDot(a * _t, r, Palette.Citizen);
-                DrawDot(b * _t, r, Palette.Citizen);
+                DrawDot(P(a), r, Palette.Citizen);
+                DrawDot(P(b), r, Palette.Citizen);
                 // They're residents of the block, and can be clicked like anyone else.
                 int first = Talker(bx, by, seed, 0), second = Talker(bx, by, seed, 1);
                 _chatSpots[first] = a;
@@ -189,7 +189,7 @@ public partial class MapView
         var keep = C;
         C = _marks;
         float s = DotRadius * 1.5f * scale;
-        var foot = speaker * _t;
+        var foot = P(speaker);
         var centre = foot + new Vector2(lean * s * 0.35f, -s * 1.05f);
         var size = new Vector2(s * 1.5f, s * 1.1f);
         var paper = new Color("f3eddf");

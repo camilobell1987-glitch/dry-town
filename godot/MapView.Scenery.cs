@@ -157,6 +157,15 @@ public partial class MapView
     /// </summary>
     private void DrawCar(Vector2 centre, bool horizontal, Color paint, float night, float scale = 1, bool police = false, int heading = 1)
     {
+        // Out in the widened street the car keeps its shape: it's placed by its middle, and drawn round that.
+        var keep = _pin;
+        _pin = centre;
+        DrawCarShape(centre, horizontal, paint, night, scale, police, heading);
+        _pin = keep;
+    }
+
+    private void DrawCarShape(Vector2 centre, bool horizontal, Color paint, float night, float scale, bool police, int heading)
+    {
         float len = 0.5f * scale, wid = 0.22f * scale, z0 = 0.03f * scale, z1 = 0.1f * scale, z2 = 0.19f * scale;
         float cx = centre.X, cy = centre.Y;
         var light = paint.Lightened(0.14f);
@@ -255,9 +264,9 @@ public partial class MapView
             float length = car.Horizontal ? Map.Width : Map.Height;
             float pos = ((car.Phase + _anim * car.Speed) % (length + 2)) - 1;
             if (car.Heading < 0) pos = length - pos;
-            // Keep to the right: eastbound and southbound in the lower or left lane.
-            float lane = car.Horizontal ? car.Line * CityMap.StrideY + 0.5f + 0.2f * car.Heading
-                                        : car.Line * CityMap.StrideX + 0.5f - 0.2f * car.Heading;
+            // Keep to the right: eastbound in the lower lane, southbound in the left one, clear of the parked cars.
+            float lane = car.Horizontal ? Across(car.Line, CityMap.StrideY, car.Heading > 0 ? FarLane : NearLane)
+                                        : Across(car.Line, CityMap.StrideX, car.Heading > 0 ? NearLane : FarLane);
             var centre = car.Horizontal ? new Vector2(pos, lane) : new Vector2(lane, pos);
             if (centre.X < 0.2f || centre.X > Map.Width - 0.2f || centre.Y < 0.2f || centre.Y > Map.Height - 0.2f) continue;
             if (!view.HasPoint(centre)) continue;
@@ -274,7 +283,8 @@ public partial class MapView
         {
             if (lot.Use is not (LotUse.Headquarters or LotUse.Precinct) || !view.HasPoint(new Vector2(lot.X, lot.Y)) || CornerOf(lot) != null) continue;
             bool frontTop = lot.FrontY < lot.Y;
-            float carY = lot.FrontY + 0.5f + (frontTop ? 0.24f : -0.24f);
+            // In the bay at the kerb outside.
+            float carY = Across(lot.FrontY / CityMap.StrideY, CityMap.StrideY, frontTop ? FarBay : NearBay);
             C = DynAt(carY);
             if (lot.Use == LotUse.Headquarters) DrawCar(new Vector2(lot.X + 0.5f, carY), true, Palette.Gang(w, lot.GangId).Darkened(0.35f), night);
             else

@@ -1511,6 +1511,7 @@ public partial class Main : Control
                         .Select(W.HqOf).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "speakeasy" => W.Businesses.Where(b => b.IsOpen && b.Racket == RacketKind.Speakeasy).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
+                    "river" => W.Map.Lots.Where(l => l.Terrain == Terrain.Water).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "cemetery" => W.Map.Lots.Where(l => l.Terrain == Terrain.Cemetery).OrderByDescending(l => W.Map.LotsOfBlock((l.X - 1) / CityMap.StrideX, (l.Y - 1) / CityMap.StrideY).Count(x => x.Terrain == Terrain.Cemetery)).ThenBy(l => l.Id).First(),
                     "biz" => _map.SelectedBusiness >= 0 ? W.LotOf(W.BusinessById(_map.SelectedBusiness)) : hq,
                     "job" => _shell.Sim.Upcoming.FirstOrDefault(j => j.GangId == Me && Simulation.TeamOf(j.Order).Any()) is { } job

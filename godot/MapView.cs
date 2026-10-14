@@ -62,9 +62,9 @@ public partial class MapView : Control
     }
     private bool _angled;
 
-    private float FitTile => Mathf.Min(Size.X / (Map.Width + 0.6f), Size.Y / (Map.Height + 0.6f + Headroom));
+    private float FitTile => Mathf.Min(Size.X / (DrawnSize.X + 0.6f), Size.Y / (DrawnSize.Y + 0.6f + Headroom));
     private float Tile => FitTile * _zoom;
-    private Vector2 Origin => (Size - new Vector2(Map.Width, Map.Height - Headroom) * Tile) / 2 + _pan;
+    private Vector2 Origin => (Size - new Vector2(DrawnSize.X, DrawnSize.Y - Headroom) * Tile) / 2 + _pan;
 
     public override void _Ready()
     {
@@ -106,9 +106,9 @@ public partial class MapView : Control
         _pan = Vector2.Zero;
         if (focus == null || (Map.BlocksX <= 5 && zoomTo == null) || Size.X <= 0) return;
         float zoom = zoomTo ?? (Map.BlocksX >= 15 ? 3 : 2);
-        ZoomAt(Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile, zoom);
+        ZoomAt(OnScreen(new Vector2(focus.X + 0.5f, focus.Y + 0.5f)), zoom);
         // Bring the lot towards the middle of the view.
-        _pan += Size / 2 - (Origin + new Vector2(focus.X + 0.5f, focus.Y + 0.5f) * Tile);
+        _pan += Size / 2 - OnScreen(new Vector2(focus.X + 0.5f, focus.Y + 0.5f));
         ClampPan();
     }
 
@@ -118,8 +118,8 @@ public partial class MapView : Control
     /// </summary>
     public void PanTo(Lot lot, bool mark = true)
     {
-        if (_zoom < 6) ZoomAt(Origin + new Vector2(lot.X + 0.5f, lot.Y + 0.5f) * Tile, 6 / _zoom);
-        _pan += Size / 2 - (Origin + new Vector2(lot.X + 0.5f, lot.Y + 0.5f) * Tile);
+        if (_zoom < 6) ZoomAt(OnScreen(new Vector2(lot.X + 0.5f, lot.Y + 0.5f)), 6 / _zoom);
+        _pan += Size / 2 - OnScreen(new Vector2(lot.X + 0.5f, lot.Y + 0.5f));
         ClampPan();
         if (!mark) return;
         _markLot = lot.Id;
@@ -139,7 +139,7 @@ public partial class MapView : Control
         float pulse = 0.6f + 0.4f * Mathf.Sin(age * 6), fade = Mathf.Clamp(4 - age, 0, 1);
         var keep = C;
         C = DynAt(at.Y);
-        C.DrawArc(at * _t, _t * (0.7f + 0.1f * pulse), 0, Mathf.Tau, 32, new Color(Palette.Bad, fade * pulse), Px(3));
+        C.DrawArc(P(at), _t * (0.7f + 0.1f * pulse), 0, Mathf.Tau, 32, new Color(Palette.Bad, fade * pulse), Px(3));
         C = keep;
     }
 
@@ -148,7 +148,7 @@ public partial class MapView : Control
 
     private void ClampPan()
     {
-        var excess = (new Vector2(Map.Width, Map.Height + Headroom) * Tile - Size) / 2 + Vector2.One * Tile;
+        var excess = (new Vector2(DrawnSize.X, DrawnSize.Y + Headroom) * Tile - Size) / 2 + Vector2.One * Tile;
         excess = excess.Max(Vector2.Zero);
         _pan = _pan.Clamp(-excess, excess);
     }
@@ -309,11 +309,11 @@ public partial class MapView : Control
         {
             if (_dragging) { _pan += motion.Relative; ClampPan(); }
             _hoverLot = LotUnder(motion.Position);
-            HoverWard = ShowWards ? WardAtTile((motion.Position - Origin) / Tile) : -1;
+            HoverWard = ShowWards ? WardAtTile(TileUnder(motion.Position)) : -1;
         }
         else if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } click)
         {
-            if (ShowWards && WardAtTile((click.Position - Origin) / Tile) is int ward and >= 0) WardClicked?.Invoke(ward);
+            if (ShowWards && WardAtTile(TileUnder(click.Position)) is int ward and >= 0) WardClicked?.Invoke(ward);
             // People stand in front of the buildings, so they're found first.
             if (!ShowWards && PickAt(click.Position) is { } who)
             {
@@ -362,7 +362,8 @@ public partial class MapView : Control
         int best = -1;
         foreach (var lot in World.Map.Lots)
         {
-            if (lot.X > tile.X + 0.2f || lot.X + 1 + S * 3 < tile.X || lot.Y + 1 < tile.Y || lot.Y - 3 > tile.Y) continue;
+            var drawn = Widen(new Vector2(lot.X, lot.Y));
+            if (drawn.X > tile.X + 0.2f || drawn.X + 1 + S * 3 < tile.X || drawn.Y + 1 < tile.Y || drawn.Y - 3 > tile.Y) continue;
             if (!Geometry2D.IsPointInPolygon(tile, Silhouette(lot))) continue;
             if (best < 0 || InFront(lot, World.Map.LotAt(best))) best = lot.Id;
         }
@@ -631,8 +632,8 @@ public partial class MapView : Control
     /// <summary>The tiles on screen, with a margin for tall buildings and people half in view.</summary>
     private Rect2 VisibleTiles()
     {
-        var from = (-Origin) / Tile;
-        return new Rect2(from, Size / Tile).Grow(1.5f);
+        var from = TileUnder(Vector2.Zero);
+        return new Rect2(from, TileUnder(Size) - from).Grow(1.5f);
     }
 
     /// <summary>Draw everything that moves or marks, once a frame.</summary>
@@ -650,6 +651,7 @@ public partial class MapView : Control
         float night = Night;
         DrawTraffic(night, view);
         DrawParkedOfficials(night, view);
+        DrawParkedCars(night, view);
         _clickables.Clear();
         DrawStreetPeople(view);
         DrawLoiterers(view);
@@ -703,7 +705,7 @@ public partial class MapView : Control
             width = CornerOf(lot) != null ? Px(2) : Px(3);
         }
 
-        var outline = Silhouette(lot).Select(p => p * _t).ToArray();
+        var outline = Silhouette(lot).Select(p => _o + p * _t).ToArray();
         var closed = outline.Append(outline[0]).ToArray();
         if (rim is Color r) C.DrawPolyline(closed, r with { A = 0.9f }, width);
 
@@ -733,7 +735,7 @@ public partial class MapView : Control
     private void DrawDot(Vector2 ground, float r, Color fill, Color? rim = null)
     {
         var keep = C;
-        C = DynAt(ground.Y / _t);
+        C = DynAt(Narrow((ground.Y - _o.Y) / _t, CityMap.StrideY));
         C.DrawCircle(ground + new Vector2(r * 0.25f, r * 0.3f), r, Shadow);
         if (rim is { } ring)
         {
@@ -799,7 +801,7 @@ public partial class MapView : Control
                 ahead = Along(actor.Path, f - 0.02f) - at;
             }
 
-            var pos = at * t;
+            var pos = P(at);
             bool atScene = now >= actor.Arrive && now <= actor.Leave;
 
             // Men with a car drive there and back, and get out at the door.
@@ -820,13 +822,13 @@ public partial class MapView : Control
                     _ => Palette.Neutral,
                 };
                 float pulse = 1 + 0.35f * Mathf.Sin(_anim * 6);
-                FlatRing(target * t, t * 0.4f * pulse, ring, Px(2.5f));
+                FlatRing(P(target), t * 0.4f * pulse, ring, Px(2.5f));
             }
 
             // In a takeover the rival's man stands in the doorway, and shots are traded.
             if (a.Kind is ActionKind.Takeover or ActionKind.Hit && a.DefenderHoodId >= 0 && now >= actor.Arrive - 0.5f && now <= actor.Leave)
             {
-                var defPos = (target + new Vector2(0.3f, -0.15f)) * t;
+                var defPos = P(target + new Vector2(0.3f, -0.15f));
                 var (dFill, dRim) = ManOf(a.DefenderGangId);
                 DrawDot(defPos, radius, dFill, dRim);
                 if (atScene && now - actor.Arrive < 0.8f && Mathf.Sin(_anim * 23 + a.HoodId) > 0.55f)
@@ -855,7 +857,7 @@ public partial class MapView : Control
             var a = actor.Action;
             if (a.CasualtyHoodId < 0 || a.Result == ActionResult.Arrested || now < actor.Arrive) continue;
             if (a.Kind == ActionKind.Raid) continue;
-            var c = (actor.Path[^1] + new Vector2(-0.3f, 0.15f)) * t;
+            var c = P(actor.Path[^1] + new Vector2(-0.3f, 0.15f));
             float s = t * 0.12f;
             C.DrawLine(c - new Vector2(s, s * 0.6f), c + new Vector2(s, s * 0.6f), Palette.Bad, Px(2.5f));
             C.DrawLine(c - new Vector2(s, -s * 0.6f), c + new Vector2(s, -s * 0.6f), Palette.Bad, Px(2.5f));
@@ -903,7 +905,7 @@ public partial class MapView : Control
             var path = StreetPath(gang.HqLotId, toLot);
             float f = (now - (job.Tick - hours)) / hours;
             var at = Along(path, f);
-            var pos = at * t;
+            var pos = P(at);
             var ahead = Along(path, f + 0.02f) - at;
             var colour = Palette.Gang(World, gang.Id);
             if (CarFor(team) is var car and not Car.None) { DrawGangCar(at, ahead, colour, car); continue; }
