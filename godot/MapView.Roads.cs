@@ -93,7 +93,7 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
         {
             float x0 = bx * CityMap.StrideX, y0 = by * CityMap.StrideY;
             // Along the street: bays on its north kerb belong to the block above, its south kerb to the block below.
-            if (bx < map.BlocksX)
+            if (bx < map.BlocksX && !map.StreetClosed(bx, by))
                 for (int side = 0; side < 2; side++)
                 {
                     if (!KerbHasBays(by, side)) continue;
@@ -112,7 +112,7 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
                     }
                 }
             // Along the avenue, the same down each kerb.
-            if (by < map.BlocksY && by != map.RiverRow)
+            if (by < map.BlocksY && by != map.RiverRow && !map.AvenueClosed(bx, by))
                 for (int side = 0; side < 2; side++)
                 {
                     if (side == 0 && bx == 0 || side == 1 && bx == map.BlocksX) continue;
@@ -146,7 +146,7 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
         float x0 = bx * CityMap.StrideX, y0 = by * CityMap.StrideY;
         var paint = RoadPaint with { A = 0.3f };
         float lw = Mathf.Max(1, _t * 0.02f);
-        if (bx < Map.BlocksX)
+        if (bx < Map.BlocksX && !Map.StreetClosed(bx, by))
             for (int side = 0; side < 2; side++)
             {
                 if (!KerbHasBays(by, side)) continue;
@@ -160,7 +160,7 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
                 // The line between the bays and the traffic.
                 C.DrawLine(P(x0 + 1 + 0.35f - Bay / 2, edge), P(x0 + 1 + 0.35f + 5.5f * Bay, edge), paint with { A = 0.18f }, lw);
             }
-        if (by < Map.BlocksY && by != Map.RiverRow)
+        if (by < Map.BlocksY && by != Map.RiverRow && !Map.AvenueClosed(bx, by))
             for (int side = 0; side < 2; side++)
             {
                 if (side == 0 && bx == 0 || side == 1 && bx == Map.BlocksX) continue;

@@ -26,6 +26,8 @@ public sealed partial class World
         if (lot.Terrain != Terrain.Land) return null;
         // The passage into a tenement court takes the ground floor of its house.
         if (lot.Court && Map.CourtGate((lot.X - 1) / CityMap.StrideX, (lot.Y - 1) / CityMap.StrideY)?.Id == lot.Id) return null;
+        // No ramp comes up into a square.
+        if (Map.FrontsSquare(lot)) return null;
         if (lot.Use == LotUse.Precinct) return new Garage(lot.Id, true, Content.PrecinctGarage);
         if (lot.Use != LotUse.Business || lot.BusinessId < 0) return null;
         return BusinessById(lot.BusinessId).Kind switch

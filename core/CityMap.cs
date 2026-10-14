@@ -136,6 +136,65 @@ public sealed class CityMap
         return spots;
     }
 
+    // ---- Squares ---------------------------------------------------------------
+
+    private HashSet<(int, int, bool)>? _squares;
+
+    /// <summary>
+    /// Stretches of road closed to traffic and paved over: a square with a fountain where a street ran between two
+    /// avenues, or a little plaza where an avenue ran between two streets. Each is given as the avenue and street
+    /// it starts from, and whether it was an avenue. People walk across them; cars go round.
+    /// </summary>
+    public IReadOnlyCollection<(int Bx, int By, bool Avenue)> Squares => _squares ??= LaySquares();
+
+    /// <summary>Whether the stretch of a street row between avenue <paramref name="bx"/> and the next is a square.</summary>
+    public bool StreetClosed(int bx, int street) => (_squares ??= LaySquares()).Contains((bx, street, false));
+
+    /// <summary>Whether the stretch of an avenue between street row <paramref name="by"/> and the next is a plaza.</summary>
+    public bool AvenueClosed(int avenue, int by) => (_squares ??= LaySquares()).Contains((avenue, by, true));
+
+    /// <summary>Whether a lot's door opens onto a square rather than a street cars can drive down.</summary>
+    public bool FrontsSquare(Lot lot) => StreetClosed((lot.X - 1) / StrideX, lot.FrontY / StrideY);
+
+    /// <summary>The street row the elevated railway runs over, counted in streets, or -1 in a city too small for one.</summary>
+    public int RailStreet => BlocksY >= 5 ? BlocksY / 3 : -1;
+
+    /// <summary>
+    /// Pick the squares: about one for every five blocks, never on the edge of the city, the waterfront, the street
+    /// under the El or the street a back alley opens onto, and never two at one crossing, so traffic can always
+    /// turn off before one. Chosen by position and the street names rather than by dice, so the city's other draws
+    /// come out the same, and a city loaded from an older save gets the same squares.
+    /// </summary>
+    private HashSet<(int, int, bool)> LaySquares()
+    {
+        uint salt = 2166136261;
+        foreach (char ch in string.Concat(StreetNames) + string.Concat(AvenueNames)) salt = (salt ^ ch) * 16777619;
+        int seed = (int)(salt & 0xFFFFFF);
+        var candidates = new List<(int Bx, int By, bool Avenue)>();
+        for (int s = 1; s < BlocksY; s++)
+        {
+            if (s == RailStreet || s == RiverRow || s == RiverRow + 1) continue;
+            for (int bx = 0; bx < BlocksX; bx++)
+                if (!HasBackAlley(bx, s)) candidates.Add((bx, s, false));
+        }
+        for (int a = 1; a < BlocksX; a++)
+        for (int by = 0; by < BlocksY; by++)
+            if (by != RiverRow) candidates.Add((a, by, true));
+
+        var chosen = new HashSet<(int, int, bool)>();
+        var crossings = new HashSet<(int, int)>();
+        int count = Math.Max(1, BlocksX * BlocksY / 5);
+        foreach (var c in candidates.OrderBy(c => Hash(c.Bx * 977 + c.By * 31 + (c.Avenue ? 7 : 0), seed)))
+        {
+            if (chosen.Count >= count) break;
+            var ends = c.Avenue ? new[] { (c.Bx, c.By), (c.Bx, c.By + 1) } : new[] { (c.Bx, c.By), (c.Bx + 1, c.By) };
+            if (ends.Any(crossings.Contains)) continue;
+            chosen.Add(c);
+            foreach (var e in ends) crossings.Add(e);
+        }
+        return chosen;
+    }
+
     /// <summary>A number from 0 to 1 that depends only on its arguments, the same one the map is drawn with.</summary>
     public static float Hash(int a, int b = 0)
     {

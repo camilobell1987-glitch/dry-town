@@ -153,7 +153,7 @@ public partial class MapView
 
     private readonly List<(Vector2 At, float Strength)> _headlights = new();
 
-    private sealed record Traffic(bool Horizontal, int Line, int Heading, float Speed, float Phase, Ride Ride, Color Paint);
+    private sealed record Traffic(List<Leg> Legs, float Length, float Speed, float Phase, Ride Ride, Color Paint);
 
     private List<Traffic> _traffic = new();
 
@@ -172,7 +172,8 @@ public partial class MapView
             var ride = TrafficRide(Hash(i, 206), parked: false);
             // Trucks and vans go slower than the cars.
             float speed = (0.6f + Hash(i, 203) * 0.7f) * (ride is Ride.StakeTruck or Ride.BeerTruck or Ride.Van or Ride.BankCar or Ride.PaddyWagon ? 0.7f : 1);
-            _traffic.Add(new Traffic(horizontal, line, heading, speed, Hash(i, 204) * 40, ride, RidePaint(ride, Hash(i, 205))));
+            var legs = Route(horizontal, line, heading, i);
+            _traffic.Add(new Traffic(legs, RouteLength(legs), speed, Hash(i, 204) * 40, ride, RidePaint(ride, Hash(i, 205))));
         }
     }
 
@@ -181,17 +182,11 @@ public partial class MapView
         if (_trafficFor != Map) BuildTraffic();
         foreach (var car in _traffic)
         {
-            float length = car.Horizontal ? Map.Width : Map.Height;
-            float pos = ((car.Phase + _anim * car.Speed) % (length + 2)) - 1;
-            if (car.Heading < 0) pos = length - pos;
-            // Keep to the right: eastbound in the lower lane, southbound in the left one, clear of the parked cars.
-            float lane = car.Horizontal ? Across(car.Line, CityMap.StrideY, car.Heading > 0 ? FarLane : NearLane)
-                                        : Across(car.Line, CityMap.StrideX, car.Heading > 0 ? NearLane : FarLane);
-            var centre = car.Horizontal ? new Vector2(pos, lane) : new Vector2(lane, pos);
+            var (centre, horizontal, heading) = AlongRoute(car.Legs, (car.Phase + _anim * car.Speed) % car.Length);
             if (centre.X < 0.2f || centre.X > Map.Width - 0.2f || centre.Y < 0.2f || centre.Y > Map.Height - 0.2f) continue;
             if (!view.HasPoint(centre)) continue;
             C = DynAt(centre.Y);
-            DrawVehicle(centre, car.Horizontal, car.Heading, car.Ride, car.Paint, night, 0.9f);
+            DrawVehicle(centre, horizontal, heading, car.Ride, car.Paint, night, 0.9f);
         }
     }
 
@@ -201,7 +196,7 @@ public partial class MapView
         var w = World!;
         foreach (var lot in w.Map.Lots)
         {
-            if (lot.Use is not (LotUse.Headquarters or LotUse.Precinct) || !view.HasPoint(new Vector2(lot.X, lot.Y)) || CornerOf(lot) != null) continue;
+            if (lot.Use is not (LotUse.Headquarters or LotUse.Precinct) || !view.HasPoint(new Vector2(lot.X, lot.Y)) || CornerOf(lot) != null || Map.FrontsSquare(lot)) continue;
             bool frontTop = lot.FrontY < lot.Y;
             // In the bay at the kerb outside.
             float carY = Across(lot.FrontY / CityMap.StrideY, CityMap.StrideY, frontTop ? FarBay : NearBay);
