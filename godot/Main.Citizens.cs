@@ -43,7 +43,7 @@ public partial class Main
         _overheard = null;
         if (_map.Directory is not { } d || !d.Exists(id)) return;
         var c = d.Get(id);
-        W.Meet(id, W.Map.LotAt(c.HomeLotId).WardId);
+        W.Introduce(id, W.Map.LotAt(c.HomeLotId).WardId, c.Ties);
         int partner = _map.TalkingWith(id);
         if (partner < 0) return;
         var other = d.Get(partner);
@@ -73,6 +73,7 @@ public partial class Main
         var c = directory.Get(id);
         var known = KnownAbout(id);
         var home = W.Map.LotAt(c.HomeLotId);
+        W.Introduce(id, home.WardId, c.Ties);
         var (bx, by, _) = directory.Where(id);
         var seen = _map.WhereIs(id) is { } at
             ? W.Map.LotsOfBlock(bx, by).OrderBy(l => new Vector2(l.X + 0.5f, l.Y + 0.5f).DistanceSquaredTo(at)).First()
@@ -128,6 +129,7 @@ public partial class Main
         Line("Owns", Fact.Owns, () => c.OwnsBusinessId >= 0 ? W.BusinessById(c.OwnsBusinessId).Name
             : c.Owns.Count > 0 ? $"{(c.Owns.Count == 1 ? "A tenement" : $"{c.Owns.Count} tenements")}: {string.Join("; ", c.Owns.Select(l => Address(W.Map.LotAt(l))))}"
             : "Nothing to speak of");
+        Family(grid, id, c, known);
 
         if (_map.WhereIs(id) == null) AddLabel(panel, "Indoors just now.", Palette.InkQuiet);
         else AddLabel(panel, $"Seen on {W.Map.StreetOf(seen)} St in {W.Wards.ElementAtOrDefault(seen.WardId)?.Name ?? "the district"}.", Palette.InkQuiet, wrap: true);
@@ -137,7 +139,7 @@ public partial class Main
         if (known == Fact.None)
             AddLabel(panel, "You don't know the first thing about this one yet.", Palette.InkQuiet, wrap: true);
         if (known != Fact.All)
-            AddLabel(panel, "Word on the street fills in a line now and then on anyone you've come across, more often where you hold turf.", Palette.InkQuiet, wrap: true);
+            AddLabel(panel, "Word on the street fills in a line now and then on anyone you've come across, more often where you hold turf. It also turns up who they are close to: click a name to see that card.", Palette.InkQuiet, wrap: true);
 
         bool Concerns(Order o) => o switch
         {
@@ -171,10 +173,13 @@ public partial class Main
         // What each would cost and the odds with the man picked. Until you know the person you can only guess at his nerve.
         bool reads = W.ReadsNerve(W.Player, id);
         int nerve = reads ? W.NerveOf(id) : 5;
+        // A family pays what the richest of them can.
+        int family = W.KnownTiesOf(id).Where(t => t.Kin != Kin.Employer && directory.Exists(t.Id)).Select(t => directory.Get(t.Id).Worth).Append(c.Worth).Max();
+        double leverage = W.Leverage(W.Player, id);
         var buttons = new List<(Button Button, Lean Lean, Func<string> Label)>();
         void Act(Lean lean, Func<string> label)
         {
-            var b = AddButton(panel, "", () => Give(new LeanOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who, lean, c.Worth, c.OwnsBusinessId, c.Owns.Count)));
+            var b = AddButton(panel, "", () => Give(new LeanOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who, lean, lean == Lean.Kidnap ? family : c.Worth, c.OwnsBusinessId, c.Owns.Count)));
             buttons.Add((b, lean, label));
         }
         // What they're good for shows once you know what they do.
@@ -184,7 +189,7 @@ public partial class Main
         Act(Lean.Bribe, () => $"Put them on the payroll ({Money(price)}, then {Money(World.Retainer(c.Worth))} a week)");
         Act(Lean.Intimidate, () => "Lean on them");
         Act(Lean.Extort, () => $"Shake them down (about {Money(Math.Max(5, c.Worth * Content.ShakedownOfWorth))})");
-        Act(Lean.Kidnap, () => $"Snatch them for ransom ({Money(Math.Max(50, c.Worth * Content.RansomOfWorth))})");
+        Act(Lean.Kidnap, () => $"Snatch them for ransom ({Money(Math.Max(50, family * Content.RansomOfWorth))})");
         Act(Lean.Kill, () => "Have them killed");
         void Odds()
         {
@@ -192,16 +197,59 @@ public partial class Main
             foreach (var (b, lean, label) in buttons)
             {
                 string why = W.CannotLean(W.Player, id, lean) is { } no ? $" · {no}" : "";
-                double odds = Simulation.LeanChance(hood, lean, nerve, known);
+                double odds = Simulation.LeanChance(hood, lean, nerve, known, leverage);
                 b.Text = $"{label()} · {(reads ? "" : "maybe ")}{odds:P0}{why}";
                 b.Disabled = why != "" || lean == Lean.Bribe && W.Player.Cash < price;
             }
         }
         man.ItemSelected += _ => Odds();
         Odds();
+        if (W.HostageFrom(W.Player, id) is int held and >= 0)
+            AddLabel(panel, $"You're holding their {Content.Label(W.KnownTiesOf(id).First(t => t.Id == held).Kin, directory.Get(held).Woman).ToLowerInvariant()}. They'll do as they're told.", Palette.Good, wrap: true);
+        else if (leverage > 0) AddLabel(panel, "You know who their family are, which makes a threat or a shakedown likelier to work. Snatch one of them and they'll do as they're told.", Palette.InkQuiet, wrap: true);
         if (!reads) AddLabel(panel, $"You can't tell yet how much nerve they have, so the odds are a guess. Learn {Content.NerveFacts} things about them to know for sure.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Knowing where they live makes a threat or a snatch likelier to work, and knowing where they work helps with everything else. A shopkeeper in your pocket takes your protection gladly and resents it less, and anyone you've bought or scared keeps the block quiet when there are witnesses.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "A bribed man tells you what he hears, and so does a frightened one for a while. Shaking someone down pays now; a snatch pays if the family comes up with the money. Every one but a bribe brings heat, and anyone can be seen doing it. A killing makes you feared and the neighbourhood talks of murder.", Palette.InkQuiet, wrap: true);
+    }
+
+    /// <summary>A line on the card for each of the people someone is close to that you know of, each one a way to their card.</summary>
+    private void Family(GridContainer grid, int id, Citizen c, Fact known)
+    {
+        var d = _map.Directory!;
+        var a = W.Acquaintances.GetValueOrDefault(id);
+        var ties = _revealCitizens ? c.Ties.ToList() : W.KnownTiesOf(id).ToList();
+        // Someone you've bought or frightened has told you who they have; otherwise there may always be more.
+        bool told = _revealCitizens || a is { Standing: Standing.Bought or Standing.Scared } && a.GangId == Me && !a.UnknownTies.Any();
+        foreach (var tie in ties.Where(t => d.Exists(t.Id)))
+        {
+            var them = d.Get(tie.Id);
+            AddLabel(grid, Content.Label(tie.Kin, them.Woman), CardFaint);
+            string surname = them.Name[(them.Name.IndexOf(' ') + 1)..];
+            string name = KnownAbout(tie.Id).HasFlag(Fact.Name) ? them.Name
+                : tie.Kin != Kin.Employer && known.HasFlag(Fact.Name) && c.Name.EndsWith(surname) ? $"??? {surname}" : "Name unknown";
+            var link = new LinkButton { Text = name, Underline = LinkButton.UnderlineMode.OnHover };
+            link.AddThemeColorOverride("font_color", CardInk);
+            link.AddThemeColorOverride("font_hover_color", new Color("9a2a22"));
+            link.AddThemeFontSizeOverride("font_size", 14);
+            int other = tie.Id;
+            link.Pressed += () =>
+            {
+                _map.Select(citizen: other);
+                _overheard = null;
+                RefreshBusiness();
+            };
+            grid.AddChild(link);
+        }
+        if (told && ties.Count == 0)
+        {
+            AddLabel(grid, "Family", CardFaint);
+            AddLabel(grid, "Nobody to speak of", CardInk);
+        }
+        else if (!told)
+        {
+            AddLabel(grid, ties.Count == 0 ? "Family" : "Others", CardFaint);
+            AddLabel(grid, "???", CardFaint);
+        }
     }
 
     /// <summary>The people you know something about, so you can find their cards again.</summary>

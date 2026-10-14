@@ -123,14 +123,14 @@ public sealed record LeanOrder(int GangId, int HoodId, int CitizenId, int LotId,
 public sealed partial class Simulation
 {
     /// <summary>The chance a man pulls it off against someone with this much nerve, knowing what you know about him.</summary>
-    public static double LeanChance(Hood man, Lean lean, int nerve, Fact known = Fact.None) => Math.Clamp(lean switch
+    public static double LeanChance(Hood man, Lean lean, int nerve, Fact known = Fact.None, double leverage = 0) => Math.Clamp(lean switch
     {
         // Money talks, except to the honest few.
         Lean.Bribe => 1.05 - nerve * 0.07 + man.Brains * 0.02,
         Lean.Intimidate or Lean.Extort => 0.35 + man.Intimidation * 0.06 - nerve * 0.04,
         Lean.Kidnap => 0.3 + man.Muscle * 0.04 + man.Stealth * 0.03 - nerve * 0.02,
         _ => 0.5 + man.Muscle * 0.04 + man.Stealth * 0.01 - nerve * 0.01,
-    } + KnowingHelps(lean, known), 0.05, 0.95);
+    } + KnowingHelps(lean, known) + (lean is Lean.Intimidate or Lean.Extort ? leverage : 0), 0.05, 0.95);
 
     /// <summary>
     /// What it's worth knowing about someone before you go to him: where he lives, for a threat or a snatch; where he
@@ -170,7 +170,7 @@ public sealed partial class Simulation
         var lot = w.Map.LotAt(o.LotId);
         var a = w.Meet(o.CitizenId, lot.WardId);
         int nerve = w.NerveOf(o.CitizenId);
-        bool ok = w.Rng.Chance(LeanChance(man, o.Lean, nerve, a.Known));
+        bool ok = w.Rng.Chance(LeanChance(man, o.Lean, nerve, a.Known, w.Leverage(gang, o.CitizenId)));
         a.Worth = o.Worth;
         a.BusinessId = o.BusinessId;
         a.Tenements = o.Tenements;
@@ -185,6 +185,7 @@ public sealed partial class Simulation
                 a.Standing = Standing.Bought;
                 a.GangId = gang.Id;
                 a.Known = Fact.All;
+                foreach (var tie in a.Ties.ToList()) w.LearnTie(o.CitizenId, tie);
                 kind = ActionKind.Hire;
                 text = $"{man.Name} put {o.Who} on the payroll for ${price}, and ${World.Retainer(o.Worth)} a week after. They'll tell you what they hear.";
                 break;
@@ -194,7 +195,7 @@ public sealed partial class Simulation
                 text = $"{o.Who} wouldn't take {man.Name}'s money, and told the beat cop about it.";
                 break;
             case Lean.Intimidate when ok:
-                Scare(a, gang);
+                Scare(o.CitizenId, a, gang);
                 gang.Heat = Math.Min(100, gang.Heat + 1);
                 w.Renown(gang, fear: 0.5);
                 text = $"{man.Name} leaned on {o.Who}, who told him everything and will be no trouble.";
@@ -204,7 +205,7 @@ public sealed partial class Simulation
                 gang.Cash += take;
                 w.Ledger(gang.Id).Rackets += take;
                 a.ShakenWeek = w.Week;
-                Scare(a, gang);
+                Scare(o.CitizenId, a, gang);
                 gang.Heat = Math.Min(100, gang.Heat + 2);
                 w.Renown(gang, fear: 0.5, respect: -0.5);
                 text = $"{man.Name} shook down {o.Who} for ${take}.";
@@ -244,7 +245,7 @@ public sealed partial class Simulation
                 break;
             default:
                 gang.Heat = Math.Min(100, gang.Heat + 6);
-                Scare(a, gang);
+                Scare(o.CitizenId, a, gang);
                 kind = ActionKind.Hit;
                 text = $"{man.Name} went after {o.Who}, who got away hurt and terrified.";
                 break;
@@ -254,13 +255,15 @@ public sealed partial class Simulation
         MaybeWitness(gang, man, lot, $"{man.Name} {Content.Label(o.Lean)} {o.Who}", WitnessChance(o.Lean, ok));
     }
 
-    private void Scare(Acquaintance a, Gang gang)
+    private void Scare(int citizen, Acquaintance a, Gang gang)
     {
         if (a.Standing is Standing.Bought or Standing.Held or Standing.Dead) return;
         a.Standing = Standing.Scared;
         a.GangId = gang.Id;
         a.UntilWeek = World.Week + Content.ScaredWeeks;
         a.Known |= Fact.Name | Fact.Job | Fact.Work | Fact.Home;
+        // A frightened man says who he'd want kept out of it.
+        foreach (var tie in a.Ties.ToList()) World.LearnTie(citizen, tie);
     }
 
     /// <summary>Sunday for the people you've dealt with: ransoms paid or given up on, and fear wearing off.</summary>

@@ -3,7 +3,14 @@ namespace DryTown.Core;
 /// <summary>Everything there is to know about one resident of the city, whether or not you know it yet.</summary>
 public sealed record Citizen(
     int Id, string Name, bool Woman, int Age, Ethnicity Origin, string Job,
-    int HomeLotId, int WorkBusinessId, int LandlordId, IReadOnlyList<int> Owns, int OwnsBusinessId, int Worth);
+    int HomeLotId, int WorkBusinessId, int LandlordId, IReadOnlyList<int> Owns, int OwnsBusinessId, int Worth,
+    IReadOnlyList<Tie> Ties);
+
+/// <summary>How one resident is bound to another.</summary>
+public enum Kin { Spouse, Child, Parent, Sibling, Employer }
+
+/// <summary>Someone a resident is bound to, and how: his wife, his son, the man he works for.</summary>
+public readonly record struct Tie(int Id, Kin Kin);
 
 /// <summary>
 /// The city directory: every man, woman and child living in the city, each with a name, an age, a
@@ -74,7 +81,9 @@ public sealed class CityDirectory
                 var home = buildings[(int)(Roll(ward.Key, 50 + k) * buildings.Count)];
                 int b = BlockOf(home);
                 if (_blockPopulation[b] == 0) continue;
-                int id = b * PerBlock + (int)(Roll(ward.Key, 80 + k) * _blockPopulation[b]);
+                // Whoever it lands on, the building belongs to the head of his household.
+                int n = (int)(Roll(ward.Key, 80 + k) * _blockPopulation[b]);
+                int id = b * PerBlock + HouseholdAt(b, n).Start;
                 if (!pool.Contains(id) && !_businessOfOwner.ContainsKey(id)) pool.Add(id);
             }
             if (pool.Count == 0) continue;
@@ -119,14 +128,28 @@ public sealed class CityDirectory
         int block = id / PerBlock;
         int homeLot = HomeOf(block, n);
         var home = _w.Map.LotAt(homeLot);
+        var (start, size) = HouseholdAt(block, n);
+        int place = n - start, headId = block * PerBlock + start;
+        var head = place == 0 ? null : Get(headId);
+        bool married = size >= 2 && Roll(headId, 301) < 0.8;
+        // The head's family are his wife and children if he's old enough to have them, else his brothers and sisters.
+        var kin = place == 0 ? Kin.Spouse : place == 1 && married ? Kin.Spouse : head!.Age >= 32 ? Kin.Child : Kin.Sibling;
 
-        // Most are of the neighbourhood's people; the rest came from anywhere.
+        // Most are of the neighbourhood's people; the rest came from anywhere. A family are all one people.
         var local = _w.Neighbourhood(home.WardId);
-        var origin = local != Ethnicity.Unknown && Roll(id, 1) < 0.75 ? local : Content.Peoples[(int)(Roll(id, 2) * Content.Peoples.Length)];
-        bool woman = Roll(id, 3) < 0.5;
+        var origin = head?.Origin ?? (local != Ethnicity.Unknown && Roll(id, 1) < 0.75 ? local : Content.Peoples[(int)(Roll(id, 2) * Content.Peoples.Length)]);
+        bool woman = place == 1 && married ? !head!.Woman : Roll(id, 3) < 0.5;
         int age = 16 + (int)(Math.Pow(Roll(id, 4), 1.4) * 60);
-        string first = Pick(woman ? WomenOf(origin) : Content.FirstNamesOf.GetValueOrDefault(origin) ?? Content.FirstNames, id, 5);
-        string last = Pick(Content.LastNamesOf.GetValueOrDefault(origin) ?? Content.LastNames, id, 6);
+        if (head == null) age = Math.Max(age, size >= 3 ? 34 : size == 2 ? 20 : 16);
+        else if (kin == Kin.Spouse) age = Math.Clamp(head.Age + (int)(Roll(id, 302) * 10) - (woman ? 6 : 2), 18, 90);
+        else if (kin == Kin.Child) age = Math.Max(1, head.Age - 20 - (int)(Roll(id, 303) * 22));
+        else age = Math.Clamp(head.Age + (int)(Roll(id, 304) * 12) - 6, 16, 90);
+        var names = woman ? WomenOf(origin) : Content.FirstNamesOf.GetValueOrDefault(origin) ?? Content.FirstNames;
+        string first = Pick(names, id, 5);
+        // Nobody names a child after his brother, and few after his father.
+        var taken = Enumerable.Range(0, place).Select(k => Get(block * PerBlock + start + k).Name.Split(' ')[0]).ToList();
+        for (int salt = 14; salt < 24 && taken.Contains(first); salt++) first = Pick(names, id, salt);
+        string last = head?.Name[(head.Name.IndexOf(' ') + 1)..] ?? Pick(Content.LastNamesOf.GetValueOrDefault(origin) ?? Content.LastNames, id, 6);
 
         int owns = _businessOfOwner.GetValueOrDefault(id, -1);
         var buildings = _ownedBy.GetValueOrDefault(id) ?? (IReadOnlyList<int>)Array.Empty<int>();
@@ -139,13 +162,14 @@ public sealed class CityDirectory
             int mark = biz.Name.IndexOf("'s ", StringComparison.Ordinal);
             if (mark > 0 && !biz.Name[..mark].Contains(' ')) last = biz.Name[..mark];
             job = $"Owns {Short(biz.Name)}";
-            age = Math.Max(age, 30 + (int)(Roll(id, 7) * 30));
+            if (size < 3) age = Math.Max(age, 30 + (int)(Roll(id, 7) * 30));
         }
         else if (buildings.Count > 0)
         {
             job = buildings.Count == 1 ? "Landlord of a tenement" : $"Landlord of {buildings.Count} tenements";
-            age = Math.Max(age, 35 + (int)(Roll(id, 7) * 30));
+            if (size < 3) age = Math.Max(age, 35 + (int)(Roll(id, 7) * 30));
         }
+        else if (age < 14) job = age < 6 ? "Too young for school" : "At school";
         else if (age >= 65 && Roll(id, 8) < 0.7) job = "Retired";
         else if (_businessesInWard.TryGetValue(home.WardId, out var nearby) && Roll(id, 9) < 0.3)
         {
@@ -158,12 +182,62 @@ public sealed class CityDirectory
         // What he's good for in a week, which sets what a bribe costs and what he can be shaken down or ransomed for.
         int worth = owns >= 0 ? Math.Max(15, _w.BusinessById(owns).Takings / 5)
             : buildings.Count > 0 ? 25 * buildings.Count
+            : age < 14 ? 1
             : job is "Out of work" or "Newsboy" ? 2
             : job is "Retired" or "Keeps house" ? 5
             : 8 + (int)(Roll(id, 13) * 11);
-        var citizen = new Citizen(id, $"{first} {last}", woman, age, origin, job, homeLot, work, LandlordOf(homeLot), buildings, owns, worth);
+        var ties = new List<Tie>();
+        for (int k = 0; k < size; k++)
+        {
+            if (k == place) continue;
+            int other = block * PerBlock + start + k;
+            if (KinBetween(place, k, married, (head?.Age ?? age) >= 32) is Kin between) ties.Add(new Tie(other, between));
+        }
+        if (work >= 0 && OwnerOf(work) is int boss and >= 0 && boss != id) ties.Add(new Tie(boss, Kin.Employer));
+        var citizen = new Citizen(id, $"{first} {last}", woman, age, origin, job, homeLot, work, LandlordOf(homeLot), buildings, owns, worth, ties);
         _cache[id] = citizen;
         return citizen;
+    }
+
+    /// <summary>
+    /// How the k-th of a household is related to the one in place: the head comes first, then his wife if he has
+    /// one, then his children if he's old enough to have them, or else his brothers and sisters.
+    /// </summary>
+    private static Kin? KinBetween(int place, int k, bool married, bool children)
+    {
+        int Role(int i) => i == 0 ? 0 : i == 1 && married ? 1 : 2;
+        return (Role(place), Role(k)) switch
+        {
+            (0, 1) or (1, 0) => Kin.Spouse,
+            (0, 2) or (1, 2) when children => Kin.Child,
+            (2, 0) or (2, 1) when children => Kin.Parent,
+            (0, 2) or (2, 0) => Kin.Sibling,
+            (2, 2) => Kin.Sibling,
+            _ => null,
+        };
+    }
+
+    /// <summary>Where in his block's numbering a resident's household starts, and how many are in it.</summary>
+    private (int Start, int Size) HouseholdAt(int block, int n)
+    {
+        int lotStart = 0;
+        foreach (var (lot, people) in _homes[block])
+        {
+            if (n < lotStart + people)
+            {
+                // Each building is let out to households of one to five, in order from its first resident.
+                int at = lotStart;
+                for (int k = 0; ; k++)
+                {
+                    double r = Roll(lot * 64 + k, 300);
+                    int size = Math.Min(lotStart + people - at, r < 0.2 ? 1 : r < 0.45 ? 2 : r < 0.7 ? 3 : r < 0.88 ? 4 : 5);
+                    if (n < at + size) return (at, size);
+                    at += size;
+                }
+            }
+            lotStart += people;
+        }
+        return (n, 1);
     }
 
     /// <summary>A business's name without the street it's on.</summary>
