@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using DryTown.Core;
 using Godot;
@@ -6,7 +7,8 @@ using Godot;
 /// The squares: stretches of street closed to traffic and paved over, with bollards across each end. Where a street
 /// ran there's a square with a fountain, benches and a tree at each end, or a market street lined with stalls. Where
 /// an avenue ran there's a little plaza with a statue between two trees, or a glass-roofed arcade built across the gap
-/// that joins the two blocks into one. People cross them on foot, and the traffic turns off at the crossing before.
+/// that joins the two blocks into one, or buildings put up across the old roadway to make one double block. People
+/// cross them on foot, except where they've been built over, and the traffic turns off at the crossing before.
 /// </summary>
 public partial class MapView
 {
@@ -54,6 +56,12 @@ public partial class MapView
                 TreeShadow(cx + side * 1.6f, cy, 1);
                 Ellipse(P(cx + side * 1.6f, cy), new Vector2(0.14f, 0.1f) * _t, Flags.Darkened(0.3f));
             }
+        }
+        if (by < Map.BlocksY && Map.BuiltOver(bx, by))
+        {
+            // The yard behind the buildings that fill the old roadway, and their shadows.
+            C.DrawRect(R(x0 - 0.02f, y0 + 1, 1.04f, CityMap.LotsPerBlockY), Pavement.Darkened(0.4f));
+            return;
         }
         if (by < Map.BlocksY && Map.AvenueClosed(bx, by))
         {
@@ -120,6 +128,12 @@ public partial class MapView
             {
                 float cx = bx * CityMap.StrideX + 0.5f, cy = by * CityMap.StrideY + 2;
                 if (Column(cx) != col) continue;
+                if (Map.BuiltOver(bx, by))
+                {
+                    if (y == (int)cy - 1) DrawInfill(bx, by, false);
+                    if (y == (int)cy) DrawInfill(bx, by, true);
+                    continue;
+                }
                 if (IsArcade(bx, by))
                 {
                     if (y == (int)cy) DrawArcade(bx * CityMap.StrideX, by * CityMap.StrideY);
@@ -136,6 +150,39 @@ public partial class MapView
                 if (y == (int)(cy + 0.6f)) DrawTree(cx, cy + 0.6f, 1);
             }
         }
+    }
+
+    /// <summary>
+    /// One of the two buildings put up across a closed avenue, joining the blocks either side into a double block:
+    /// the north one facing the street above, the south one the street below, each in the style of its neighbours.
+    /// </summary>
+    private void DrawInfill(int bx, int by, bool south)
+    {
+        float x0 = bx * CityMap.StrideX - 0.05f, x1 = bx * CityMap.StrideX + 1.05f;
+        float y0 = by * CityMap.StrideY + (south ? 2.04f : 1.06f), y1 = y0 + 0.9f;
+        int row = by * CityMap.StrideY + (south ? 2 : 1);
+        // Built to match the house next door, to the west.
+        var next = Map.Lots.FirstOrDefault(l => l.Y == row && l.X == bx * CityMap.StrideX - 1);
+        float h = next == null ? 0.6f : Mathf.Clamp(HeightCached(next), 0.4f, 1.4f);
+        var wall = next != null && next.Terrain == Terrain.Land ? WallFor(next) : Bricks[(bx * 7 + by) % Bricks.Length];
+        var roof = Roofs[(bx * 5 + by * 3 + (south ? 1 : 0)) % Roofs.Length];
+        Box(x0, y0, x1, y1, 0, h, wall, wall.Lightened(0.12f), roof);
+        if (Fine)
+        {
+            for (float z = 0.06f; z + 0.12f <= h; z += 0.2f)
+                for (float x = x0 + 0.08f; x + 0.1f < x1; x += 0.2f)
+                {
+                    float xx = x, zz = z;
+                    Face(xx, xx + 0.09f, y1, zz, zz + 0.11f, Glass);
+                    Lit(() => Face(xx + 0.01f, xx + 0.08f, y1, zz + 0.01f, zz + 0.1f,
+                        new Color("ffd890") with { A = Hash(bx * 31 + by * 7 + (int)(xx * 20), (int)(zz * 30)) < 0.45f ? 0.85f : 0 }));
+                }
+            for (float y = y0 + 0.12f; y < y1 - 0.1f; y += 0.28f)
+                for (float z = 0.06f; z + 0.12f <= h; z += 0.2f)
+                    West(x0, y, y + 0.1f, z + 0.03f, z + 0.11f, Glass.Lightened(0.08f));
+        }
+        Face(x0, x1, y1, h - 0.04f, h, wall.Lightened(0.15f));
+        if (south) Face((x0 + x1) / 2 - 0.05f, (x0 + x1) / 2 + 0.05f, y1, 0, 0.15f, new Color("2a1c14"));
     }
 
     private const int StallCount = 5;

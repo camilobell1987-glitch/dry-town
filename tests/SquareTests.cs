@@ -69,4 +69,25 @@ public class SquareTests
         var loaded = SaveGame.Restore(SaveGame.Read(SaveGame.Write(sim, Array.Empty<Order>()))).World;
         Assert.Equal(sim.World.Map.Squares.OrderBy(s => s), loaded.Map.Squares.OrderBy(s => s));
     }
+
+    [Fact]
+    public void NobodyWalksThroughADoubleBlock()
+    {
+        var m = City(8, CitySize.Metropolis).Map;
+        Assert.Contains(m.Squares, s => s.Avenue && m.BuiltOver(s.Bx, s.By));
+        Assert.Contains(m.Squares, s => s.Avenue && !m.BuiltOver(s.Bx, s.By));
+        var land = m.Lots.Where(l => l.Terrain == Terrain.Land).ToList();
+        for (int i = 0; i < 400; i++)
+        {
+            var path = m.Path(land[i * 7 % land.Count], land[i * 13 % land.Count]);
+            for (int k = 1; k < path.Count; k++)
+            {
+                var (ax, ay) = path[k - 1];
+                var (bx, by) = path[k];
+                if (ax != bx || ay == by || ax % CityMap.StrideX != 0) continue;
+                // Up or down an avenue: every stretch of it between the two streets is open to walkers.
+                Assert.True(m.Walkable(ax / CityMap.StrideX, ay / CityMap.StrideY, by / CityMap.StrideY));
+            }
+        }
+    }
 }

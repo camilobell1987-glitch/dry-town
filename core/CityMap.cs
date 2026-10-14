@@ -153,6 +153,38 @@ public sealed partial class CityMap
     /// <summary>Whether the stretch of an avenue between street row <paramref name="by"/> and the next is a plaza.</summary>
     public bool AvenueClosed(int avenue, int by) => (_squares ??= LaySquares()).Contains((avenue, by, true));
 
+    /// <summary>
+    /// Whether a closed stretch of avenue has been built over, joining the blocks either side into one double block.
+    /// Nobody walks through one: the walk goes round by the next avenue along.
+    /// </summary>
+    public bool BuiltOver(int avenue, int by) => AvenueClosed(avenue, by) && Hash(avenue * 977 + by, 1302) < 0.4f;
+
+    /// <summary>Whether an avenue can be walked between two street rows: none of the stretch between them is built over.</summary>
+    public bool Walkable(int avenue, int fromStreet, int toStreet)
+    {
+        for (int by = Math.Min(fromStreet, toStreet); by < Math.Max(fromStreet, toStreet); by++)
+            if (BuiltOver(avenue, by)) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// The avenue a walk between two doors on different streets goes up or down: the one with the shortest way
+    /// round, never one built over between the two streets.
+    /// </summary>
+    public int WalkAvenue(float x1, float x2, int fromStreet, int toStreet)
+    {
+        int best = 0;
+        float bestCost = float.MaxValue;
+        for (int a = 0; a <= BlocksX; a++)
+        {
+            if (!Walkable(a, fromStreet, toStreet)) continue;
+            int ax = a * StrideX;
+            float cost = Math.Abs(ax - x1) + Math.Abs(ax - x2);
+            if (cost < bestCost) { bestCost = cost; best = ax; }
+        }
+        return best;
+    }
+
     /// <summary>Whether a lot's door opens onto a square rather than a street cars can drive down.</summary>
     public bool FrontsSquare(Lot lot) => StreetClosed((lot.X - 1) / StrideX, lot.FrontY / StrideY);
 
@@ -357,7 +389,7 @@ public sealed partial class CityMap
         var path = new List<(int, int)> { (from.X, from.Y), (from.X, from.FrontY) };
         if (from.FrontY != to.FrontY)
         {
-            int avenue = NearestAvenue(from.X, to.X);
+            int avenue = WalkAvenue(from.X, to.X, from.FrontY / StrideY, to.FrontY / StrideY);
             path.Add((avenue, from.FrontY));
             path.Add((avenue, to.FrontY));
         }
@@ -373,17 +405,5 @@ public sealed partial class CityMap
         int d = 0;
         for (int i = 1; i < p.Count; i++) d += Math.Abs(p[i].X - p[i - 1].X) + Math.Abs(p[i].Y - p[i - 1].Y);
         return d;
-    }
-
-    private int NearestAvenue(int x1, int x2)
-    {
-        int best = 0, bestCost = int.MaxValue;
-        for (int a = 0; a <= BlocksX; a++)
-        {
-            int ax = a * StrideX;
-            int cost = Math.Abs(ax - x1) + Math.Abs(ax - x2);
-            if (cost < bestCost) { bestCost = cost; best = ax; }
-        }
-        return best;
     }
 }
