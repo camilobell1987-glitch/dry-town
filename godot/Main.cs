@@ -1336,6 +1336,7 @@ public partial class Main : Control
         _revealCitizens = Flag("--reveal");
         if (Flag("--character-tab")) _cardTab = CardTab.Character;
         if (Flag("--grudge-tab")) _cardTab = CardTab.Grudges;
+        _pinGrudgeHelp = Flag("--grudge-help");
         if (Arg("--select-bank") is string bankArg)
             _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));
         if (Flag("--select-hood")) _map.Select(hood: W.Hoods.First(h => h.IsAvailable && h.GangId != Me && W.GangById(h.GangId).Alive).Id);

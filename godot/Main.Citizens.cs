@@ -115,11 +115,16 @@ public partial class Main
         foreach (var (title, which) in new[] { ("Particulars", CardTab.Particulars), ("Character", CardTab.Character), ("Grudges", CardTab.Grudges) })
         {
             bool on = _cardTab == which;
-            var tab = new LinkButton { Text = title, Underline = on ? LinkButton.UnderlineMode.Always : LinkButton.UnderlineMode.OnHover, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
+            // The grudges tab explains itself when the pointer rests on it, rather than taking room on the card.
+            var tab = which == CardTab.Grudges ? new HelpLink { Heading = "Grudges", Lines = GrudgeHelp, TooltipText = "Grudges" } : new LinkButton();
+            tab.Text = title;
+            tab.Underline = on ? LinkButton.UnderlineMode.Always : LinkButton.UnderlineMode.OnHover;
+            tab.MouseDefaultCursorShape = Control.CursorShape.PointingHand;
             tab.AddThemeColorOverride("font_color", on ? CardInk : CardFaint);
             tab.AddThemeColorOverride("font_hover_color", new Color("9a2a22"));
             tab.AddThemeFontSizeOverride("font_size", 13);
             tab.Pressed += () => { _cardTab = which; RefreshBusiness(); };
+            if (tab is HelpLink help && _pinGrudgeHelp) PinHelp(help);
             tabs.AddChild(tab);
         }
         var grid = new GridContainer { Columns = 2, Visible = _cardTab == CardTab.Particulars };
@@ -261,7 +266,7 @@ public partial class Main
         else if (leverage > 0) AddLabel(panel, "You know who their family are, which makes a threat or a shakedown likelier to work. Snatch one of them and they'll do as they're told.", Palette.InkQuiet, wrap: true);
         if (W.HasVendetta(W.Player, id, knownOnly: !_revealCitizens))
             AddLabel(panel, "They've sworn a vendetta against you. It will never fade, nothing will square it, and sooner or later they'll act on it.", Palette.Bad, wrap: true);
-        else if (bad > 0) AddLabel(panel, $"They're {Content.Label(Content.TierOf(bad)).ToLowerInvariant()} with you, which makes them harder to buy or scare. Paying them off eases it most and calms their family too; a good turn or a good word for their business helps, and so does a soup kitchen in your name. Let it reach a vendetta and there's no coming back.", Palette.InkQuiet, wrap: true);
+        else if (bad > 0) AddLabel(panel, $"They're {Content.Label(Content.TierOf(bad)).ToLowerInvariant()} with you, which makes them harder to buy or scare.", Palette.InkQuiet, wrap: true);
         if (!reads) AddLabel(panel, $"You can't tell yet how much nerve they have, so the odds are a guess. Learn {Content.NerveFacts} things about them to know for sure.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Anything they're hiding makes a threat likelier to work, and is grounds for blackmail. A crime you know of can be handed to the police, which cools them on you. The term fits the crime and how the trial goes: money buys a deal, and reformers want examples made. A shopkeeper taken in leaves his shop shut for a while.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Knowing where they live makes a threat or a snatch likelier to work, and knowing where they work helps with everything else. A shopkeeper in your pocket takes your protection gladly and resents it less, and anyone you've bought or scared keeps the block quiet when there are witnesses.", Palette.InkQuiet, wrap: true);
@@ -328,6 +333,29 @@ public partial class Main
         AddLabel(lines, "Asking around, tailing them, the street's gossip and dealing with them all show what sort they are.", CardFaint, 12, wrap: true);
     }
 
+    /// <summary>For screenshots: the grudges help card shown as if the pointer were resting on the tab.</summary>
+    private bool _pinGrudgeHelp;
+    private Control? _pinnedHelp;
+
+    private void PinHelp(HelpLink link)
+    {
+        _pinnedHelp?.QueueFree();
+        var card = (Control)link._MakeCustomTooltip("");
+        _pinnedHelp = card;
+        AddChild(card);
+        Callable.From(() => card.GlobalPosition = link.GlobalPosition + new Vector2(-120, 24)).CallDeferred();
+    }
+
+    /// <summary>What the grudges tab says about grudges when the pointer rests on it.</summary>
+    private static readonly string[] GrudgeHelp =
+    {
+        "What's done to people and their families leaves bad blood: against your outfit, the man you sent, a beat cop, or a neighbour.",
+        "They run from prickly to sore, scowling and beefing, and at the worst a vendetta, which never fades and can't be squared.",
+        "Someone with it in for you is harder to buy or scare, and quicker to come forward as a witness. Once they're beefing they act on it: the police, the papers, or a brick through a window.",
+        "Money, a good turn, a good word for their business, or a soup kitchen in your name all ease a grudge before it gets that far. Grudges fade a little each week anyway.",
+        "Someone who hates a neighbour is glad to talk about them.",
+    };
+
     /// <summary>The card's third tab: who they have it in for, and who has it in for them, as far as you know.</summary>
     private void GrudgesTab(VBoxContainer lines, int id)
     {
@@ -383,7 +411,6 @@ public partial class Main
             Reason($"They {Over(g)}.");
         }
         if (against.Count == 0) AddLabel(lines, _revealCitizens ? "Nobody" : "Nobody you know of", CardInk);
-        AddLabel(lines, "Grudges run from prickly to sore, scowling, beefing and, at the worst, a vendetta, which never fades and can't be squared. Someone with it in for you is harder to buy or scare and quicker to come forward as a witness; once they're beefing they go to the police or the papers, or put a brick through a window. Money, a good turn, a good word for their business or a soup kitchen in your name all ease a grudge before it gets that far. Someone who hates a neighbour is glad to talk about them.", CardFaint, 12, wrap: true);
     }
 
     /// <summary>A link on a card, in the card's ink, turning red under the pointer.</summary>
