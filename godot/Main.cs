@@ -1511,6 +1511,7 @@ public partial class Main : Control
                         .Select(W.HqOf).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "speakeasy" => W.Businesses.Where(b => b.IsOpen && b.Racket == RacketKind.Speakeasy).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
+                    "raid" => W.Script.LastOrDefault(x => x.Kind == ActionKind.Raid) is { } raid ? W.Map.LotAt(raid.ToLot) : hq,
                     "river" => W.Map.Lots.Where(l => l.Terrain == Terrain.Water).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "cemetery" => W.Map.Lots.Where(l => l.Terrain == Terrain.Cemetery).OrderByDescending(l => W.Map.LotsOfBlock((l.X - 1) / CityMap.StrideX, (l.Y - 1) / CityMap.StrideY).Count(x => x.Terrain == Terrain.Cemetery)).ThenBy(l => l.Id).First(),
                     "biz" => _map.SelectedBusiness >= 0 ? W.LotOf(W.BusinessById(_map.SelectedBusiness)) : hq,
@@ -1521,6 +1522,7 @@ public partial class Main : Control
                 _map.ResetView(lot, float.Parse(Arg("--zoom") ?? "4"));
                 // Ring the spot as a link on a card would, to see the mark.
                 if (Flag("--mark")) _map.PanTo(lot);
+                if (Flag("--showroom")) { _map.Showroom = lot; _map.CentreOn(new Vector2(lot.X, lot.FrontY + 0.5f)); }
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
             else if (Arg("--zoom") is string zoom) { _map.ZoomCentre(float.Parse(zoom)); await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }

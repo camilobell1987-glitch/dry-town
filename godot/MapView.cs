@@ -143,6 +143,13 @@ public partial class MapView : Control
         C = keep;
     }
 
+    /// <summary>Bring a tile to the middle of the view without changing the zoom, for screenshots.</summary>
+    public void CentreOn(Vector2 tile)
+    {
+        _pan += Size / 2 - OnScreen(tile);
+        ClampPan();
+    }
+
     /// <summary>Zoom about the middle of the map, for screenshots.</summary>
     public void ZoomCentre(float zoom) => ZoomAt(Size / 2, zoom / _zoom);
 
@@ -649,9 +656,10 @@ public partial class MapView : Control
         _fine = Tile >= 16;
         var view = VisibleTiles();
         float night = Night;
-        DrawTraffic(night, view);
+        if (Showroom == null) DrawTraffic(night, view);
         DrawParkedOfficials(night, view);
-        DrawParkedCars(night, view);
+        if (Showroom == null) DrawParkedCars(night, view);
+        DrawShowroom();
         _clickables.Clear();
         DrawStreetPeople(view);
         DrawLoiterers(view);
@@ -803,6 +811,15 @@ public partial class MapView : Control
 
             var pos = P(at);
             bool atScene = now >= actor.Arrive && now <= actor.Leave;
+
+            // The police drive to a raid in a paddy wagon, the Untouchables in their raid truck, and pull up at the kerb.
+            if (a.Kind == ActionKind.Raid)
+            {
+                var ride = a.Federal ? Ride.RaidTruck : Ride.PaddyWagon;
+                var paint = a.Federal ? Olive : WagonBlue;
+                if (walking) { DrawOnTheRoad(at, ahead, ride, paint, true); continue; }
+                DrawAtKerb(World!.Map.LotAt(a.ToLot), ride, paint, true);
+            }
 
             // Men with a car drive there and back, and get out at the door.
             if (walking && a.Kind is not (ActionKind.Raid or ActionKind.Collect) && CarFor(a.Backup.Prepend(a.HoodId)) is var car and not Car.None)

@@ -1182,7 +1182,10 @@ public partial class MapView
             case Filler.Parking:
                 for (int i = 0; i < 3; i++)
                     if (Hash(lot.Id, 80 + i) > 0.45f)
-                        DrawCar(new Vector2(lot.X + 0.25f + i * 0.25f, lot.Y + (FacesSouth(lot) ? 0.62f : 0.38f)), false, CarPaint[(int)(Hash(lot.Id, 90 + i) * CarPaint.Length)], 0, 0.8f);
+                    {
+                        var ride = Hash(lot.Id, 95 + i) < 0.6f ? Ride.ModelT : Ride.Packard;
+                        DrawVehicle(new Vector2(lot.X + 0.25f + i * 0.25f, lot.Y + (FacesSouth(lot) ? 0.62f : 0.38f)), false, 1, ride, RidePaint(ride, Hash(lot.Id, 90 + i)), 0, 0.75f);
+                    }
                 break;
             case Filler.PocketPark:
                 foreach (var (tx, ty, size) in TreesOn(lot).OrderBy(t => t.Y)) DrawTree(tx, ty, size);

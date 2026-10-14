@@ -145,7 +145,11 @@ public sealed partial class Simulation
         b.Racket = RacketKind.None;
         s.LastRaidWeek = w.Week;
         w.Log(EventKind.Untouchables, g.Id, $"The Untouchables smashed {g.Name}'s {what} at {b.Name}, with the papers watching.");
-        if (man is { IsAvailable: true } && w.Rng.Chance(Content.SquadArrest)) Jail(man, w.Rng.Range(26, 52), "with running liquor", federal: true);
+        bool arrested = man is { IsAvailable: true } && w.Rng.Chance(Content.SquadArrest);
+        if (arrested) Jail(man!, w.Rng.Range(26, 52), "with running liquor", federal: true);
+        // Out on the streets: the squad's truck pulls up outside, and the agents go in.
+        w.Act(new ScriptAction(ActionKind.Raid, -1, -1, w.PrecinctNear(w.LotOf(b)).Id, b.LotId, b.Id,
+            arrested ? ActionResult.Arrested : ActionResult.Success, $"The Untouchables smashed {g.Name}'s {what} at {b.Name}.", g.Id, -1, arrested ? man!.Id : -1) { Federal = true });
         if (s.Evidence == Content.SquadIndictment - 1)
             w.Log(EventKind.Whisper, g.Id, $"Word is the Untouchables are one raid away from taking {w.HoodById(g.BossHoodId).Name} before a grand jury.");
     }

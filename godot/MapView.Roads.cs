@@ -107,7 +107,8 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
                         var at = new Vector2(x, y);
                         if (!view.HasPoint(at)) continue;
                         C = DynAt(y);
-                        DrawCar(at, true, CarPaint[(int)(Hash(key, 761) * CarPaint.Length)], 0, 0.9f, heading: side == 0 ? -1 : 1);
+                        var ride = TrafficRide(Hash(key, 764), parked: true);
+                        DrawVehicle(at, true, side == 0 ? -1 : 1, ride, RidePaint(ride, Hash(key, 761)), 0, 0.85f, seed: key);
                     }
                 }
             // Along the avenue, the same down each kerb.
@@ -125,7 +126,8 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
                         var at = new Vector2(x, y);
                         if (!view.HasPoint(at)) continue;
                         C = DynAt(y);
-                        DrawCar(at, false, CarPaint[(int)(Hash(key, 763) * CarPaint.Length)], 0, 0.9f, heading: side == 0 ? 1 : -1);
+                        var ride = TrafficRide(Hash(key, 765), parked: true);
+                        DrawVehicle(at, false, side == 0 ? 1 : -1, ride, RidePaint(ride, Hash(key, 763)), 0, 0.85f, seed: key);
                     }
                 }
         }
