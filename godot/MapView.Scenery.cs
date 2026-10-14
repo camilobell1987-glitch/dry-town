@@ -209,8 +209,9 @@ public partial class MapView
             if (lot.Use == LotUse.Headquarters) DrawVehicle(new Vector2(lot.X + 0.5f, carY), true, 1, Ride.Packard, Palette.Gang(w, lot.GangId).Darkened(0.35f), night);
             else
             {
-                DrawVehicle(new Vector2(lot.X + 0.22f, carY), true, 1, Ride.PoliceCar, PoliceBlack, night, 0.9f);
-                DrawVehicle(new Vector2(lot.X + 0.78f, carY), true, -1, Ride.PaddyWagon, WagonBlue, night, 0.9f);
+                // A patrol car at the kerb, clear of the garage ramp, where the paddy wagon is kept.
+                bool rampEast = !_ramps.TryGetValue(lot.Id, out bool east) || east;
+                DrawVehicle(new Vector2(lot.X + (rampEast ? 0.3f : 0.7f), carY), true, rampEast ? 1 : -1, Ride.PoliceCar, PoliceBlack, night, 0.9f);
             }
         }
     }

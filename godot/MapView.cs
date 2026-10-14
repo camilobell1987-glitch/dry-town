@@ -162,6 +162,9 @@ public partial class MapView : Control
 
     // ---- Live replay ----------------------------------------------------------
 
+    /// <summary>For screenshots: start the map's animations this many seconds in.</summary>
+    public float AnimFrom { set => _anim = value; }
+
     private sealed record Actor(ScriptAction Action, List<Vector2> Path, float Depart, float Arrive, float Leave, float Home, Color Colour, int Order, Trip? Via = null);
 
     /// <summary>The simulation running the week, which the map steps forward as the clock moves.</summary>
@@ -209,6 +212,8 @@ public partial class MapView : Control
         {
             var a = World.Script[i];
             var path = StreetPath(a.FromLot, a.ToLot);
+            // The police set out from the garage under the precinct house, up the ramp.
+            if (a.Kind == ActionKind.Raid && RampOut(World.Map.LotAt(a.FromLot)) is { } ramp) path = ramp.Concat(path.Skip(1)).ToList();
             var ride = RideOf(a);
             float hours = Simulation.WalkHours(World, a.FromLot, a.ToLot) / Content.Cars[ride].Speed;
             float arrive = a.Tick;
@@ -407,12 +412,12 @@ public partial class MapView : Control
                 string shut = b.IsOpen ? "" : $"\nClosed by police for {b.ShutWeeks} more weeks";
                 string front = b.IsFront ? $"\nA front for {World.GangById(b.OwnerGangId).Name}" : "";
                 string takes = b.Kind == BusinessKind.Court ? $"A tenement court · the block pays ${b.Takings} a week" : $"Takes ${b.Takings} a week · owner toughness {b.Toughness}/10";
-                return $"{b.Name}\n{takes}\n{owner}{front}{racket}{shut}{WardLine(lot)}";
+                return $"{b.Name}\n{takes}\n{owner}{front}{racket}{shut}{GarageLine(lot)}{WardLine(lot)}";
             case LotUse.Headquarters:
                 var g = World.Gangs.First(x => x.Id == lot.GangId);
                 return g.IsSmall ? CornerTip(g) : $"Headquarters of {g.Name}";
             case LotUse.Precinct:
-                return "Precinct house" + WardLine(lot);
+                return "Precinct house" + GarageLine(lot) + WardLine(lot);
             case LotUse.Bank:
                 var bank = World.BankAt(lot.Id);
                 return bank == null ? "" : $"{bank.Name}\nAbout ${bank.Vault / 500 * 500:N0} in the vault · {bank.Guards} guard{(bank.Guards == 1 ? "" : "s")}{WardLine(lot)}";
@@ -670,6 +675,7 @@ public partial class MapView : Control
         if (Showroom == null) DrawTraffic(night, view);
         DrawParkedOfficials(night, view);
         if (Showroom == null) DrawParkedCars(night, view);
+        if (Showroom == null) DrawGarageTraffic(night, view);
         DrawShowroom();
         _clickables.Clear();
         DrawStreetPeople(view);

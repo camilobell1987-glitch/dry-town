@@ -135,6 +135,10 @@ About a quarter of the blocks have a back alley running across the middle, and a
 
 During the live week you can watch it happen: the getaway car turns down the alley, the doors swing open and it noses in, and the men walk home; a hijacked truck drives in the same way with the gang's car behind it. Rival outfits take a lockup near home once they have cars and money to spare.
 
+### Underground garages
+
+Every motor garage and hotel has an underground garage, reached by a concrete ramp beside the building that runs down from the pavement into the dark under it, with an enamel GARAGE plate at the top. A motor garage holds 40 cars and a hotel 25. Every precinct house has one too, with 12 spaces and a blue lamp at the ramp, where the paddy wagon is kept. Cars turn off the street and roll down out of sight, and others come back up; the bay in front of each ramp is kept clear. A raid sets out up the precinct's ramp, and the wagon drives back down it afterwards. Hover over a building to see how many spaces are under it.
+
 ![The gun shop](docs/screenshots/gun-shop.png)
 ![A gang car on the way to a job](docs/screenshots/driving.png)
 
