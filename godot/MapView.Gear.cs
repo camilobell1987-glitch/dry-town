@@ -171,6 +171,7 @@ public partial class MapView
         var keep = C;
         C = PenFor(at);
         DrawVehicle(at + lane, horizontal, heading, ride, paint, Night, siren: siren);
+        ShadeIfOnRamp(at + lane, horizontal, ride);
         C = keep;
         return at + lane;
     }

@@ -1500,6 +1500,7 @@ public partial class Main : Control
         }
         if (Arg("--shot") is string shot)
         {
+            if (Arg("--anim") is string anim) _map.AnimFrom = float.Parse(anim);
             for (int i = 0; i < 4; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             if (Flag("--ballot") && _wardHeader != null && _hallPanel.GetParent()?.GetParent() is ScrollContainer hallScroll)
             {
@@ -1543,6 +1544,9 @@ public partial class Main : Control
                     "speakeasy" => W.Businesses.Where(b => b.IsOpen && b.Racket == RacketKind.Speakeasy).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "raid" => W.Script.LastOrDefault(x => x.Kind == ActionKind.Raid) is { } raid ? W.Map.LotAt(raid.ToLot) : hq,
+                    "garage" => W.Garages.Where(g => !g.Police).Select(g => W.Map.LotAt(g.LotId)).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    _ when int.TryParse(focus, out int lotId) => W.Map.LotAt(lotId),
+                    "precinct" => W.Map.Lots.Where(l => l.Use == LotUse.Precinct).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "lockup" => W.LockupsOf(Me).Select(W.LockupLot).FirstOrDefault() ?? hq,
                     "alley" => W.Map.Lots.Where(l => l.Terrain == Terrain.Land && W.Map.HasBackAlley((l.X - 1) / CityMap.StrideX, (l.Y - 1) / CityMap.StrideY))
                         .OrderBy(l => W.Map.Distance(hq, l)).ThenBy(l => l.Id).FirstOrDefault() ?? hq,

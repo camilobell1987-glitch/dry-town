@@ -596,6 +596,7 @@ public partial class MapView
         if (lot.Terrain == Terrain.Church) { DrawChurch(lot); return; }
         if (lot.Court) DrawCourtYard(lot);
         DrawAlleyClutter(lot);
+        DrawRamp(lot);
         switch (lot.Use)
         {
             case LotUse.Business:

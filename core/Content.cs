@@ -269,6 +269,9 @@ public static partial class Content
     public const int TruckCoolWeeks = 2;
     public const double TruckPatience = 1.5;
 
+    /// <summary>Spaces under a motor garage, a hotel and a precinct house.</summary>
+    public const int MotorGarage = 40, HotelGarage = 25, PrecinctGarage = 12;
+
     /// <summary>The chance each week, at full heat, that the police find what's in one of a gang's lockups.</summary>
     public const double LockupSearched = 0.1;
 

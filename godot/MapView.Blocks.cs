@@ -48,6 +48,7 @@ public partial class MapView
             _alley[bx, by] = Map.AlleyOf(bx, by);
             _backAlley[bx, by] = Map.HasBackAlley(bx, by);
         }
+        IndexGarages();
     }
 
     private static (int Bx, int By, int Lx, int Row) Place(Lot lot) =>
@@ -63,6 +64,7 @@ public partial class MapView
     {
         float x0 = lot.X + 0.07f, y0 = lot.Y + 0.1f, x1 = lot.X + 0.93f, y1 = lot.Y + 0.9f;
         var (bx, by, lx, row) = Place(lot);
+        (x0, x1) = BesideRamp(lot, x0, x1);
         if (lot.Court)
         {
             if (row == 0) y1 = lot.Y + 0.55f;
@@ -71,8 +73,8 @@ public partial class MapView
         }
         int a = AlleyOf(bx, by);
         if (a == 0) return (x0, y0, x1, y1);
-        if (lx == a - 1) x1 = lot.X + 0.8f;
-        if (lx == a) x0 = lot.X + 0.2f;
+        if (lx == a - 1) x1 = Mathf.Min(x1, lot.X + 0.8f);
+        if (lx == a) x0 = Mathf.Max(x0, lot.X + 0.2f);
         // Along a back alley the buildings stand back to make room for the lockups and the lane in front of them.
         if (_backAlley[bx, by])
         {

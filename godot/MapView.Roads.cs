@@ -103,7 +103,7 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
                         float x = x0 + 1 + 0.35f + i * Bay;
                         if (x > x0 + CityMap.StrideX - 0.3f) break;
                         int key = ((by * 2 + side) * (map.BlocksX + 1) + bx) * 8 + i;
-                        if (Hash(key, 760) >= taken || _reserved.Contains(((int)x, by * CityMap.StrideY + (side == 0 ? -1 : 1)))) continue;
+                        if (Hash(key, 760) >= taken || _reserved.Contains(((int)x, by * CityMap.StrideY + (side == 0 ? -1 : 1))) || BlocksRamp(x, by, side)) continue;
                         var at = new Vector2(x, y);
                         if (!view.HasPoint(at)) continue;
                         C = DynAt(y);
