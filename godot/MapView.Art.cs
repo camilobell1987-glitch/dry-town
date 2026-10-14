@@ -341,6 +341,7 @@ public partial class MapView
             _lights = pass == 0 ? _lit[y, col] : null;
             if (y == RailRow) DrawElevated(col);
             if (lamps != null) foreach (var l in lamps) DrawLampPost(l);
+            DrawSquareFurniture(y, col);
             if (lots != null) foreach (var lot in lots) DrawLot(lot);
             C.Flush();
         }
@@ -389,14 +390,16 @@ public partial class MapView
         for (int nx = bx - 1; nx <= bx; nx++)
             for (int ny = by - 1; ny <= by; ny++)
                 DrawPavement(nx, ny, cell);
+        DrawSquareGround(bx, by);
+        bool streetOpen = bx < Map.BlocksX && !Map.StreetClosed(bx, by), avenueOpen = by < Map.BlocksY && !Map.AvenueClosed(bx, by);
 
         // Centre lines, broken at the crossings.
         float dash = 0.32f, gap = 0.28f, lw = Mathf.Max(1, _t * 0.035f);
         var paint = RoadPaint with { A = 0.45f };
-        if (bx < Map.BlocksX)
+        if (streetOpen)
             for (float x = x0 + 1.25f; x < x0 + CityMap.StrideX - 0.25f; x += dash + gap)
                 C.DrawLine(P(x, y0 + 0.5f), P(Mathf.Min(x + dash, x0 + CityMap.StrideX - 0.25f), y0 + 0.5f), paint, lw);
-        if (by < Map.BlocksY)
+        if (avenueOpen)
             for (float y = y0 + 1.25f; y < y0 + CityMap.StrideY - 0.25f; y += dash + gap)
                 C.DrawLine(P(x0 + 0.5f, y), P(x0 + 0.5f, Mathf.Min(y + dash, y0 + CityMap.StrideY - 0.25f)), paint, lw);
 
@@ -409,10 +412,10 @@ public partial class MapView
             for (int s = 0; s < 5; s++)
             {
                 float k = 0.24f + s * 0.11f;
-                if (bx > 0) C.DrawRect(R(x0 - 0.16f, y0 + k, 0.12f, 0.08f), zebra);
-                if (bx < Map.BlocksX) C.DrawRect(R(x0 + 1.04f, y0 + k, 0.12f, 0.08f), zebra);
-                if (by > 0) C.DrawRect(R(x0 + k, y0 - 0.16f, 0.08f, 0.12f), zebra);
-                if (by < Map.BlocksY) C.DrawRect(R(x0 + k, y0 + 1.04f, 0.08f, 0.12f), zebra);
+                if (bx > 0 && !Map.StreetClosed(bx - 1, by)) C.DrawRect(R(x0 - 0.16f, y0 + k, 0.12f, 0.08f), zebra);
+                if (streetOpen) C.DrawRect(R(x0 + 1.04f, y0 + k, 0.12f, 0.08f), zebra);
+                if (by > 0 && !Map.AvenueClosed(bx, by - 1)) C.DrawRect(R(x0 + k, y0 - 0.16f, 0.08f, 0.12f), zebra);
+                if (avenueOpen) C.DrawRect(R(x0 + k, y0 + 1.04f, 0.08f, 0.12f), zebra);
             }
         }
 

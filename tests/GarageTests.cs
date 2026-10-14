@@ -29,7 +29,7 @@ public class GarageTests
             var kind = w.BusinessById(w.Map.LotAt(g.LotId).BusinessId).Kind;
             Assert.Equal(kind == BusinessKind.Garage ? Content.MotorGarage : Content.HotelGarage, g.Spaces);
         }
-        Assert.All(w.Businesses.Where(b => b.Kind is BusinessKind.Garage or BusinessKind.Hotel && !IsGate(w, w.LotOf(b))),
+        Assert.All(w.Businesses.Where(b => b.Kind is BusinessKind.Garage or BusinessKind.Hotel && !IsGate(w, w.LotOf(b)) && !w.Map.FrontsSquare(w.LotOf(b))),
             b => Assert.NotNull(w.GarageAt(b.LotId)));
         Assert.Equal(under.Sum(g => g.Spaces), w.GarageSpaces);
     }

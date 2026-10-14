@@ -302,17 +302,21 @@ public partial class MapView
         C.DrawLine(P(bx0 - 0.2f, by1 + 0.1f), P(bx1 + 0.2f, by1 + 0.1f), joint, Hair(0.006f));
 
         // Drain grates in the gutter at each corner.
-        foreach (var (gx, gy) in new[] { (bx0 + 0.1f, by0 - 0.24f), (bx1 - 0.25f, by1 + 0.21f) })
+        foreach (var (gx, gy, street) in new[] { (bx0 + 0.1f, by0 - 0.24f, by), (bx1 - 0.25f, by1 + 0.21f, by + 1) })
         {
+            if (Map.StreetClosed(bx, street)) continue;
             C.DrawRect(R(gx, gy, 0.14f, 0.05f), new Color("1a1918"));
             for (int k = 1; k < 5; k++) C.DrawLine(P(gx + k * 0.028f, gy), P(gx + k * 0.028f, gy + 0.05f), new Color("4a4844"), Hair(0.006f));
         }
 
         // A manhole out in the street north of the block.
         float mx = bx0 + CityMap.LotsPerBlockX * (0.3f + Hash(bx, by + 900) * 0.4f), my = by0 - 0.7f;
-        Ellipse(P(mx, my), new Vector2(0.08f, 0.055f) * _t, new Color("26252a"));
-        Ellipse(P(mx, my), new Vector2(0.065f, 0.044f) * _t, new Color("38363a"));
-        C.DrawLine(P(mx - 0.05f, my), P(mx + 0.05f, my), new Color("26252a"), Hair(0.006f));
+        if (!Map.StreetClosed(bx, by))
+        {
+            Ellipse(P(mx, my), new Vector2(0.08f, 0.055f) * _t, new Color("26252a"));
+            Ellipse(P(mx, my), new Vector2(0.065f, 0.044f) * _t, new Color("38363a"));
+            C.DrawLine(P(mx - 0.05f, my), P(mx + 0.05f, my), new Color("26252a"), Hair(0.006f));
+        }
 
         // The fire hydrant on the north-west corner.
         float hx = bx0 - 0.1f, hy = by0 - 0.12f;

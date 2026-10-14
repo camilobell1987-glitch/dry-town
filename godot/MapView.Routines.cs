@@ -39,13 +39,8 @@ public partial class MapView
     private float AvenueBetween(Vector2 from, Vector2 to)
     {
         if (Mathf.Abs(from.Y - to.Y) < 0.01f) return -1;
-        int best = 0, bestCost = int.MaxValue;
-        for (int a = 0; a <= World!.Map.BlocksX; a++)
-        {
-            int ax = a * CityMap.StrideX;
-            int cost = (int)(Mathf.Abs(ax - from.X) + Mathf.Abs(ax - to.X));
-            if (cost < bestCost) { bestCost = cost; best = ax; }
-        }
+        var map = World!.Map;
+        int best = map.WalkAvenue(from.X, to.X, Mathf.RoundToInt(from.Y / CityMap.StrideY), Mathf.RoundToInt(to.Y / CityMap.StrideY));
         // Down the near side of the avenue.
         return best + (from.X > best + 0.5f ? 0.9f : 0.1f);
     }

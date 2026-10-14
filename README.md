@@ -111,6 +111,10 @@ Two trades come with the rows. A **hardware store** takes $130 to $240 a week an
 
 ![A row of three shops, one of them burnt out](docs/screenshots/shop-row.png)
 
+## Squares and plazas
+
+Not every street runs straight through. About one stretch in five between crossings is closed to traffic and paved over: a square with a fountain or a street market of striped stalls where a street ran between two avenues, or, where an avenue ran between two streets, a statue plaza, a glass-roofed shopping arcade, or buildings put up across the old roadway to join the blocks either side into one big double block. People walk across squares, plazas and arcades as before, but a double block they have to walk round by the next avenue, so some walks get longer. Cars turn off at the crossing before one and go round, nobody parks on them, and no garage ramp opens onto one. Squares never close the edge of the city, the waterfront, the street under the El or a street a back alley opens onto, and two never meet at one crossing. They come from the map itself, so a city loaded from an older save gets the same ones.
+
 ## Guns and cars
 
 Every other ward has a sporting-goods store with rifles on its sign, and every fourth a motor dealer with cars on the forecourt and pennants strung over them. Click one and the **Selected** tab sells to whichever of your men you pick. You can also click a man's card on the rolodex and press **Find a gun shop** or **Find a car dealer**. Whatever he has already is traded in for half what it cost.

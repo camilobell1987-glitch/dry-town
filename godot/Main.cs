@@ -1559,6 +1559,11 @@ public partial class Main : Control
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "raid" => W.Script.LastOrDefault(x => x.Kind == ActionKind.Raid) is { } raid ? W.Map.LotAt(raid.ToLot) : hq,
                     "row" => ShopRowNearHq() ?? hq,
+                    "square" => W.Map.Squares.Where(s => !s.Avenue).Select(s => W.Map.LotsOfBlock(s.Bx, s.By).First()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    "market" => W.Map.Squares.Where(s => !s.Avenue && MapView.IsMarket(s.Bx, s.By)).Select(s => W.Map.LotsOfBlock(s.Bx, s.By).First()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    "double" => W.Map.Squares.Where(s => s.Avenue && W.Map.BuiltOver(s.Bx, s.By)).Select(s => W.Map.LotsOfBlock(Math.Max(0, s.Bx - 1), s.By).Last()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    "arcade" => W.Map.Squares.Where(s => s.Avenue && !W.Map.BuiltOver(s.Bx, s.By) && MapView.IsArcade(s.Bx, s.By)).Select(s => W.Map.LotsOfBlock(Math.Max(0, s.Bx - 1), s.By).Last()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    "plaza" => W.Map.Squares.Where(s => s.Avenue && !W.Map.BuiltOver(s.Bx, s.By)).Select(s => W.Map.LotsOfBlock(Math.Max(0, s.Bx - 1), s.By).Last()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "civic" => W.Map.Lots.Where(l => l.Terrain == Terrain.Civic).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     _ when focus.StartsWith("zone:") && Enum.TryParse<Zone>(focus[5..], true, out var zone) =>
                         W.Map.Lots.Where(l => W.Map.ZoneOf(l) == zone && l.Terrain == Terrain.Land).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
