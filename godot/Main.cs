@@ -1530,9 +1530,9 @@ public partial class Main : Control
             W.Learn(t.Id, Fact.Name);
         }
         var man = W.HoodsOf(Me).First(h => h.Id != W.Player.BossHoodId);
-        W.Bear(Party.Resident, id, Party.Gang, Me, 70, "shook them down", ward, known: true);
-        W.Bear(Party.Resident, id, Party.Hood, man.Id, 40, "shook them down", ward, known: true);
-        if (W.BeatCopOf(ward) is { } cop) W.Bear(Party.Resident, id, Party.Cop, cop.Id, 35, "took in", ward, known: true, aboutId: kin[0].Id, aboutKin: Content.Reverse(kin[0].Kin));
-        W.Bear(Party.Resident, kin[1].Id, Party.Resident, id, 45, "fell out with them over their mother's will", ward, known: true);
+        W.Bear(Party.Resident, id, Party.Gang, Me, 45, "shook them down", ward, known: true);
+        W.Bear(Party.Resident, id, Party.Hood, man.Id, 100, "shook them down", ward, known: true);
+        if (W.BeatCopOf(ward) is { } cop) W.Bear(Party.Resident, id, Party.Cop, cop.Id, 25, "took in", ward, known: true, aboutId: kin[0].Id, aboutKin: Content.Reverse(kin[0].Kin));
+        W.Bear(Party.Resident, kin[1].Id, Party.Resident, id, 10, "fell out with them over their mother's will", ward, known: true);
     }
 }

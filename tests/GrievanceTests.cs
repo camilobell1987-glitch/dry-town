@@ -126,15 +126,86 @@ public class GrievanceTests
     }
 
     [Fact]
-    public void ABadEnoughGrudgeBoilsOver()
+    public void GrudgesClimbThroughTheTiers()
+    {
+        Assert.Equal(Tier.Prickly, Content.TierOf(10));
+        Assert.Equal(Tier.Sore, Content.TierOf(25));
+        Assert.Equal(Tier.Scowling, Content.TierOf(45));
+        Assert.Equal(Tier.Beefing, Content.TierOf(70));
+        Assert.Equal(Tier.Vendetta, Content.TierOf(90));
+        Assert.Equal("Prickly with", Content.GrudgeWords(5));
+        Assert.Equal("Beefing with", Content.GrudgeWords(60));
+        // Nobody acts on a grudge until they're beefing.
+        Assert.Equal(0, Content.RevengeChance(Content.BeefingAt - 1, Array.Empty<Trait>()));
+        Assert.True(Content.RevengeChance(Content.BeefingAt, Array.Empty<Trait>()) > 0);
+    }
+
+    [Fact]
+    public void AVendettaCantBeUndone()
     {
         var (sim, w, me, man) = Start();
         int ward = w.HqOf(me).WardId;
-        w.Introduce(7000, ward, Array.Empty<Tie>(), Array.Empty<Secret>(), new Character(Background.None, new[] { Trait.Hothead, Trait.HardBoiled }));
+        w.Introduce(7000, ward, Array.Empty<Tie>(), Array.Empty<Secret>(), Plain, business: w.Businesses.First().Id);
+        var g = w.Bear(Party.Resident, 7000, Party.Gang, me.Id, 80, "shook them down", ward, known: true)!;
+        Assert.False(g.Vendetta);
+        w.Bear(Party.Resident, 7000, Party.Gang, me.Id, 10, "shook them down", ward, known: true);
+        Assert.True(g.Vendetta);
+        Assert.Equal(100, g.Amount);
+        Assert.Contains(w.Events, e => e.Text.Contains("sworn a vendetta against you"));
+        Assert.Equal(0, w.Ease(g, 50));
+        foreach (var lean in new[] { Lean.Bribe, Lean.Square, Lean.Favour, Lean.GoodWord })
+            Assert.Equal("They've sworn a vendetta against you. Nothing will square it.", w.CannotLean(me, 7000, lean));
+        Assert.Null(w.CannotLean(me, 7000, Lean.Intimidate));
+        // It never fades, and sooner or later it boils over.
+        for (int i = 0; i < 20; i++) sim.AdvanceWeek(Mine(w));
+        Assert.Equal(100, g.Amount);
+        Assert.Contains(w.Events, e => e.Text.Contains("Someone with a grudge against") || e.Text.Contains("has been talking to a reporter"));
+    }
+
+    [Fact]
+    public void AVendettaWithATemperComesForTheManWithAGun()
+    {
+        var (sim, w, me, man) = Start();
+        int ward = w.HqOf(me).WardId;
+        w.Introduce(7000, ward, Array.Empty<Tie>(), Array.Empty<Secret>(), new Character(Background.None, new[] { Trait.Hothead }));
         var g = w.Bear(Party.Resident, 7000, Party.Hood, man.Id, 100, "killed", ward, known: true)!;
-        for (int i = 0; i < 20 && w.Grievances.Contains(g) && g.Amount > 70; i++) sim.AdvanceWeek(Mine(w));
-        Assert.Contains(w.Events, e => e.Text.Contains($"has it in for {man.Name} went to the police about him"));
-        Assert.True(g.Amount <= 70);
+        Assert.True(g.Vendetta);
+        for (int i = 0; i < 20 && man.State != HoodState.Dead; i++) sim.AdvanceWeek(Mine(w));
+        Assert.Contains(w.Events, e => e.Text.Contains("took a shot at him") || e.Text.Contains("sworn a vendetta against him"));
+    }
+
+    [Fact]
+    public void AGoodTurnOrAGoodWordEasesAGrudge()
+    {
+        var (sim, w, me, man) = Start();
+        int who = Meek(w);
+        var shop = w.Businesses.First(b => b.IsOpen);
+        shop.Resentment = 50;
+        w.Introduce(who, 1, Array.Empty<Tie>(), Array.Empty<Secret>(), Plain);
+        Assert.Equal("They've no quarrel with you.", w.CannotLean(me, who, Lean.Favour));
+        Assert.Equal("They've no business to speak up for.", w.CannotLean(me, who, Lean.GoodWord));
+        w.Acquaintances[who].BusinessId = shop.Id;
+        var g = w.Bear(Party.Resident, who, Party.Gang, me.Id, 50, "shook them down", known: true)!;
+        sim.AdvanceWeek(Mine(w, Send(w, man, who, Lean.Favour) with { BusinessId = shop.Id }));
+        if (!w.Events.Any(e => e.Text.Contains("good turn"))) return;
+        Assert.True(g.Amount <= 50 - Content.Favoured);
+        man.State = HoodState.Free;
+        sim.AdvanceWeek(Mine(w, Send(w, man, who, Lean.GoodWord) with { BusinessId = shop.Id }));
+        if (!w.Events.Any(e => e.Text.Contains("is grateful"))) return;
+        Assert.True(!w.Grievances.Contains(g) || g.Amount <= 50 - Content.Favoured - Content.GoodWord);
+        Assert.True(shop.Resentment < 50);
+    }
+
+    [Fact]
+    public void ASoupKitchenSoftensTheNeighbourhood()
+    {
+        var (sim, w, me, _) = Start();
+        w.Introduce(7000, 1, Array.Empty<Tie>(), Array.Empty<Secret>(), Plain);
+        var g = w.Bear(Party.Resident, 7000, Party.Gang, me.Id, 50, "shook them down")!;
+        me.SoupKitchen = true;
+        me.Cash = 5000;
+        sim.AdvanceWeek(Mine(w));
+        Assert.True(g.Amount <= 50 - 1 - Content.SoupEases);
     }
 
     [Fact]

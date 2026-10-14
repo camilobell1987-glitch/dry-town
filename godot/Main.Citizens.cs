@@ -230,7 +230,12 @@ public partial class Main
         Act(Lean.Blackmail, () => $"Blackmail them ({Money(World.HushMoney(c.Worth))} a week)");
         int bad = W.BadBlood(W.Player, id, knownOnly: !_revealCitizens);
         int squarePrice = Content.SquarePrice(c.Worth, bad);
-        if (bad > 0) Act(Lean.Square, () => $"Square things with them ({Money(squarePrice)})");
+        if (bad > 0)
+        {
+            Act(Lean.Square, () => $"Pay them to square things ({Money(squarePrice)})");
+            Act(Lean.Favour, () => "Do them a good turn");
+            if (c.OwnsBusinessId >= 0) Act(Lean.GoodWord, () => $"Put in a good word for {Short(W.BusinessById(c.OwnsBusinessId).Name)}");
+        }
         if (W.KnownCrime(id) is { } crime) Act(Lean.TurnIn, () => $"Turn them in for {Content.Crime(crime)} ({Content.Penalty(Content.Offence(crime)).Least:0} to {Content.Penalty(Content.Offence(crime)).Most:0} years)");
         void Odds()
         {
@@ -249,7 +254,9 @@ public partial class Main
         if (W.HostageFrom(W.Player, id) is int held and >= 0)
             AddLabel(panel, $"You're holding their {Content.Label(W.KnownTiesOf(id).First(t => t.Id == held).Kin, directory.Get(held).Woman).ToLowerInvariant()}. They'll do as they're told.", Palette.Good, wrap: true);
         else if (leverage > 0) AddLabel(panel, "You know who their family are, which makes a threat or a shakedown likelier to work. Snatch one of them and they'll do as they're told.", Palette.InkQuiet, wrap: true);
-        if (bad > 0) AddLabel(panel, "They have a grudge against you, which makes them harder to buy or scare. Squaring things with them eases it, and eases their family's too.", Palette.InkQuiet, wrap: true);
+        if (W.HasVendetta(W.Player, id, knownOnly: !_revealCitizens))
+            AddLabel(panel, "They've sworn a vendetta against you. It will never fade, nothing will square it, and sooner or later they'll act on it.", Palette.Bad, wrap: true);
+        else if (bad > 0) AddLabel(panel, $"They're {Content.Label(Content.TierOf(bad)).ToLowerInvariant()} with you, which makes them harder to buy or scare. Paying them off eases it most and calms their family too; a good turn or a good word for their business helps, and so does a soup kitchen in your name. Let it reach a vendetta and there's no coming back.", Palette.InkQuiet, wrap: true);
         if (!reads) AddLabel(panel, $"You can't tell yet how much nerve they have, so the odds are a guess. Learn {Content.NerveFacts} things about them to know for sure.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Anything they're hiding makes a threat likelier to work, and is grounds for blackmail. A crime you know of can be handed to the police, which cools them on you. The term fits the crime and how the trial goes: money buys a deal, and reformers want examples made. A shopkeeper taken in leaves his shop shut for a while.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Knowing where they live makes a threat or a snatch likelier to work, and knowing where they work helps with everything else. A shopkeeper in your pocket takes your protection gladly and resents it less, and anyone you've bought or scared keeps the block quiet when there are witnesses.", Palette.InkQuiet, wrap: true);
@@ -324,7 +331,7 @@ public partial class Main
         var against = W.HeldAgainst(Party.Resident, id).Where(Shown).OrderByDescending(g => g.Amount).ToList();
         string Over(Grievance g) => Content.Over(g, g.AboutId >= 0 && d.Exists(g.AboutId) ? d.Get(g.AboutId).Woman : null);
         string Resident(int other) => !d.Exists(other) ? "someone" : KnownAbout(other).HasFlag(Fact.Name) || _revealCitizens ? d.Get(other).Name : "someone you don't know";
-        Color Heat(int amount) => amount >= 60 ? new Color("9a2a22") : amount >= 30 ? new Color("7a3a2a") : CardInk;
+        Color Heat(int amount) => amount >= Content.BeefingAt ? new Color("9a2a22") : amount >= Content.ScowlingAt ? new Color("7a3a2a") : CardInk;
         void Reason(string text) => AddLabel(lines, text, CardInk, 13, wrap: true);
 
         AddLabel(lines, "Holds a grudge against", CardFaint, 13);
@@ -370,7 +377,7 @@ public partial class Main
             Reason($"They {Over(g)}.");
         }
         if (against.Count == 0) AddLabel(lines, _revealCitizens ? "Nobody" : "Nobody you know of", CardInk);
-        AddLabel(lines, "What's done to people and their families leaves bad blood. Someone with it in for you is harder to buy or scare, quicker to come forward as a witness, and may go to the police or the papers, or put a brick through a window. Square things with money before it boils over. Someone who hates a neighbour is glad to talk about them.", CardFaint, 12, wrap: true);
+        AddLabel(lines, "Grudges run from prickly to sore, scowling, beefing and, at the worst, a vendetta, which never fades and can't be squared. Someone with it in for you is harder to buy or scare and quicker to come forward as a witness; once they're beefing they go to the police or the papers, or put a brick through a window. Money, a good turn, a good word for their business or a soup kitchen in your name all ease a grudge before it gets that far. Someone who hates a neighbour is glad to talk about them.", CardFaint, 12, wrap: true);
     }
 
     /// <summary>A link on a card, in the card's ink, turning red under the pointer.</summary>

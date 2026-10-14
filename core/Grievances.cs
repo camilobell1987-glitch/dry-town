@@ -31,15 +31,30 @@ public sealed class Grievance
 
     /// <summary>Whether you know about it.</summary>
     public bool Known { get; set; }
+
+    /// <summary>Sworn for good: it never fades and nothing squares it.</summary>
+    public bool Vendetta { get; set; }
 }
+
+/// <summary>How bad a grudge has got, from a little prickly to a vendetta there's no coming back from.</summary>
+public enum Tier { Prickly, Sore, Scowling, Beefing, Vendetta }
 
 public static partial class Content
 {
-    /// <summary>How bad a grudge has to be before someone does something about it, or quits your payroll over it.</summary>
-    public const int RevengeGrudge = 50, QuitGrudge = 60;
+    /// <summary>Where each tier starts. A grudge that reaches a vendetta stays there.</summary>
+    public const int SoreAt = 20, ScowlingAt = 40, BeefingAt = 60, VendettaAt = 85;
 
-    /// <summary>How much a grudge eases when the holder gets it off their chest, and when you pay them off.</summary>
-    public const int Vented = 35, Squared = 50, KinSquared = 20;
+    /// <summary>How bad a grudge has to be before someone does something about it, or quits your payroll over it.</summary>
+    public const int RevengeGrudge = BeefingAt, QuitGrudge = BeefingAt;
+
+    /// <summary>
+    /// How much a grudge eases when the holder gets it off their chest, when you pay them off (and their family with
+    /// them), when a bribe lands, when you do them a good turn, and when you put in a good word for their business.
+    /// </summary>
+    public const int Vented = 35, Squared = 50, KinSquared = 20, Bribed = 25, Favoured = 15, GoodWord = 25;
+
+    /// <summary>How much a soup kitchen in a gang's name eases every grudge against it each week, doubled in the Depression.</summary>
+    public const int SoupEases = 2;
 
     /// <summary>How much a resident's grudge against a beat cop makes the block clam up, and the most it can.</summary>
     public const double CopHated = 0.02, CopHatedMost = 0.1;
@@ -47,19 +62,38 @@ public static partial class Content
     /// <summary>How much likelier a witness comes forward for each grudge against the gang on the block, and the most.</summary>
     public const double AxeToGrind = 0.03, AxeToGrindMost = 0.12;
 
-    /// <summary>A grudge in words.</summary>
-    public static string GrudgeWords(int amount) => amount switch
+    public static Tier TierOf(int amount) => amount switch
     {
-        < 30 => "Has a bone to pick with",
-        < 60 => "Sore at",
-        < 85 => "Has it in for",
-        _ => "Out for blood against",
+        >= VendettaAt => Tier.Vendetta,
+        >= BeefingAt => Tier.Beefing,
+        >= ScowlingAt => Tier.Scowling,
+        >= SoreAt => Tier.Sore,
+        _ => Tier.Prickly,
+    };
+
+    public static string Label(Tier tier) => tier switch
+    {
+        Tier.Prickly => "Prickly",
+        Tier.Sore => "Sore",
+        Tier.Scowling => "Scowling",
+        Tier.Beefing => "Beefing",
+        _ => "Vendetta",
+    };
+
+    /// <summary>A grudge in words: "Beefing with".</summary>
+    public static string GrudgeWords(int amount) => TierOf(amount) switch
+    {
+        Tier.Prickly => "Prickly with",
+        Tier.Sore => "Sore at",
+        Tier.Scowling => "Scowling at",
+        Tier.Beefing => "Beefing with",
+        _ => "Sworn a vendetta against",
     };
 
     /// <summary>How much harder someone with a grudge against you is to deal with. A killing they'll leave to you.</summary>
     public static double GrudgeOdds(int amount, Lean lean) => lean switch
     {
-        Lean.Bribe or Lean.Intimidate or Lean.Extort or Lean.Blackmail => -amount / 400.0,
+        Lean.Bribe or Lean.Intimidate or Lean.Extort or Lean.Blackmail or Lean.Favour or Lean.GoodWord => -amount / 400.0,
         Lean.Square => -amount / 300.0,
         _ => 0,
     };
@@ -91,7 +125,8 @@ public static partial class Content
     public static double RevengeChance(int amount, IEnumerable<Trait> traits)
     {
         if (amount < RevengeGrudge) return 0;
-        double chance = (amount - 40) / 400.0;
+        // A vendetta is never far from their mind.
+        double chance = (amount - 40) / 400.0 * (amount >= VendettaAt ? 2 : 1);
         foreach (var t in traits)
             chance *= t switch
             {
@@ -202,8 +237,17 @@ public sealed partial class World
         if (scaled <= 0) return null;
         var g = GrievanceOf(holder, holderId, target, targetId);
         if (g == null) Grievances.Add(g = new Grievance { Holder = holder, HolderId = holderId, Target = target, TargetId = targetId });
+        if (g.Vendetta) return g;
         g.Amount = Math.Min(100, g.Amount + scaled);
         g.Floor = Math.Min(g.Amount, Math.Max(g.Floor, floor));
+        if (g.Amount >= Content.VendettaAt)
+        {
+            // There's no coming back from this.
+            g.Vendetta = true;
+            g.Amount = g.Floor = 100;
+            if (known && (target == Party.Gang && targetId == Player.Id || target == Party.Hood && Hoods.FirstOrDefault(h => h.Id == targetId)?.GangId == Player.Id))
+                Log(EventKind.Street, Player.Id, $"Someone has sworn a vendetta against {(target == Party.Gang ? "you" : Hoods.First(h => h.Id == targetId).Name)}. Nothing will square it now.");
+        }
         g.Why = why;
         g.AboutId = aboutId;
         g.AboutKin = aboutKin;
@@ -216,6 +260,7 @@ public sealed partial class World
     /// <summary>A grudge eases, though never below what can't be forgiven. Returns how much it eased.</summary>
     public int Ease(Grievance g, int amount)
     {
+        if (g.Vendetta) return 0;
         int before = g.Amount;
         g.Amount = Math.Max(g.Floor, g.Amount - amount);
         if (g.Amount <= 0) Grievances.Remove(g);
@@ -231,8 +276,13 @@ public sealed partial class World
     public int BadBlood(Gang gang, int citizen, bool knownOnly = false) =>
         AgainstGang(gang, Party.Resident, citizen).Where(g => !knownOnly || g.Known).Select(g => g.Amount).DefaultIfEmpty(0).Max();
 
-    /// <summary>How much harder a grudge makes dealing with someone.</summary>
-    public double GrudgeOdds(Gang gang, int citizen, Lean lean, bool knownOnly) => Content.GrudgeOdds(BadBlood(gang, citizen, knownOnly), lean);
+    /// <summary>Whether a resident has sworn a vendetta against a gang or one of its men.</summary>
+    public bool HasVendetta(Gang gang, int citizen, bool knownOnly = false) =>
+        AgainstGang(gang, Party.Resident, citizen).Any(g => g.Vendetta && (!knownOnly || g.Known));
+
+    /// <summary>How much harder a grudge makes dealing with someone. A good word goes further from an outfit people respect.</summary>
+    public double GrudgeOdds(Gang gang, int citizen, Lean lean, bool knownOnly) =>
+        Content.GrudgeOdds(BadBlood(gang, citizen, knownOnly), lean) + (lean == Lean.GoodWord ? gang.Respect / 200 : 0);
 
     /// <summary>How badly a beat cop has it in for a gang.</summary>
     public int CopGrudge(Gang gang, int cop) => GrievanceOf(Party.Cop, cop, Party.Gang, gang.Id)?.Amount ?? 0;
@@ -273,7 +323,7 @@ public sealed partial class Simulation
         if (lean == Lean.Bribe && ok)
         {
             // Money soothes most things.
-            foreach (var g in w.AgainstGang(gang, Party.Resident, citizen).ToList()) w.Ease(g, 20);
+            foreach (var g in w.AgainstGang(gang, Party.Resident, citizen).ToList()) w.Ease(g, Content.Bribed);
             return;
         }
         if (lean == Lean.TurnIn)
@@ -327,6 +377,11 @@ public sealed partial class Simulation
         foreach (var biz in w.Businesses.Where(b => b.IsProtected && b.IsOpen && b.Resentment > 60).OrderBy(b => b.Id))
             foreach (var (id, a) in w.Acquaintances.Where(kv => kv.Value.BusinessId == biz.Id).OrderBy(kv => kv.Key))
                 w.Bear(Party.Resident, id, Party.Gang, biz.ProtectorGangId, 2, "bleeds their shop dry", a.WardId, known: biz.ProtectorGangId == w.Player.Id);
+        // A soup kitchen in the boss's name softens the neighbourhood towards the whole outfit.
+        foreach (var gang in w.Gangs.Where(x => x.Alive && x.SoupKitchen).OrderBy(x => x.Id))
+            foreach (var g in w.Grievances.Where(g => g.Holder == Party.Resident && (g.Target == Party.Gang && g.TargetId == gang.Id
+                || g.Target == Party.Hood && w.Hoods.FirstOrDefault(h => h.Id == g.TargetId)?.GangId == gang.Id)).ToList())
+                w.Ease(g, Content.SoupEases * (w.Depression ? 2 : 1));
         foreach (var g in w.Grievances.OrderBy(g => g.Holder).ThenBy(g => g.HolderId).ThenBy(g => g.Target).ThenBy(g => g.TargetId).ToList())
         {
             if (!w.Grievances.Contains(g)) continue;
@@ -386,6 +441,13 @@ public sealed partial class Simulation
                 var hood = w.Hoods.FirstOrDefault(h => h.Id == g.TargetId);
                 var gang = hood == null ? null : w.GangById(hood.GangId);
                 if (hood is not { IsAvailable: true } || gang is not { Alive: true } || lot == null) return false;
+                // A vendetta and a temper: they come for him with a gun.
+                if (g.Vendetta && hood.Id != gang.BossHoodId && (traits.Contains(Trait.Hothead) || traits.Contains(Trait.HardBoiled)))
+                {
+                    if (w.Rng.Chance(0.3)) Kill(hood, "in the street by someone who'd sworn a vendetta against him");
+                    else w.Log(EventKind.Street, gang.Id, $"Someone with a vendetta against {hood.Name} took a shot at him in the street, and missed.");
+                    return true;
+                }
                 w.NewPerson(PersonKind.Witness, lot, 3, gang.Id, hood.Id, $"what {hood.Name} did");
                 w.Log(EventKind.Street, gang.Id, $"Someone who has it in for {hood.Name} went to the police about him. A witness is ready to testify.");
                 break;

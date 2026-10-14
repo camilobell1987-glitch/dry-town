@@ -154,6 +154,9 @@ public static partial class Content
         (Trait.OnTheTake, Lean.Square) => 0.15,
         (Trait.Tightwad or Trait.Pious, Lean.Square) => 0.1,
         (Trait.Hothead or Trait.HardBoiled, Lean.Square) => -0.1,
+        (Trait.Sap, Lean.Favour) => 0.1,
+        (Trait.Sharp, Lean.Favour) => -0.05,
+        (Trait.Tightwad, Lean.GoodWord) => 0.1,
         _ => 0,
     };
 
