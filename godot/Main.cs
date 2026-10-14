@@ -10,10 +10,11 @@ using Godot;
 /// </summary>
 public partial class Main : Control
 {
-    private const float HoursPerSecond = 2f;
+    /// <summary>Game hours a second at 1×: a day takes eight minutes, so people can be watched going about it.</summary>
+    private const float HoursPerSecond = 24f / (8 * 60);
 
-    /// <summary>The live week's speeds: at 1× a week takes about a minute and a half, at ¼× six minutes, at 8× under eleven seconds.</summary>
-    private static readonly float[] Speeds = { 0.25f, 0.5f, 1, 2, 4, 8 };
+    /// <summary>The live week's speeds: a day takes eight minutes at 1×, four at 2×, two at 4× and one at 8×.</summary>
+    private static readonly float[] Speeds = { 1, 2, 4, 8 };
 
     private CommandShell _shell = null!;
     private World W => _shell.Sim.World;
@@ -118,7 +119,7 @@ public partial class Main : Control
     {
         if (!_map.Live) return;
         if (_playing) _map.Advance((float)delta * HoursPerSecond * _speed);
-        _clock.Text = MapView.ClockText(_map.Clock);
+        _clock.Text = MapView.ClockMinutes(_map.Clock);
         if (_map.ReplayFinished) FinishReplay();
     }
 
@@ -905,14 +906,14 @@ public partial class Main : Control
 
         _liveBar = new HBoxContainer { Visible = false };
         _liveBar.AddThemeConstantOverride("separation", 8);
-        _clock = new Label { CustomMinimumSize = new Vector2(150, 0) };
+        _clock = new Label { CustomMinimumSize = new Vector2(200, 0) };
         _clock.AddThemeFontSizeOverride("font_size", 17);
         _liveBar.AddChild(_clock);
         _pause = AddButton(_liveBar, "Pause", () => { _playing = !_playing; _pause.Text = _playing ? "Pause" : "Play"; });
         foreach (var s in Speeds)
         {
             var speed = s;
-            var b = AddButton(_liveBar, s switch { 0.25f => "¼×", 0.5f => "½×", _ => $"{s}×" }, () => SetSpeed(speed));
+            var b = AddButton(_liveBar, $"{s}×", () => SetSpeed(speed));
             b.ToggleMode = true;
             _speedButtons.Add(b);
         }
