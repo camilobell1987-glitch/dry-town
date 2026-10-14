@@ -183,40 +183,39 @@ public partial class MapView
     // ---- What stands where -----------------------------------------------------
 
     /// <summary>What a lot nobody does business on has on it.</summary>
-    private enum Filler { None, Tenement, Office, Factory, Vacant, Parking, PocketPark }
+    private enum Filler { None, Tenement, Office, Factory, Vacant, Parking, PocketPark, Rowhouse, House, Mansion, Apartment, Warehouse, Gasworks, Yard }
 
-    /// <summary>
-    /// How far a point is into downtown, from 0 at the edge of it to 1 in the middle. Big cities have one;
-    /// a city split by a river has it north of the water.
-    /// </summary>
-    private float Downtown(float x, float y)
-    {
-        if (Map.BlocksX < 9) return 0;
-        float cy = Map.RiverRow >= 0 ? Map.Height * 0.3f : Map.Height * 0.5f;
-        float dx = (x - Map.Width * 0.5f) / (Map.Width * 0.5f), dy = (y - cy) / (Map.Height * 0.5f);
-        return Mathf.Clamp((0.42f - Mathf.Sqrt(dx * dx + dy * dy)) / 0.3f, 0, 1);
-    }
-
-    /// <summary>Whether a lot's block is on the waterfront.</summary>
-    private bool Waterfront(Lot lot) => Map.RiverRow >= 0 && Math.Abs((lot.Y - 1) / CityMap.StrideY - Map.RiverRow) == 1;
+    /// <summary>How far a point is into downtown, from 0 outside it, through 0.4 at its edge, to 1 at its heart.</summary>
+    private float Downtown(float x, float y) =>
+        Map.CoreOf(Mathf.Clamp(((int)x - 1) / CityMap.StrideX, 0, Map.BlocksX - 1), Mathf.Clamp(((int)y - 1) / CityMap.StrideY, 0, Map.BlocksY - 1));
 
     private Filler FillerOf(Lot lot)
     {
         if (lot.Use != LotUse.Empty || lot.Terrain != Terrain.Land) return Filler.None;
         if (lot.Court) return Filler.Tenement;
         float h = Hash(lot.Id, 11);
-        if (Downtown(lot.X + 0.5f, lot.Y + 0.5f) > 0.3f) return h < 0.88f ? Filler.Office : Filler.Parking;
-        if (Waterfront(lot)) return h < 0.45f ? Filler.Factory : h < 0.65f ? Filler.Vacant : h < 0.8f ? Filler.Parking : Filler.Tenement;
-        return h switch
+        return Map.ZoneOf(lot) switch
         {
-            < 0.5f => Filler.Tenement,
-            < 0.62f => Filler.Vacant,
-            < 0.72f => Filler.Parking,
-            < 0.84f => Filler.PocketPark,
-            < 0.9f => Filler.Factory,
+            Zone.Downtown => h < 0.88f ? Filler.Office : Filler.Parking,
+            Zone.Industrial => h switch
+            {
+                < 0.4f => Filler.Factory,
+                < 0.6f => Filler.Warehouse,
+                < 0.68f => Filler.Gasworks,
+                < 0.8f => Filler.Yard,
+                < 0.9f => Filler.Vacant,
+                _ => Filler.Parking,
+            },
+            Zone.Tenements => h switch { < 0.84f => Filler.Tenement, < 0.92f => Filler.Vacant, _ => Filler.PocketPark },
+            Zone.Rowhouses => h switch { < 0.8f => Filler.Rowhouse, < 0.88f => Filler.Tenement, < 0.94f => Filler.PocketPark, _ => Filler.Vacant },
+            Zone.GoldCoast => h switch { < 0.55f => Filler.Mansion, < 0.9f => Filler.Apartment, _ => Filler.PocketPark },
+            Zone.Suburbs => h < 0.9f ? Filler.House : Filler.Vacant,
             _ => Filler.Tenement,
         };
     }
+
+    /// <summary>Whether people live in a building of this sort, rather than work in it.</summary>
+    private static bool IsHome(Filler f) => f is Filler.Tenement or Filler.Rowhouse or Filler.House or Filler.Mansion or Filler.Apartment;
 
     private string FillerName(Lot lot) => lot.Terrain != Terrain.Land ? LandmarkName(lot) : FillerOf(lot) switch
     {
@@ -226,13 +225,21 @@ public partial class MapView
         Filler.Vacant => "Vacant lot",
         Filler.Parking => "Parking lot",
         Filler.PocketPark => "Little park",
+        Filler.Rowhouse => "Brownstone",
+        Filler.House => "House",
+        Filler.Mansion => "Mansion",
+        Filler.Apartment => "Apartment house",
+        Filler.Warehouse => "Warehouse",
+        Filler.Gasworks => "Gasworks",
+        Filler.Yard => "Coal and lumber yard",
         _ => "",
-    };
+    } + ZoneLine(lot);
 
     /// <summary>How tall a lot's building stands, in tiles.</summary>
     private float HeightOf(Lot lot)
     {
         if (lot.Terrain == Terrain.Church) return 0.55f;
+        if (lot.Terrain == Terrain.Civic) return CivicHeight(lot);
         if (lot.Terrain != Terrain.Land || World == null) return 0;
         // Round a court the houses on the street are low, and the tall tenements stand at the back.
         if (lot.Court && FacesSouth(lot)) return 0.36f + 0.08f * Hash(lot.Id, 7);
@@ -260,6 +267,12 @@ public partial class MapView
             Filler.Tenement => (0.55f + 0.3f * h) * (1 + 1.2f * d),
             Filler.Office => (0.8f + 0.6f * h) * (1 + 0.5f * d),
             Filler.Factory => 0.4f,
+            Filler.Rowhouse => 0.42f + 0.08f * Hash(Map.BlockOf(lot), 1501),
+            Filler.House => 0.28f,
+            Filler.Mansion => 0.42f,
+            Filler.Apartment => 0.9f + 0.4f * h,
+            Filler.Warehouse => 0.5f,
+            Filler.Gasworks => 0.5f + 0.25f * h,
             _ => 0,
         };
     }
@@ -499,8 +512,16 @@ public partial class MapView
     {
         var r = R(lot.X, lot.Y, 1, 1).Grow(-_t * 0.02f);
         if (lot.Terrain == Terrain.Cemetery) { DrawCemeteryGround(lot); return; }
+        if (lot.Terrain == Terrain.Civic) { DrawCivicGround(lot); return; }
         switch (FillerOf(lot))
         {
+            case Filler.House or Filler.Mansion:
+                DrawGardenGround(lot);
+                break;
+            case Filler.Factory or Filler.Warehouse or Filler.Gasworks or Filler.Yard:
+                C.DrawRect(r, Cinders);
+                if (FillerOf(lot) == Filler.Yard) DrawYardGround(lot);
+                break;
             case Filler.Vacant:
                 C.DrawRect(r, Dirt);
                 for (int i = 0; i < (Fine ? 9 : 0); i++)
@@ -594,6 +615,7 @@ public partial class MapView
         if (lot.Terrain == Terrain.Park) { DrawParkLot(lot); return; }
         if (lot.Terrain == Terrain.Cemetery) { DrawCemeteryLot(lot); return; }
         if (lot.Terrain == Terrain.Church) { DrawChurch(lot); return; }
+        if (lot.Terrain == Terrain.Civic) { DrawCivic(lot); return; }
         if (lot.Court) DrawCourtYard(lot);
         DrawAlleyClutter(lot);
         DrawRamp(lot);
@@ -695,6 +717,8 @@ public partial class MapView
 
     private Color WallFor(Lot lot)
     {
+        if (FillerOf(lot) == Filler.Rowhouse) return Brownstones[(int)(Hash(lot.Id, 2) * Brownstones.Length)];
+        if (FillerOf(lot) == Filler.Apartment) return Limestones[(int)(Hash(lot.Id, 2) * Limestones.Length)];
         bool stone = Downtown(lot.X + 0.5f, lot.Y + 0.5f) > 0.3f;
         var set = stone ? Stones : Bricks;
         return set[(int)(Hash(lot.Id, 2) * set.Length)];
@@ -1220,6 +1244,27 @@ public partial class MapView
                         var ride = Hash(lot.Id, 95 + i) < 0.6f ? Ride.ModelT : Ride.Packard;
                         DrawVehicle(new Vector2(lot.X + 0.25f + i * 0.25f, lot.Y + (FacesSouth(lot) ? 0.62f : 0.38f)), false, 1, ride, RidePaint(ride, Hash(lot.Id, 90 + i)), 0, 0.75f);
                     }
+                break;
+            case Filler.Rowhouse:
+                DrawRowhouse(lot, h);
+                break;
+            case Filler.House:
+                DrawHouse(lot, h);
+                break;
+            case Filler.Mansion:
+                DrawMansion(lot, h);
+                break;
+            case Filler.Apartment:
+                DrawApartment(lot, h);
+                break;
+            case Filler.Warehouse:
+                DrawWarehouse(lot, h);
+                break;
+            case Filler.Gasworks:
+                DrawGasworks(lot, h);
+                break;
+            case Filler.Yard:
+                DrawYard(lot);
                 break;
             case Filler.PocketPark:
                 foreach (var (tx, ty, size) in TreesOn(lot).OrderBy(t => t.Y)) DrawTree(tx, ty, size);

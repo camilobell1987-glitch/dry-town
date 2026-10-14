@@ -70,7 +70,10 @@ public class CityDirectoryTests
     public void FamiliesLiveTogetherAndShareANameAndPeople()
     {
         var (w, d) = Start();
-        var families = Enumerable.Range(0, d.CountOn(2, 2)).Select(n => d.Get(d.IdOf(2, 2, n))).Where(c => c.Ties.Any(t => t.Kin == Kin.Spouse)).Take(20).ToList();
+        // A block in the tenements, where the families live.
+        var (bx, by) = Enumerable.Range(0, w.Map.BlocksX * w.Map.BlocksY).Select(i => (i % w.Map.BlocksX, i / w.Map.BlocksX))
+            .First(b => w.Map.ZoneOf(b.Item1, b.Item2) == Zone.Tenements && d.CountOn(b.Item1, b.Item2) > 0);
+        var families = Enumerable.Range(0, d.CountOn(bx, by)).Select(n => d.Get(d.IdOf(bx, by, n))).Where(c => c.Ties.Any(t => t.Kin == Kin.Spouse)).Take(20).ToList();
         Assert.NotEmpty(families);
         foreach (var c in families)
         {

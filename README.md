@@ -458,6 +458,12 @@ Rival outfits with a third of the aldermen buy a place that can do the work when
 
 ![The city's contracts on the City Hall tab](docs/screenshots/contracts.png)
 
+## Zoning
+
+The city is laid out the way New York had grown by 1920. Downtown, in the middle of town or north of the river, office towers stand over the streets, and at its heart the city's own buildings face each other in stone: City Hall under its copper dome, the county courthouse, and in a bigger city the Municipal Building's gilt tower, the Hall of Records, the Public Library with its lions, the Museum of Art, the Opera House and the Palace Theatre. Factories, warehouses, gasholders and coal yards line the waterfront and spread out along one edge of town. Packed in round them and round downtown, where the work is, are the immigrant tenements, and the tenement courts are all here; hovering over a building there tells you whose they are, the Italian tenements or the Polish. Further out come the brownstone rows with their stoops, beside the parks the fashionable district of mansions and grand apartment houses, and at the edge of town the suburbs, wooden houses on lawns behind picket fences.
+
+Businesses set up where they belong. Warehouses go to the industrial district and hotels downtown or on the fashionable streets; the suburbs have a few shops but no pool halls, and the rich only a tailor, a haberdasher or a pharmacy here and there. Every ward still gets its share of shops. A shop takes 30% more downtown and 40% more among the rich, 10% more in the suburbs, 10% less among the factories and 15% less in the tenements. The zoning comes from where the blocks lie, so a city loaded from an older save is zoned too; only a new city gets the civic buildings.
+
 ## Neighbourhoods
 
 Every ward is home to one people: Irish, Italian, Jewish, Polish or German. A small city has room for two of them and a metropolis for all five, and a neighbourhood runs on across ward lines, so the Italians might hold three wards side by side. Every man has a people too, and so do the shopkeepers, the drifters and the outfits, whose people are their boss's. An outfit starts out of the neighbourhood its headquarters is in.

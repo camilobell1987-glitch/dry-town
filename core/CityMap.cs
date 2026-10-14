@@ -4,9 +4,9 @@ public enum LotUse { Empty, Business, Headquarters, Precinct, Bank, GunShop, Car
 
 /// <summary>
 /// What the ground under a lot is. Only land can be built on; the river, the parks, the graveyards
-/// and the churches stay as they are.
+/// the churches and the city's own buildings downtown stay as they are.
 /// </summary>
-public enum Terrain { Land, Water, Park, Cemetery, Church }
+public enum Terrain { Land, Water, Park, Cemetery, Church, Civic }
 
 /// <summary>A building plot. Every lot faces one street row, above or below its block.</summary>
 public sealed class Lot
@@ -49,7 +49,7 @@ public sealed class Lot
 /// Horizontal street rows run the full width and vertical avenues the full height,
 /// so any two doors are joined by an L or Z shaped walk along the streets.
 /// </summary>
-public sealed class CityMap
+public sealed partial class CityMap
 {
     public const int LotsPerBlockX = 4, LotsPerBlockY = 2;
     public const int StrideX = LotsPerBlockX + 1, StrideY = LotsPerBlockY + 1;
@@ -177,6 +177,7 @@ public sealed class CityMap
         int blocks = blocksX * blocksY;
         map.LayParks(Math.Max(parks, Math.Max(1, blocks / 30)));
         map.LayLandmarks(rng);
+        map.LayCivic();
         return map;
     }
 
@@ -239,9 +240,9 @@ public sealed class CityMap
             open.Remove(b);
         }
 
-        // Tenement courts are where the poor live, away from the middle of town.
+        // Tenement courts are where the poor live, in the tenement district.
         int courts = Math.Max(2, blocks / 7);
-        foreach (var b in open.Where(b => FromMiddle(b.X, b.Y) > 0.35).Take(courts).ToList())
+        foreach (var b in open.Where(b => ZoneOf(b.X, b.Y) == Zone.Tenements).Take(courts).ToList())
         {
             foreach (var lot in LotsOfBlock(b.X, b.Y)) lot.Court = true;
             open.Remove(b);

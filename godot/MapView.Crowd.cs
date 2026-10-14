@@ -81,6 +81,10 @@ void fragment() {
             {
                 Filler.Tenement => lot.Court ? 120 + (int)(h * 41) : 80 + (int)(h * 31),
                 Filler.Office => 2,
+                Filler.Rowhouse => 24 + (int)(h * 13),
+                Filler.House => 4 + (int)(h * 5),
+                Filler.Mansion => 6 + (int)(h * 9),
+                Filler.Apartment => 50 + (int)(h * 31),
                 _ => 0,
             },
             _ => 2,
