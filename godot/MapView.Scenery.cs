@@ -151,92 +151,9 @@ public partial class MapView
 
     // ---- Vehicles and passers-by ---------------------------------------------
 
-    /// <summary>
-    /// A 1920s sedan seen from above and to the south: a body, a cabin with glass, and wheels.
-    /// <paramref name="horizontal"/> lays it along a street rather than an avenue.
-    /// </summary>
-    private void DrawCar(Vector2 centre, bool horizontal, Color paint, float night, float scale = 1, bool police = false, int heading = 1)
-    {
-        // Out in the widened street the car keeps its shape: it's placed by its middle, and drawn round that.
-        var keep = _pin;
-        _pin = centre;
-        DrawCarShape(centre, horizontal, paint, night, scale, police, heading);
-        _pin = keep;
-    }
-
-    private void DrawCarShape(Vector2 centre, bool horizontal, Color paint, float night, float scale, bool police, int heading)
-    {
-        float len = 0.5f * scale, wid = 0.22f * scale, z0 = 0.03f * scale, z1 = 0.1f * scale, z2 = 0.19f * scale;
-        float cx = centre.X, cy = centre.Y;
-        var light = paint.Lightened(0.14f);
-        var cabinTop = police ? new Color("e9e6df") : paint.Lightened(0.08f);
-        var wheel = new Color("141414");
-        if (horizontal)
-        {
-            Ellipse(P(cx + 0.06f, cy + 0.04f), new Vector2(len * 0.55f, wid * 0.6f) * _t, Shadow);
-            Box(cx - len / 2, cy - wid / 2, cx + len / 2, cy + wid / 2, z0, z1, paint, light, light);
-            float cab = cx - heading * len * 0.08f;
-            Box(cab - len * 0.22f, cy - wid * 0.4f, cab + len * 0.22f, cy + wid * 0.4f, z1, z2, paint, light, cabinTop);
-            if (Fine)
-            {
-                Face(cab - len * 0.17f, cab + len * 0.17f, cy + wid * 0.4f, z1 + 0.015f, z2 - 0.02f, Glass.Lightened(0.25f));
-                C.DrawLine(Q(cab, cy + wid * 0.4f, z1 + 0.015f), Q(cab, cy + wid * 0.4f, z2 - 0.02f), paint, _t * 0.012f * scale);
-                // A chrome strip down the side, the running board, and a bumper at each end.
-                C.DrawLine(Q(cx - len / 2, cy + wid / 2, z1 - 0.012f), Q(cx + len / 2, cy + wid / 2, z1 - 0.012f), paint.Lightened(0.35f), _t * 0.006f);
-                Face(cx - len * 0.36f, cx + len * 0.36f, cy + wid / 2 + 0.015f, z0 - 0.01f, z0 + 0.005f, new Color("1a1a1a"));
-                Face(cx - len / 2 - 0.02f, cx - len / 2 + 0.04f, cy + wid / 2, z0, z0 + 0.018f, new Color("b8b4a8"));
-                Face(cx + len / 2 - 0.04f, cx + len / 2 + 0.02f, cy + wid / 2, z0, z0 + 0.018f, new Color("b8b4a8"));
-            }
-            foreach (float wx in new[] { cx - len * 0.3f, cx + len * 0.3f })
-            {
-                var hub = Q(wx, cy + wid / 2, z0 + 0.01f);
-                if (Fine) C.DrawColoredPolygon(new[] { Q(wx - len * 0.14f, cy + wid / 2 + 0.005f, z0), Q(wx + len * 0.14f, cy + wid / 2 + 0.005f, z0), Q(wx + len * 0.1f, cy + wid / 2 + 0.005f, z0 + 0.07f * scale), Q(wx - len * 0.1f, cy + wid / 2 + 0.005f, z0 + 0.07f * scale) }, paint.Darkened(0.35f));
-                C.DrawCircle(hub, 0.045f * scale * _t, wheel);
-                if (Fine)
-                {
-                    C.DrawCircle(hub, 0.026f * scale * _t, new Color("8a8478"));
-                    C.DrawCircle(hub, 0.01f * scale * _t, new Color("2a2826"));
-                }
-            }
-            float front = cx + heading * len / 2;
-            C.DrawCircle(Q(front, cy + wid * 0.3f, z1 - 0.02f), 0.025f * scale * _t, new Color("f3e6b0"));
-            if (police) C.DrawCircle(Q(cab, cy, z2 + 0.02f), _t * 0.035f, ((int)(_anim * 3) % 2 == 0 && Live) ? Palette.Bad : Palette.Police);
-            if (night > 0.3f) _headlights.Add((P(front + heading * 0.28f, cy), night));
-        }
-        else
-        {
-            Ellipse(P(cx + 0.05f, cy + 0.05f), new Vector2(wid * 0.6f, len * 0.55f) * _t, Shadow);
-            Box(cx - wid / 2, cy - len / 2, cx + wid / 2, cy + len / 2, z0, z1, paint, light, light);
-            float cab = cy - heading * len * 0.06f;
-            Box(cx - wid * 0.4f, cab - len * 0.2f, cx + wid * 0.4f, cab + len * 0.2f, z1, z2, paint, light, cabinTop);
-            float lamps = cy + len / 2;
-            if (heading > 0)
-            {
-                if (Fine)
-                {
-                    Face(cx - wid * 0.34f, cx + wid * 0.34f, cab + len * 0.2f, z1 + 0.015f, z2 - 0.02f, Glass.Lightened(0.25f));
-                    // The radiator grille between the lamps, and the bumper under it.
-                    Face(cx - wid * 0.16f, cx + wid * 0.16f, lamps, z0 + 0.015f, z1 - 0.005f, new Color("a8a498"));
-                    for (float gx = cx - wid * 0.12f; gx < cx + wid * 0.14f; gx += wid * 0.06f)
-                        C.DrawLine(Q(gx, lamps, z0 + 0.02f), Q(gx, lamps, z1 - 0.01f), new Color("4a4844"), _t * 0.004f);
-                    Face(cx - wid * 0.5f, cx + wid * 0.5f, lamps + 0.012f, z0 - 0.005f, z0 + 0.012f, new Color("b8b4a8"));
-                }
-                C.DrawCircle(Q(cx - wid * 0.3f, lamps, z1 - 0.025f), 0.025f * scale * _t, new Color("f3e6b0"));
-                C.DrawCircle(Q(cx + wid * 0.3f, lamps, z1 - 0.025f), 0.025f * scale * _t, new Color("f3e6b0"));
-            }
-            else
-            {
-                C.DrawCircle(Q(cx - wid * 0.3f, lamps, z1 - 0.025f), 0.02f * scale * _t, new Color("c03028"));
-                C.DrawCircle(Q(cx + wid * 0.3f, lamps, z1 - 0.025f), 0.02f * scale * _t, new Color("c03028"));
-            }
-            if (police) C.DrawCircle(Q(cx, cab, z2 + 0.02f), _t * 0.035f, ((int)(_anim * 3) % 2 == 0 && Live) ? Palette.Bad : Palette.Police);
-            if (night > 0.3f) _headlights.Add((P(cx, cy + heading * (len / 2 + 0.28f)), night));
-        }
-    }
-
     private readonly List<(Vector2 At, float Strength)> _headlights = new();
 
-    private sealed record Traffic(bool Horizontal, int Line, int Heading, float Speed, float Phase, Color Paint);
+    private sealed record Traffic(bool Horizontal, int Line, int Heading, float Speed, float Phase, Ride Ride, Color Paint);
 
     private List<Traffic> _traffic = new();
 
@@ -252,7 +169,10 @@ public partial class MapView
             bool horizontal = Hash(i, 200) < 0.6f;
             int line = (int)(Hash(i, 201) * ((horizontal ? Map.BlocksY : Map.BlocksX) + 1));
             int heading = Hash(i, 202) < 0.5f ? 1 : -1;
-            _traffic.Add(new Traffic(horizontal, line, heading, 0.6f + Hash(i, 203) * 0.7f, Hash(i, 204) * 40, CarPaint[(int)(Hash(i, 205) * CarPaint.Length)]));
+            var ride = TrafficRide(Hash(i, 206), parked: false);
+            // Trucks and vans go slower than the cars.
+            float speed = (0.6f + Hash(i, 203) * 0.7f) * (ride is Ride.StakeTruck or Ride.BeerTruck or Ride.Van or Ride.BankCar or Ride.PaddyWagon ? 0.7f : 1);
+            _traffic.Add(new Traffic(horizontal, line, heading, speed, Hash(i, 204) * 40, ride, RidePaint(ride, Hash(i, 205))));
         }
     }
 
@@ -271,7 +191,7 @@ public partial class MapView
             if (centre.X < 0.2f || centre.X > Map.Width - 0.2f || centre.Y < 0.2f || centre.Y > Map.Height - 0.2f) continue;
             if (!view.HasPoint(centre)) continue;
             C = DynAt(centre.Y);
-            DrawCar(centre, car.Horizontal, car.Paint, night, 0.9f, heading: car.Heading);
+            DrawVehicle(centre, car.Horizontal, car.Heading, car.Ride, car.Paint, night, 0.9f);
         }
     }
 
@@ -286,11 +206,11 @@ public partial class MapView
             // In the bay at the kerb outside.
             float carY = Across(lot.FrontY / CityMap.StrideY, CityMap.StrideY, frontTop ? FarBay : NearBay);
             C = DynAt(carY);
-            if (lot.Use == LotUse.Headquarters) DrawCar(new Vector2(lot.X + 0.5f, carY), true, Palette.Gang(w, lot.GangId).Darkened(0.35f), night);
+            if (lot.Use == LotUse.Headquarters) DrawVehicle(new Vector2(lot.X + 0.5f, carY), true, 1, Ride.Packard, Palette.Gang(w, lot.GangId).Darkened(0.35f), night);
             else
             {
-                DrawCar(new Vector2(lot.X + 0.25f, carY), true, new Color("1a1a1e"), night, police: true);
-                DrawCar(new Vector2(lot.X + 0.8f, carY), true, new Color("1a1a1e"), night, police: true);
+                DrawVehicle(new Vector2(lot.X + 0.22f, carY), true, 1, Ride.PoliceCar, PoliceBlack, night, 0.9f);
+                DrawVehicle(new Vector2(lot.X + 0.78f, carY), true, -1, Ride.PaddyWagon, WagonBlue, night, 0.9f);
             }
         }
     }

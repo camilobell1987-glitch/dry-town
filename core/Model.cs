@@ -451,6 +451,9 @@ public sealed record ScriptAction(
 {
     /// <summary>Men who went along as backup, not counting <see cref="HoodId"/>.</summary>
     public IReadOnlyList<int> Backup { get; init; } = Array.Empty<int>();
+
+    /// <summary>A raid by the Untouchables rather than the police.</summary>
+    public bool Federal { get; init; }
 }
 
 /// <summary>Who someone on the street is. Shopkeepers and gangsters are clicked through their businesses and gangs.</summary>

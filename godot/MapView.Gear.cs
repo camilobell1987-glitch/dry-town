@@ -91,10 +91,10 @@ public partial class MapView
         // Cars for sale, noses to the street.
         if (south)
             for (int i = 0; i < 3; i++)
-                DrawCar(new Vector2(lot.X + 0.22f + i * 0.28f, (fy0 + fy1) / 2), false, CarPaint[(lot.Id + i * 3) % CarPaint.Length], 0, 0.75f, heading: 1);
+                DrawVehicle(new Vector2(lot.X + 0.22f + i * 0.28f, (fy0 + fy1) / 2), false, 1, ForSale(lot, i), CarPaint[(lot.Id + i * 3) % CarPaint.Length], 0, 0.75f);
         else
             for (int i = 0; i < 2; i++)
-                DrawCar(new Vector2((fx0 + fx1) / 2, lot.Y + 0.3f + i * 0.4f), false, CarPaint[(lot.Id + i * 3) % CarPaint.Length], 0, 0.75f, heading: -1);
+                DrawVehicle(new Vector2((fx0 + fx1) / 2, lot.Y + 0.3f + i * 0.4f), false, -1, ForSale(lot, i), CarPaint[(lot.Id + i * 3) % CarPaint.Length], 0, 0.75f);
 
         if (Fine)
         {
@@ -147,16 +147,43 @@ public partial class MapView
     /// <summary>A gang's car on its way to or from a job, keeping to the right-hand lane.</summary>
     private void DrawGangCar(Vector2 at, Vector2 ahead, Color gang, Car car)
     {
+        var paint = car == Car.Cadillac ? new Color("1c1a1c") : gang.Darkened(0.35f);
+        var ride = car switch { Car.ModelT => Ride.ModelT, Car.Packard => Ride.Packard, _ => Ride.Armoured };
+        var spot = DrawOnTheRoad(at, ahead, ride, paint, false);
+        // A band of the gang's colour on the roof, so you can tell whose it is.
+        if (car == Car.Cadillac)
+        {
+            var keep = C;
+            C = DynAt(spot.Y);
+            C.DrawCircle(Q(spot.X, spot.Y, 0.225f), _t * 0.04f, gang);
+            C = keep;
+        }
+    }
+
+    /// <summary>A vehicle driving along a path, in the right-hand lane. Returns where it was drawn.</summary>
+    private Vector2 DrawOnTheRoad(Vector2 at, Vector2 ahead, Ride ride, Color paint, bool siren)
+    {
         bool horizontal = Mathf.Abs(ahead.X) >= Mathf.Abs(ahead.Y);
         int heading = horizontal ? (ahead.X >= 0 ? 1 : -1) : (ahead.Y >= 0 ? 1 : -1);
         float off = Roadway * (FarLane - 0.5f);
         var lane = horizontal ? new Vector2(0, off * heading) : new Vector2(-off * heading, 0);
-        var paint = car == Car.Cadillac ? new Color("1c1a1c") : gang.Darkened(0.35f);
         var keep = C;
         C = DynAt(at.Y);
-        DrawCar(at + lane, horizontal, paint, Night, car == Car.ModelT ? 0.95f : 1.05f, heading: heading);
-        // A band of the gang's colour along the roof, so you can tell whose it is.
-        if (car == Car.Cadillac) C.DrawCircle(Q(at.X + lane.X, at.Y + lane.Y, 0.21f), _t * 0.04f, gang);
+        DrawVehicle(at + lane, horizontal, heading, ride, paint, Night, siren: siren);
+        C = keep;
+        return at + lane;
+    }
+
+    /// <summary>A vehicle pulled up in the bay at the kerb outside a lot.</summary>
+    private void DrawAtKerb(Lot lot, Ride ride, Color paint, bool siren)
+    {
+        float y = Across(lot.FrontY / CityMap.StrideY, CityMap.StrideY, lot.FrontY < lot.Y ? FarBay : NearBay);
+        var keep = C;
+        C = DynAt(y);
+        DrawVehicle(new Vector2(lot.X + 0.5f, y), true, lot.FrontY < lot.Y ? 1 : -1, ride, paint, Night, siren: siren);
         C = keep;
     }
+
+    /// <summary>One of the motor dealer's cars for sale.</summary>
+    private static Ride ForSale(Lot lot, int i) => ((lot.Id + i) % 3) switch { 0 => Ride.ModelT, 1 => Ride.Packard, _ => Ride.Roadster };
 }
