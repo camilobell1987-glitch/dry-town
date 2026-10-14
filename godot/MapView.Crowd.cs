@@ -32,7 +32,14 @@ uniform vec4 shade : source_color = vec4(1.0);
 const float W = 4.2;
 const float H = 2.2;
 varying vec2 uv;
+" + PlanShader + @"
 void vertex() {
+    vec4 day = planned(INSTANCE_ID);
+    if (day.w > -0.5) {
+        // Someone with somewhere to be: out on the street only on the way, or at a door.
+        VERTEX = VERTEX * (day.z > 0.5 && COLOR.g < 1.5 ? radius * 2.0 : 0.0) + day.xy;
+        uv = UV;
+    } else {
     // x, y: the block's north-west corner; z: how far round the block he starts; w: his pace, signed.
     vec4 c = INSTANCE_CUSTOM;
     float per = 2.0 * (W + H);
@@ -52,6 +59,7 @@ void vertex() {
     else p = vec2(across, H - (d - 2.0 * W - H));
     VERTEX = VERTEX * size + c.xy + p;
     uv = UV;
+    }
 }
 void fragment() {
     float d = length(uv - vec2(0.5)) * 2.0;
@@ -101,6 +109,7 @@ void fragment() {
         _crowdBlocks = perBlock;
         _directory = null;
         FillCrowd();
+        BuildPlans();
         _crowdItem = RenderingServer.CanvasItemCreate();
         RenderingServer.CanvasItemSetParent(_crowdItem, parent);
         RenderingServer.CanvasItemSetDrawIndex(_crowdItem, _items.Count);
@@ -165,7 +174,9 @@ void fragment() {
             buffer[k + 8] = (Hash(salt, 910) - 0.5f) * 0.14f;
             // The kidnapped and the dead are never seen out.
             buffer[k + 9] = Gone(bx, by, n) ? 2 : Hash(salt, 914);
-            buffer[k + 10] = Hash(salt, 915);
+            // Children don't go to the speakeasy.
+            int who = by * map.BlocksX * CityDirectory.PerBlock + bx * CityDirectory.PerBlock + n;
+            buffer[k + 10] = Directory is { } d && d.Exists(who) && d.Get(who).Age < 18 ? 1 : Hash(salt, 915);
             buffer[k + 11] = doors[bx, by];
             buffer[k + 12] = bx * CityMap.StrideX + 1 - 0.1f;
             buffer[k + 13] = by * CityMap.StrideY + 1 - 0.1f;
@@ -202,6 +213,7 @@ void fragment() {
         }
         float hour = HourOfDay;
         _crowdMaterial.SetShaderParameter("t", _anim);
+        _crowdMaterial.SetShaderParameter("hour", CrowdHour);
         _crowdMaterial.SetShaderParameter("outside", OutsideAt(hour));
         _crowdMaterial.SetShaderParameter("night", hour >= 20 || hour < 2 ? 1f : 0f);
         _crowdMaterial.SetShaderParameter("radius", Mathf.Max(2.5f / Mathf.Max(0.01f, Tile), 0.05f) * 0.85f);
