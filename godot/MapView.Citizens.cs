@@ -62,7 +62,7 @@ public partial class MapView
     private int CrowdPick(Vector2 screen)
     {
         if (Directory == null || _crowdBlocks.Length == 0 || Tile < 9) return -1;
-        var tile = (screen - Origin) / Tile;
+        var tile = TileUnder(screen);
         var map = World!.Map;
         float reach = Mathf.Max(ClickRadius(DotRadius), 7 / Mathf.Max(1, Tile));
         int best = -1;

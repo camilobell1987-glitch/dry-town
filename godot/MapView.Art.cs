@@ -29,11 +29,26 @@ public partial class MapView
     /// <summary>How far a point moves east on screen for each tile it rises.</summary>
     private const float S = 0.25f;
 
-    private Vector2 P(float x, float y) => _o + new Vector2(x, y) * _t;
-    private Rect2 R(float x, float y, float w, float h) => new(P(x, y), new Vector2(w, h) * _t);
+    /// <summary>
+    /// While something solid is drawn out in the widened street (a car, say), the point it's placed by: its own shape
+    /// is drawn round that point without the stretch, so it isn't pulled out of shape.
+    /// </summary>
+    private Vector2? _pin;
+
+    /// <summary>A point of the plan, in tiles, as drawn.</summary>
+    private Vector2 P(float x, float y) =>
+        _pin is { } pin ? _o + (Widen(pin) + new Vector2(x, y) - pin) * _t : _o + Widen(new Vector2(x, y)) * _t;
+
+    private Vector2 P(Vector2 at) => P(at.X, at.Y);
+
+    private Rect2 R(float x, float y, float w, float h)
+    {
+        var from = P(x, y);
+        return new(from, P(x + w, y + h) - from);
+    }
 
     /// <summary>A point at a height above the ground, as drawn.</summary>
-    private Vector2 Q(float x, float y, float z) => Angled ? P(x + S * z, y - z) : P(x, y);
+    private Vector2 Q(float x, float y, float z) => Angled ? P(x, y) + new Vector2(S * z, -z) * _t : P(x, y);
 
     /// <summary>A stable pseudo-random number in [0, 1) for a pair of integers, so the city looks the same every frame.</summary>
     private static float Hash(int a, int b = 0)
@@ -258,13 +273,10 @@ public partial class MapView
     {
         var (x0, y0, x1, y1) = Footprint(lot);
         float h = HeightCached(lot);
-        if (h <= 0 || !Angled) return new[] { new Vector2(x0, y0), new Vector2(x1, y0), new Vector2(x1, y1), new Vector2(x0, y1) };
-        float s = S * h;
-        return new[]
-        {
-            new Vector2(x0, y0), new Vector2(x0 + s, y0 - h), new Vector2(x1 + s, y0 - h),
-            new Vector2(x1 + s, y1 - h), new Vector2(x1, y1), new Vector2(x0, y1),
-        };
+        if (h <= 0 || !Angled) return new[] { Widen(new Vector2(x0, y0)), Widen(new Vector2(x1, y0)), Widen(new Vector2(x1, y1)), Widen(new Vector2(x0, y1)) };
+        var up = new Vector2(S * h, -h);
+        Vector2 a = Widen(new Vector2(x0, y0)), b = Widen(new Vector2(x1, y0)), c = Widen(new Vector2(x1, y1)), d = Widen(new Vector2(x0, y1));
+        return new[] { a, a + up, b + up, c + up, c, d };
     }
 
     private static bool FacesSouth(Lot lot) => lot.FrontY > lot.Y;
@@ -374,6 +386,8 @@ public partial class MapView
         if (by < Map.BlocksY)
             for (float y = y0 + 1.25f; y < y0 + CityMap.StrideY - 0.25f; y += dash + gap)
                 C.DrawLine(P(x0 + 0.5f, y), P(x0 + 0.5f, Mathf.Min(y + dash, y0 + CityMap.StrideY - 0.25f)), paint, lw);
+
+        if (Fine) DrawBayLines(bx, by);
 
         // Zebra crossings on each side of the junction.
         if (Fine)

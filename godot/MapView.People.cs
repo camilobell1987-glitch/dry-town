@@ -88,10 +88,10 @@ public partial class MapView
             {
                 // Cops walk their beat in pairs, side by side; the one you deal with is on the street side.
                 var partner = new Vector2(0, r * 2.3f / _t);
-                DrawDot((at - partner / 2) * _t, r, MarkerOf(p.Kind));
+                DrawDot(P(at - partner / 2), r, MarkerOf(p.Kind));
                 at += partner / 2;
             }
-            DrawDot(at * _t, r, MarkerOf(p.Kind));
+            DrawDot(P(at), r, MarkerOf(p.Kind));
             if (p.Id == SelectedPerson) SelectionRing(at, r);
             _clickables.Add(new Clickable(Pickable.Person, p.Id, at, ClickRadius(r)));
         }
@@ -105,8 +105,8 @@ public partial class MapView
     {
         var keep = C;
         C = DynAt(at.Y);
-        Glow(at * _t, r * 4, Palette.Ink, 0.5f);
-        C.DrawArc(at * _t, r * 1.6f, 0, Mathf.Tau, 24, Palette.Ink, Px(2));
+        Glow(P(at), r * 4, Palette.Ink, 0.5f);
+        C.DrawArc(P(at), r * 1.6f, 0, Mathf.Tau, 24, Palette.Ink, Px(2));
         C = keep;
     }
 
@@ -132,7 +132,7 @@ public partial class MapView
                 var at = door + new Vector2(side * (0.4f + 0.2f * (i / 2)), -0.04f * (i / 2));
                 // The boss stands a little larger than his men.
                 float size = h.Id == gang.BossHoodId ? r * 1.25f : r;
-                DrawDot(at * _t, size, fill, rim);
+                DrawDot(P(at), size, fill, rim);
                 if (h.Id == SelectedHood) SelectionRing(at, size);
                 _clickables.Add(new Clickable(Pickable.Hood, h.Id, at, ClickRadius(r)));
             }
@@ -178,7 +178,7 @@ public partial class MapView
     /// <summary>The person or hood under a point on screen, frontmost first.</summary>
     private Clickable? PickAt(Vector2 screen)
     {
-        var tile = (screen - Origin) / Tile;
+        var tile = TileUnder(screen);
         Clickable? best = null;
         foreach (var c in _clickables)
         {

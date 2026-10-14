@@ -149,7 +149,8 @@ public partial class MapView
     {
         bool horizontal = Mathf.Abs(ahead.X) >= Mathf.Abs(ahead.Y);
         int heading = horizontal ? (ahead.X >= 0 ? 1 : -1) : (ahead.Y >= 0 ? 1 : -1);
-        var lane = horizontal ? new Vector2(0, 0.14f * heading) : new Vector2(-0.14f * heading, 0);
+        float off = Roadway * (FarLane - 0.5f);
+        var lane = horizontal ? new Vector2(0, off * heading) : new Vector2(-off * heading, 0);
         var paint = car == Car.Cadillac ? new Color("1c1a1c") : gang.Darkened(0.35f);
         var keep = C;
         C = DynAt(at.Y);

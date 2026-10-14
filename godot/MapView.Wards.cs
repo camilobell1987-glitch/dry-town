@@ -48,7 +48,7 @@ public partial class MapView
             {
                 var wash = colour with { A = ward.OwnerGangId >= 0 ? 0.22f : 0.1f };
                 if (ward.Id == HoverWard) wash.A += 0.08f;
-                C.DrawRect(new Rect2(P(r.Position.X, r.Position.Y), r.Size * _t), wash);
+                C.DrawRect(R(r.Position.X, r.Position.Y, r.Size.X, r.Size.Y), wash);
             }
 
             // Dashed boundary, skipping the edges of the map.
