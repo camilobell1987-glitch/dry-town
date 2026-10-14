@@ -50,6 +50,8 @@ namespace DryTown.Core;
 [JsonDerivedType(typeof(PoachOrder), "poach")]
 [JsonDerivedType(typeof(AbsorbOrder), "absorb")]
 [JsonDerivedType(typeof(WipeOutOrder), "wipeout")]
+[JsonDerivedType(typeof(FixOrder), "fix")]
+[JsonDerivedType(typeof(KidnapOrder), "kidnap")]
 public abstract record Order(int GangId);
 
 /// <summary>

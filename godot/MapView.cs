@@ -433,7 +433,7 @@ public partial class MapView : Control
         if (World == null || lot.WardId >= World.Wards.Count) return "";
         var ward = World.Wards[lot.WardId];
         string whose = ward.Reformer ? "a reformer" : ward.OwnerGangId >= 0 ? $"on {World.GangById(ward.OwnerGangId).Name}'s payroll" : "a party man";
-        return $"\n{ward.Name}: Alderman {ward.Alderman}, {whose}";
+        return $"{ZoneLine(lot)} · {ward.Name}: Alderman {ward.Alderman}, {whose}";
     }
 
     // ---- Layers ---------------------------------------------------------------
@@ -484,6 +484,7 @@ public partial class MapView : Control
     {
         foreach (var rid in _items) RenderingServer.FreeRid(rid);
         _items.Clear();
+        _grade = null;
         _builtFor = null;
     }
 
@@ -528,6 +529,7 @@ public partial class MapView : Control
         _lampGlow = NewPen(_world);
         _frameGlow = NewPen(_world);
         _marks = NewPen(_world);
+        DressForRealism();
         _screen = NewPen(GetCanvasItem());
 
         _signature = new long[map.Lots.Count];
@@ -702,6 +704,7 @@ public partial class MapView : Control
         DrawHeadquartersSigns(font, view);
         DrawCornerSigns(font, view);
         DrawWards(font);
+        DrawGrade();
         foreach (var pen in _dyn) pen.Flush();
         _frameGlow.Flush();
         _marks.Flush();

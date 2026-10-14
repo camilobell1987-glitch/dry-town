@@ -790,6 +790,8 @@ public partial class Main : Control
         menu.AddSeparator();
         menu.AddCheckItem("Angled view: buildings stand up off the map", AngledMenuId);
         menu.SetItemChecked(menu.ItemCount - 1, _map.Angled);
+        menu.AddCheckItem("Film look: the colours and grain of an old photograph", FilmMenuId);
+        menu.SetItemChecked(menu.ItemCount - 1, _map.FilmLook);
         menu.AddSeparator();
         FillScenarioMenu(menu);
         menu.AddSeparator();
@@ -811,6 +813,7 @@ public partial class Main : Control
         else if (id is > 10 and <= 10 + Slots) SaveGameTo((int)id - 10);
         else if (id is >= 20 and <= 20 + Slots) LoadGame((int)id - 20);
         else if (id == AngledMenuId) SetAngled(!_map.Angled);
+        else if (id == FilmMenuId) SetFilmLook(!_map.FilmLook);
     }
 
     private void ShowSoundPanel()
@@ -1560,6 +1563,9 @@ public partial class Main : Control
                     "market" => W.Map.Squares.Where(s => !s.Avenue && MapView.IsMarket(s.Bx, s.By)).Select(s => W.Map.LotsOfBlock(s.Bx, s.By).First()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "arcade" => W.Map.Squares.Where(s => s.Avenue && MapView.IsArcade(s.Bx, s.By)).Select(s => W.Map.LotsOfBlock(Math.Max(0, s.Bx - 1), s.By).Last()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "plaza" => W.Map.Squares.Where(s => s.Avenue).Select(s => W.Map.LotsOfBlock(Math.Max(0, s.Bx - 1), s.By).Last()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    "civic" => W.Map.Lots.Where(l => l.Terrain == Terrain.Civic).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    _ when focus.StartsWith("zone:") && Enum.TryParse<Zone>(focus[5..], true, out var zone) =>
+                        W.Map.Lots.Where(l => W.Map.ZoneOf(l) == zone && l.Terrain == Terrain.Land).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "garage" => W.Garages.Where(g => !g.Police).Select(g => W.Map.LotAt(g.LotId)).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     _ when int.TryParse(focus, out int lotId) => W.Map.LotAt(lotId),
                     "precinct" => W.Map.Lots.Where(l => l.Use == LotUse.Precinct).OrderBy(l => W.Map.Distance(hq, l)).First(),

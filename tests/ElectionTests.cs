@@ -51,7 +51,7 @@ public class ElectionTests
     [Fact]
     public void YourOwnManTakesTheSeatForGood()
     {
-        var (sim, w) = ToCampaign(2);
+        var (sim, w) = ToCampaign(3);
         var me = w.Player;
         var man = Candidate(w);
         var ward = w.Wards[0];
