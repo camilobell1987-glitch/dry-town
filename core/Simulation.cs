@@ -265,6 +265,7 @@ public sealed partial class Simulation
         Booze();
         Unions();
         PayWages();
+        Lockups();
         PayLawyers();
         Launder();
         Diplomacy();

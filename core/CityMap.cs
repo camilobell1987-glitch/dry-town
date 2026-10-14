@@ -91,6 +91,54 @@ public sealed class CityMap
     /// <summary>Two blocks side by side or one above the other, across a street or an avenue.</summary>
     public bool NextDoor(int a, int b) => Math.Abs(a % BlocksX - b % BlocksX) + Math.Abs(a / BlocksX - b / BlocksX) == 1;
 
+    // ---- Alleys ----------------------------------------------------------------
+
+    /// <summary>
+    /// The gap between lot columns an alley runs north to south through a block, or 0 for none. Only a block of
+    /// plain land has one, about half of them, chosen by position so the city's dice come out the same.
+    /// </summary>
+    public int AlleyOf(int bx, int by)
+    {
+        if (bx < 0 || by < 0 || bx >= BlocksX || by >= BlocksY) return 0;
+        if (LotsOfBlock(bx, by).Any(l => l.Terrain != Terrain.Land || l.Court)) return 0;
+        int k = bx * 131 + by;
+        return Hash(k, 900) >= 0.55f ? 0 : 1 + (int)(Hash(k, 901) * (LotsPerBlockX - 1));
+    }
+
+    /// <summary>Whether a block with an alley also has one along the middle, east to west, behind the buildings.</summary>
+    public bool HasBackAlley(int bx, int by) => AlleyOf(bx, by) > 0 && Hash(bx * 131 + by, 902) < 0.5f;
+
+    /// <summary>
+    /// How a block with a back alley is laid out from its north edge, in tiles: the buildings on the north side end at
+    /// <see cref="LockupFront"/>, a row of lockups runs along their backs to <see cref="LockupDoor"/>, and a cobbled lane
+    /// runs beside the lockups to <see cref="LaneEdge"/>, where the buildings on the south side begin.
+    /// </summary>
+    public const float LockupFront = 0.62f, LockupDoor = 1.1f, LaneEdge = 1.42f, LockupWidth = 0.34f;
+
+    /// <summary>The lockups along a block's back alley, west to east, each as its west and east edge in tiles.</summary>
+    public IReadOnlyList<(float X0, float X1)> LockupSpots(int bx, int by)
+    {
+        var spots = new List<(float, float)>();
+        if (!HasBackAlley(bx, by)) return spots;
+        float x0 = bx * StrideX + 1, alley = x0 + AlleyOf(bx, by);
+        foreach (var (from, to) in new[] { (x0 + 0.06f, alley - 0.22f), (alley + 0.22f, x0 + LotsPerBlockX - 0.06f) })
+        {
+            int n = (int)((to - from) / LockupWidth);
+            float start = from + (to - from - n * LockupWidth) / 2;
+            for (int i = 0; i < n; i++) spots.Add((start + i * LockupWidth, start + (i + 1) * LockupWidth));
+        }
+        return spots;
+    }
+
+    /// <summary>A number from 0 to 1 that depends only on its arguments, the same one the map is drawn with.</summary>
+    public static float Hash(int a, int b = 0)
+    {
+        uint h = (uint)(a * 374761393 + b * 668265263) ^ 0x9E3779B9u;
+        h = (h ^ (h >> 13)) * 1274126177u;
+        h ^= h >> 16;
+        return (h & 0xFFFFFF) / (float)0x1000000;
+    }
+
     public static bool IsStreetRow(int y) => y % StrideY == 0;
     public static bool IsAvenue(int x) => x % StrideX == 0;
     public static bool IsRoad(int x, int y) => IsStreetRow(y) || IsAvenue(x);

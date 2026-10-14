@@ -138,6 +138,9 @@ public partial class MapView
 
     // ---- Gang cars on the road --------------------------------------------------
 
+    /// <summary>The car the men on a job rode in, as it was then: it may be in a lockup now.</summary>
+    private Car RideOf(ScriptAction a) => a.Drove != Car.None ? a.Drove : CarFor(a.Backup.Prepend(a.HoodId));
+
     /// <summary>The car the men on a job ride in, if any of them drives.</summary>
     private Car CarFor(IEnumerable<int> team) => Simulation.BestCar(Men(team));
 
@@ -147,14 +150,12 @@ public partial class MapView
     /// <summary>A gang's car on its way to or from a job, keeping to the right-hand lane.</summary>
     private void DrawGangCar(Vector2 at, Vector2 ahead, Color gang, Car car)
     {
-        var paint = car == Car.Cadillac ? new Color("1c1a1c") : gang.Darkened(0.35f);
-        var ride = car switch { Car.ModelT => Ride.ModelT, Car.Packard => Ride.Packard, _ => Ride.Armoured };
-        var spot = DrawOnTheRoad(at, ahead, ride, paint, false);
+        var spot = DrawOnTheRoad(at, ahead, CarRide(car), CarPaintOf(gang, car), false);
         // A band of the gang's colour on the roof, so you can tell whose it is.
         if (car == Car.Cadillac)
         {
             var keep = C;
-            C = DynAt(spot.Y);
+            C = PenFor(spot);
             C.DrawCircle(Q(spot.X, spot.Y, 0.225f), _t * 0.04f, gang);
             C = keep;
         }
@@ -168,7 +169,7 @@ public partial class MapView
         float off = Roadway * (FarLane - 0.5f);
         var lane = horizontal ? new Vector2(0, off * heading) : new Vector2(-off * heading, 0);
         var keep = C;
-        C = DynAt(at.Y);
+        C = PenFor(at);
         DrawVehicle(at + lane, horizontal, heading, ride, paint, Night, siren: siren);
         C = keep;
         return at + lane;

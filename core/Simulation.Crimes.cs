@@ -151,8 +151,8 @@ public sealed partial class Simulation
                 : $"{hood.Name} of {gang.Name} gunned down {target.Name} of {rival.Name}.";
             w.Log(EventKind.Hit, gang.Id, text);
             w.Renown(gang, fear: boss ? Content.FearBossHit : Content.FearHit);
-            w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Hit, gang.Id, hood.Id, gang.HqLotId, where, -1, ActionResult.Won, text,
-                rival.Id, target.Id, target.Id)));
+            w.Act(DriveOff(gang, backup.Prepend(hood).ToList(), $"the killing of {target.Name}", BackedBy(backupIds, new ScriptAction(ActionKind.Hit, gang.Id, hood.Id, gang.HqLotId, where, -1, ActionResult.Won, text,
+                rival.Id, target.Id, target.Id))));
             MaybeWitness(gang, hood, w.Map.LotAt(where), $"{hood.Name} shoot {target.Name}", 0.35);
             return;
         }
@@ -194,7 +194,7 @@ public sealed partial class Simulation
             w.Hall.Outrage = Math.Min(100, w.Hall.Outrage + 3);
             string text = $"{hood.Name} and {(backup.Count == 0 ? "nobody else" : backup.Count == 1 ? "one other man" : $"{backup.Count} men")} held up {bank.Name} and got away with ${take}.";
             w.Log(EventKind.Robbery, gang.Id, text);
-            w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Robbery, gang.Id, hood.Id, gang.HqLotId, bank.LotId, -1, ActionResult.Success, text)));
+            w.Act(DriveOff(gang, backup.Prepend(hood).ToList(), $"the hold-up at {bank.Name}", BackedBy(backupIds, new ScriptAction(ActionKind.Robbery, gang.Id, hood.Id, gang.HqLotId, bank.LotId, -1, ActionResult.Success, text))));
             MaybeWitness(gang, hood, w.Map.LotAt(bank.LotId), $"{hood.Name}'s face when his mask slipped at {bank.Name}", 0.4);
             return;
         }
@@ -240,11 +240,19 @@ public sealed partial class Simulation
             long lost = Math.Min(rival.Cash, info.WeeklyIncome);
             rival.Cash -= lost;
             w.Ledger(rival.Id).Fines += lost;
-            gang.Cash += load;
-            w.Ledger(gang.Id).Rackets += load;
-            string text = $"{hood.Name} hijacked {rival.Name}'s beer truck on its way to {biz.Name} and sold the load for ${load}.";
+            // With a lockup to hide it in, the truck waits for the heat to die down and the load fetches its worth.
+            var lockup = HideTruck(gang, hood, load, $"the hijacking on the road to {biz.Name}");
+            if (lockup == null)
+            {
+                gang.Cash += load;
+                w.Ledger(gang.Id).Rackets += load;
+            }
+            string text = lockup == null
+                ? $"{hood.Name} hijacked {rival.Name}'s beer truck on its way to {biz.Name} and sold the load for ${load}."
+                : $"{hood.Name} hijacked {rival.Name}'s beer truck on its way to {biz.Name} and hid it in {w.LockupName(lockup)} until the heat's off.";
             w.Log(EventKind.Hijack, gang.Id, text);
-            w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Hijack, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Won, text, rival.Id)));
+            w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Hijack, gang.Id, hood.Id, gang.HqLotId, biz.LotId, biz.Id, ActionResult.Won, text, rival.Id)
+                { Drove = BestCar(backup.Prepend(hood)), LockupId = lockup?.Id ?? -1, Truck = lockup != null }));
             return;
         }
 

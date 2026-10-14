@@ -20,8 +20,9 @@ public partial class MapView
     public int SelectedBank { get; private set; } = -1;
 
     /// <summary>Select one thing on the map, and nothing else.</summary>
-    public void Select(int business = -1, int person = -1, int hood = -1, int bank = -1, int shop = -1, int citizen = -1)
+    public void Select(int business = -1, int person = -1, int hood = -1, int bank = -1, int shop = -1, int citizen = -1, int lockup = -1)
     {
+        SelectedLockup = lockup;
         SelectedCitizen = citizen;
         SelectedBusiness = business;
         SelectedPerson = person;

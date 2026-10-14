@@ -253,6 +253,25 @@ public static partial class Content
     /// <summary>What a gun or a car fetches when it's traded in for a better one.</summary>
     public static int TradeIn(int price) => price / 2;
 
+    // ---- Lockups -------------------------------------------------------------------
+
+    /// <summary>What a lockup in a back alley costs a week.</summary>
+    public const int LockupRent = 15;
+
+    /// <summary>Weeks the police look for a car seen at a bank job or a killing, and the chance each week they spot it out on the street.</summary>
+    public const int CarWantedWeeks = 3;
+    public const double SpotWantedCar = 0.15;
+
+    /// <summary>
+    /// A hijacked truck kept in a lockup until the heat's off: the weeks it waits, and how much more its load fetches
+    /// then than sold off in a hurry the night it was taken.
+    /// </summary>
+    public const int TruckCoolWeeks = 2;
+    public const double TruckPatience = 1.5;
+
+    /// <summary>The chance each week, at full heat, that the police find what's in one of a gang's lockups.</summary>
+    public const double LockupSearched = 0.1;
+
     /// <summary>How much harder a man in an armoured car is to hit.</summary>
     public const double ArmouredCar = 0.15;
 

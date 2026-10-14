@@ -125,6 +125,16 @@ The best car on a job carries everyone on it. It gets them there sooner, which m
 
 Rival outfits arm themselves too, once they have money to spare: revolvers for about half their men, a car or two, a shotgun or a Thompson for their hardest man, and an armoured Cadillac for a rich boss.
 
+### Lockups
+
+About a quarter of the blocks have a back alley running across the middle, and along it a row of brick lockups with tarred roofs and double doors onto a cobbled lane. Click one to rent it for $15 a week, paid every Sunday; you can give it back whenever it's empty. A rented lockup has its gang's mark chalked on the doors. The rolodex has a **Lockups** button that finds yours, or the nearest one to let.
+
+- **Cars the police want.** A car that carries men to a bank job or a killing that comes off is seen. If the outfit has an empty lockup, the car goes straight into it on the way home and the man walks until the police stop looking, three Sundays later, when it comes back out to him. Without one it stays on the street, wanted, and each Sunday there's a 15% chance the police spot it and tow it away. Trading it in at a dealer gets rid of the trouble.
+- **Hijacked trucks.** A beer truck stopped on the road goes into an empty lockup instead of being sold off the same night, and its load sells two Sundays later for half as much again.
+- **The risk.** Each Sunday the police may break open a lockup with something in it, more likely the hotter your outfit: up to one chance in ten at full heat. Whatever was inside is lost and the heat goes up.
+
+During the live week you can watch it happen: the getaway car turns down the alley, the doors swing open and it noses in, and the men walk home; a hijacked truck drives in the same way with the gang's car behind it. Rival outfits take a lockup near home once they have cars and money to spare.
+
 ![The gun shop](docs/screenshots/gun-shop.png)
 ![A gang car on the way to a job](docs/screenshots/driving.png)
 

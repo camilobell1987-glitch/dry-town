@@ -901,6 +901,7 @@ public partial class Main : Control
         _map.HoodClicked += _ => OnMapSelection();
         _map.BankClicked += _ => OnMapSelection();
         _map.ShopClicked += _ => OnMapSelection();
+        _map.LockupClicked += _ => OnMapSelection();
         _map.ActionHappened += OnAction;
         left.AddChild(_map);
 
@@ -1378,6 +1379,36 @@ public partial class Main : Control
             foreach (var h in men.Take(2)) W.Drive(W.Player, h, h == men[0] ? Car.Packard : Car.ModelT);
             W.Drive(W.Player, W.HoodById(W.Player.BossHoodId), Car.Cadillac);
         }
+        if (Flag("--lockup"))
+        {
+            // A lockup near headquarters, and a Packard for the first man out on a job, to watch it go in.
+            W.Player.Cash += 2_000;
+            var near = W.Lockups.Where(l => l.GangId < 0).OrderBy(l => W.FromHq(W.Player, l)).ThenBy(l => l.Id).ToList();
+            foreach (var l in near.Take(3)) W.RentLockup(W.Player, l);
+            if (Flag("--stocked"))
+            {
+                near[1].Holds = Stashed.Truck;
+                near[1].Value = 480;
+                near[1].OutWeek = W.Week + 2;
+                near[1].Job = "the hijacking on the road to Kelly's";
+            }
+            if (Flag("--hijack"))
+            {
+                // A rival's speakeasy close by, and a sure crew to stop its beer truck.
+                var hq = W.HqOf(W.Player);
+                var bar = W.Businesses.Where(b => b.IsOpen && b.IsProtected && b.ProtectorGangId != Me && !W.GangById(b.ProtectorGangId).IsSmall)
+                    .OrderBy(b => W.Map.Distance(hq, W.LotOf(b))).First();
+                bar.Racket = RacketKind.Speakeasy;
+                var crew = FreeHoods().Where(h => h.Id != W.Player.BossHoodId).Take(3).ToList();
+                foreach (var h in crew) h.Muscle = h.Intimidation = h.Stealth = 10;
+                _shell.Pending.Clear();
+                _shell.Pending.Add(new HijackOrder(Me, crew[0].Id, bar.Id, crew.Skip(1).Select(h => h.Id).ToArray()));
+                crew[0].Car = Car.Packard;
+            }
+            var lead = _shell.Pending.OfType<RobberyOrder>().Select(o => W.HoodById(o.HoodId)).FirstOrDefault() ?? FreeHoods().FirstOrDefault(h => h.Id != W.Player.BossHoodId);
+            if (lead != null) lead.Car = Car.Packard;
+            if (Flag("--select-lockup")) _map.Select(lockup: near[0].Id);
+        }
         if (Arg("--select-shop") is string shopKind)
         {
             var shopUse = shopKind == "car" ? LotUse.CarDealer : LotUse.GunShop;
@@ -1512,6 +1543,9 @@ public partial class Main : Control
                     "speakeasy" => W.Businesses.Where(b => b.IsOpen && b.Racket == RacketKind.Speakeasy).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "raid" => W.Script.LastOrDefault(x => x.Kind == ActionKind.Raid) is { } raid ? W.Map.LotAt(raid.ToLot) : hq,
+                    "lockup" => W.LockupsOf(Me).Select(W.LockupLot).FirstOrDefault() ?? hq,
+                    "alley" => W.Map.Lots.Where(l => l.Terrain == Terrain.Land && W.Map.HasBackAlley((l.X - 1) / CityMap.StrideX, (l.Y - 1) / CityMap.StrideY))
+                        .OrderBy(l => W.Map.Distance(hq, l)).ThenBy(l => l.Id).FirstOrDefault() ?? hq,
                     "river" => W.Map.Lots.Where(l => l.Terrain == Terrain.Water).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "cemetery" => W.Map.Lots.Where(l => l.Terrain == Terrain.Cemetery).OrderByDescending(l => W.Map.LotsOfBlock((l.X - 1) / CityMap.StrideX, (l.Y - 1) / CityMap.StrideY).Count(x => x.Terrain == Terrain.Cemetery)).ThenBy(l => l.Id).First(),
                     "biz" => _map.SelectedBusiness >= 0 ? W.LotOf(W.BusinessById(_map.SelectedBusiness)) : hq,
@@ -1522,6 +1556,11 @@ public partial class Main : Control
                 _map.ResetView(lot, float.Parse(Arg("--zoom") ?? "4"));
                 // Ring the spot as a link on a card would, to see the mark.
                 if (Flag("--mark")) _map.PanTo(lot);
+                if (focus == "lockup" && W.LockupsOf(Me).FirstOrDefault() is { } shed)
+                {
+                    var (sx0, sx1) = W.Map.LockupSpots(shed.Bx, shed.By)[shed.Index];
+                    _map.CentreOn(new Vector2((sx0 + sx1) / 2 + 0.6f, shed.By * CityMap.StrideY + 2));
+                }
                 if (Flag("--showroom")) { _map.Showroom = lot; _map.CentreOn(new Vector2(lot.X, lot.FrontY + 0.5f)); }
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
