@@ -272,6 +272,7 @@ public sealed partial class Simulation
         Police();
         OnTheLam();
         Rats();
+        Grievances();
         Street();
         Rumours();
         Residents();
@@ -450,6 +451,9 @@ public sealed partial class Simulation
         gang.Heat = Math.Min(100, gang.Heat + 5 + GunHeat(backup.Prepend(hood)));
         rival.Heat = Math.Min(100, rival.Heat + 2);
         biz.Resentment = Math.Min(100, biz.Resentment + 12);
+        // Whoever runs the place doesn't forget who shot it up.
+        foreach (var (id, a) in w.Acquaintances.Where(kv => kv.Value.BusinessId == biz.Id).OrderBy(kv => kv.Key).ToList())
+            w.Bear(Party.Resident, id, Party.Gang, gang.Id, 20, "shot up their shop", a.WardId, known: gang.IsPlayer);
 
         if (attack > roll)
         {
@@ -771,7 +775,9 @@ public sealed partial class Simulation
             gang.Heat = Math.Clamp(gang.Heat - cooling + size / 10, 0, 100);
             // A man on the inside tells the precinct where to look and when.
             bool informer = w.AvailableHoodsOf(gang.Id).Any(h => h.Informer);
-            int threshold = (w.Hall.Reform ? 30 : 35) - w.RaidSooner - (informer ? 8 : 0);
+            // A beat cop with it in for the gang goes looking for an excuse.
+            int sore = w.Grievances.Where(g => g.Holder == Party.Cop && g.Target == Party.Gang && g.TargetId == gang.Id).Select(g => g.Amount).DefaultIfEmpty(0).Max();
+            int threshold = (w.Hall.Reform ? 30 : 35) - w.RaidSooner - (informer ? 8 : 0) - sore / 8;
             if (gang.Heat <= threshold || !w.Rng.Chance((gang.Heat - threshold) / 120.0)) continue;
 
             var ledger = w.Ledger(gang.Id);
@@ -786,6 +792,10 @@ public sealed partial class Simulation
                 what = $" and closed the {Content.Rackets[site.Racket].Label} at {site.Name}";
                 site.Racket = RacketKind.None;
                 site.ShutWeeks = 6;
+                // Whoever runs the place blames the cop who padlocked it.
+                if (w.BeatCopOf(w.LotOf(site).WardId) is { } beat)
+                    foreach (var (id, a) in w.Acquaintances.Where(kv => kv.Value.BusinessId == site.Id).OrderBy(kv => kv.Key).ToList())
+                        w.Bear(Party.Resident, id, Party.Cop, beat.Id, 15, "padlocked their shop", a.WardId);
                 targetLot = site.LotId;
                 targetBiz = site.Id;
             }

@@ -545,6 +545,7 @@ public sealed partial class World
         Commission = Commission,
         Untouchables = Untouchables,
         Grudges = Grudges,
+        Grievances = Grievances,
         Offers = Offers,
         CityEvents = CityEvents,
         CityEventLast = CityEventLast,
@@ -577,6 +578,7 @@ public sealed partial class World
         if (d.Commission != null) w.Commission = d.Commission;
         if (d.Untouchables != null) w.Untouchables = d.Untouchables;
         w.Grudges.AddRange(d.Grudges);
+        w.Grievances.AddRange(d.Grievances);
         w.Offers.AddRange(d.Offers);
         w.CityEvents.AddRange(d.CityEvents);
         foreach (var (kind, week) in d.CityEventLast) w.CityEventLast[kind] = week;

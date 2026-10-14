@@ -151,6 +151,9 @@ public static partial class Content
         (Trait.Hothead, Lean.Intimidate or Lean.Extort) => -0.12,
         (Trait.Hothead, Lean.Kidnap) => -0.1,
         (Trait.SquareShooter, Lean.Bribe) => -0.15,
+        (Trait.OnTheTake, Lean.Square) => 0.15,
+        (Trait.Tightwad or Trait.Pious, Lean.Square) => 0.1,
+        (Trait.Hothead or Trait.HardBoiled, Lean.Square) => -0.1,
         _ => 0,
     };
 
@@ -234,9 +237,11 @@ public sealed partial class Acquaintance
 public sealed partial class World
 {
     /// <summary>Note what sort of person someone is, from the directory, the first time you come across him.</summary>
-    public Acquaintance Introduce(int citizen, int wardId, IReadOnlyList<Tie> ties, IReadOnlyList<Secret> secrets, Character character)
+    public Acquaintance Introduce(int citizen, int wardId, IReadOnlyList<Tie> ties, IReadOnlyList<Secret> secrets, Character character, int business = -1)
     {
         var a = Introduce(citizen, wardId, ties, secrets);
+        // The shop they run, so what happens to it can be held against whoever did it.
+        if (a.BusinessId < 0) a.BusinessId = business;
         if (a.Traits.Count == 0 && character.Traits.Count > 0)
         {
             a.Traits = character.Traits.ToList();

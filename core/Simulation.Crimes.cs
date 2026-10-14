@@ -282,7 +282,13 @@ public sealed partial class Simulation
         var cop = w.PersonById(o.PersonId);
         if (cop is not { Kind: PersonKind.BeatCop } || cop.PaidByGangId >= 0 || gang.Cash < Content.CopPrice) return;
         string text;
-        if (cop.Nerve >= 8)
+        if (w.CopGrudge(gang, cop.Id) >= 40)
+        {
+            gang.Heat = Math.Min(100, gang.Heat + 3);
+            text = $"{cop.Name} has it in for {gang.Name}, and wouldn't touch the money.";
+            w.Act(new ScriptAction(ActionKind.Hire, gang.Id, -1, gang.HqLotId, cop.LotId, -1, ActionResult.Failed, text));
+        }
+        else if (cop.Nerve >= 8)
         {
             gang.Heat = Math.Min(100, gang.Heat + 5);
             text = $"{cop.Name} wouldn't take {gang.Name}'s money and wrote it up.";
@@ -346,6 +352,11 @@ public sealed partial class Simulation
         var w = World;
         // People in your pocket on the block tell the others to keep their mouths shut.
         chance -= Math.Min(Content.HushMost, Content.Hush * w.InPocket(gang, lot.WardId));
+        // Anyone on the block with an axe to grind is glad to come forward, unless it's the beat cop they can't stand.
+        if (chance > 0) chance += Math.Min(Content.AxeToGrindMost, Content.AxeToGrind * w.Grievances.Count(g => g.Holder == Party.Resident && g.WardId == lot.WardId && g.Amount >= 30
+            && (g.Target == Party.Gang && g.TargetId == gang.Id || g.Target == Party.Hood && g.TargetId == hood.Id)));
+        if (chance > 0 && w.BeatCopOf(lot.WardId) is { } cop)
+            chance -= Math.Min(Content.CopHatedMost, Content.CopHated * w.HeldAgainst(Party.Cop, cop.Id).Count(g => g.Holder == Party.Resident && g.WardId == lot.WardId && g.Amount >= 30));
         if (!w.Rng.Chance(chance)) return;
         var witness = w.NewPerson(PersonKind.Witness, lot, 3, gang.Id, hood.Id, saw);
         w.Log(EventKind.Street, gang.Id, $"{witness.Name} saw {saw}, and is thinking about going to the police.");

@@ -1322,12 +1322,17 @@ public partial class Main : Control
                 "secret" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
                     .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n))
                     .OrderByDescending(i => directory.SecretsOf(i).Count(s => s.Vice == Vice.Lover) * 2 + directory.SecretsOf(i).Count).First(),
+                "feud" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
+                    .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n))
+                    .First(i => directory.Get(i).Age >= 25 && directory.Get(i).Ties.Count(t => t.Kin != Kin.Employer) >= 2),
                 _ => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, 0),
             };
             _map.Select(citizen: pick);
+            if (who == "feud") StageFeud(pick);
         }
         _revealCitizens = Flag("--reveal");
-        _characterTab = Flag("--character-tab");
+        if (Flag("--character-tab")) _cardTab = CardTab.Character;
+        if (Flag("--grudge-tab")) _cardTab = CardTab.Grudges;
         if (Arg("--select-bank") is string bankArg)
             _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));
         if (Flag("--select-hood")) _map.Select(hood: W.Hoods.First(h => h.IsAvailable && h.GangId != Me && W.GangById(h.GangId).Alive).Id);
@@ -1508,5 +1513,26 @@ public partial class Main : Control
             GetViewport().GetTexture().GetImage().SavePng(shot);
             GetTree().Quit();
         }
+    }
+
+    /// <summary>For screenshots: bad blood all round a resident, as if the city had been at it for a while.</summary>
+    private void StageFeud(int id)
+    {
+        var d = _map.Directory!;
+        var c = d.Get(id);
+        int ward = W.Map.LotAt(c.HomeLotId).WardId;
+        W.Introduce(id, ward, c.Ties, d.SecretsOf(id), d.CharacterOf(id), c.OwnsBusinessId);
+        W.Learn(id, Fact.Name | Fact.Job | Fact.Home);
+        var kin = c.Ties.Where(t => t.Kin != Kin.Employer).ToList();
+        foreach (var t in kin)
+        {
+            W.LearnTie(id, t);
+            W.Learn(t.Id, Fact.Name);
+        }
+        var man = W.HoodsOf(Me).First(h => h.Id != W.Player.BossHoodId);
+        W.Bear(Party.Resident, id, Party.Gang, Me, 70, "shook them down", ward, known: true);
+        W.Bear(Party.Resident, id, Party.Hood, man.Id, 40, "shook them down", ward, known: true);
+        if (W.BeatCopOf(ward) is { } cop) W.Bear(Party.Resident, id, Party.Cop, cop.Id, 35, "took in", ward, known: true, aboutId: kin[0].Id, aboutKin: Content.Reverse(kin[0].Kin));
+        W.Bear(Party.Resident, kin[1].Id, Party.Resident, id, 45, "fell out with them over their mother's will", ward, known: true);
     }
 }

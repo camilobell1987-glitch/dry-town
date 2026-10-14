@@ -324,6 +324,9 @@ public partial class Rolodex : Control
         float bottom = r.End.Y - 30, tw = cw - 20;
         float sy = Paragraph(font, new Vector2(x + 10, y + 32), tw, Reports.Known(h), Type, bottom);
         sy = Paragraph(font, new Vector2(x + 10, sy + 2), tw, Reports.Priors(h), h.Convictions >= Content.HabitualOffender ? Palette.Bad.Darkened(0.2f) : TypeQuiet, bottom);
+        int enemies = w.HeldAgainst(Party.Hood, h.Id).Count(g => g.Known);
+        if (enemies > 0)
+            sy = Paragraph(font, new Vector2(x + 10, sy + 2), tw, $"Bad blood: {(enemies == 1 ? "one person on the street has" : $"{enemies} people on the street have")} it in for him.", RedRule.Darkened(0.2f), bottom);
         if (h.Convictions >= Content.HabitualOffender)
             Stamp(font, new Vector2(x + cw - 100, y + 30), "3 STRIKES", Palette.Bad.Darkened(0.25f));
         int shown = 0;
