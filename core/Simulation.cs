@@ -783,7 +783,7 @@ public sealed partial class Simulation
             var ledger = w.Ledger(gang.Id);
             var rackets = w.TurfOf(gang.Id).Where(b => b.Racket != RacketKind.None).ToList();
             // An alderman on the payroll tips off the rackets in his ward before the wagons roll.
-            var racketSite = rackets.Where(b => informer || !Politics.Covered(w, gang, b) && !CopLooksAway(gang, b)).ToList();
+            var racketSite = rackets.Where(b => informer || !Politics.Covered(w, gang, b) && !CopLooksAway(gang, b) && !w.StoolTipsOff(gang, w.LotOf(b).WardId)).ToList();
             string what = rackets.Count > racketSite.Count && racketSite.Count == 0 ? ", but the rackets had been tipped off" : "";
             int targetLot = gang.HqLotId, targetBiz = -1;
             if (racketSite.Count > 0)

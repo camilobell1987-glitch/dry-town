@@ -113,13 +113,15 @@ public static partial class Content
                 Trait.Yellow or Trait.Sap => 0.7,
                 Trait.Pious => 0.7,
                 Trait.FamilyMan when family => 1.5,
+                Trait.HoldsAGrudge => 1.5,
                 _ => 1,
             };
         return scale;
     }
 
     /// <summary>How fast someone's grudges fade each week. The pious forgive; a hothead cools off as fast as he flares.</summary>
-    public static int GrievanceFade(IEnumerable<Trait> traits) => traits.Contains(Trait.Pious) ? 3 : traits.Contains(Trait.Hothead) ? 2 : 1;
+    public static int GrievanceFade(IEnumerable<Trait> traits) =>
+        traits.Contains(Trait.HoldsAGrudge) ? 0 : traits.Contains(Trait.Pious) ? 3 : traits.Contains(Trait.Hothead) ? 2 : 1;
 
     /// <summary>The weekly chance someone does something about a grudge this bad.</summary>
     public static double RevengeChance(int amount, IEnumerable<Trait> traits)
@@ -131,7 +133,7 @@ public static partial class Content
             chance *= t switch
             {
                 Trait.Hothead => 2,
-                Trait.HardBoiled => 1.3,
+                Trait.HardBoiled or Trait.HoldsAGrudge => 1.3,
                 Trait.Yellow => 0.3,
                 Trait.Pious => 0.5,
                 _ => 1,

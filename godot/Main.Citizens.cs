@@ -101,7 +101,7 @@ public partial class Main
             {
                 Standing.Bought => dealt.GangId == Me ? "On your payroll" : "On someone's payroll",
                 Standing.Scared => dealt.GangId == Me ? "Scared of you" : "Scared",
-                Standing.Held or Standing.Jailed => dealt.Note,
+                Standing.Held or Standing.Jailed or Standing.Joined => dealt.Note,
                 Standing.Blackmailed => dealt.GangId == Me ? $"Paying you ${World.HushMoney(dealt.Worth)} a week to keep quiet" : "Being blackmailed",
                 _ => $"Dead. {dealt.Note}",
             };
@@ -194,7 +194,7 @@ public partial class Main
         }
         var hoods = FreeHoods().ToList();
         if (hoods.Count == 0) { AddLabel(panel, "All your men are busy, so nobody can go to them.", Palette.InkQuiet, wrap: true); return; }
-        if (standing?.Standing is Standing.Held or Standing.Jailed) return;
+        if (standing?.Standing is Standing.Held or Standing.Jailed or Standing.Joined) return;
         bool tailing = AlreadyGiven(o => o is TailOrder t && t.CitizenId == id), leaning = AlreadyGiven(o => o is LeanOrder l && l.CitizenId == id);
         if (tailing || leaning) return;
 
@@ -235,6 +235,11 @@ public partial class Main
             Act(Lean.Square, () => $"Pay them to square things ({Money(squarePrice)})");
             Act(Lean.Favour, () => "Do them a good turn");
             if (c.OwnsBusinessId >= 0) Act(Lean.GoodWord, () => $"Put in a good word for {Short(W.BusinessById(c.OwnsBusinessId).Name)}");
+        }
+        if (known.HasFlag(Fact.Name) && (_revealCitizens ? directory!.CharacterOf(id).Traits : W.KnownTraitsOf(id)).Contains(Trait.WannabeTorpedo))
+        {
+            var b = AddButton(panel, "", () => Give(new LeanOrder(Me, man.GetSelectedId(), id, c.HomeLotId, c.Name, Lean.Recruit, c.Worth) { Origin = c.Origin, Age = c.Age }));
+            buttons.Add((b, Lean.Recruit, () => "Ask him to join the outfit"));
         }
         if (W.KnownCrime(id) is { } crime) Act(Lean.TurnIn, () => $"Turn them in for {Content.Crime(crime)} ({Content.Penalty(Content.Offence(crime)).Least:0} to {Content.Penalty(Content.Offence(crime)).Most:0} years)");
         void Odds()
@@ -315,7 +320,8 @@ public partial class Main
         lines.AddChild(new ColorRect { Color = CardRule, CustomMinimumSize = new Vector2(0, 1) });
         AddLabel(lines, "Character", CardFaint, 13);
         var traits = _revealCitizens ? character.Traits.ToList() : W.KnownTraitsOf(id).ToList();
-        foreach (var t in traits) Entry(Content.Label(t), Content.Meaning(t), new Color("7a3a2a"));
+        bool woman = d.Get(id).Woman;
+        foreach (var t in traits) Entry(Content.Label(t, woman), Content.Meaning(t), new Color("7a3a2a"));
         // Someone who has told you everything has nothing more to show; anyone else may.
         bool told = _revealCitizens || a is { Standing: Standing.Bought } && a.GangId == Me && !a.UnknownTraits.Any();
         if (!told) AddLabel(lines, traits.Count == 0 ? "???" : "More, perhaps: ???", CardFaint);

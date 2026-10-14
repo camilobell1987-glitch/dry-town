@@ -355,6 +355,8 @@ public sealed partial class Simulation
         // Anyone on the block with an axe to grind is glad to come forward, unless it's the beat cop they can't stand.
         if (chance > 0) chance += Math.Min(Content.AxeToGrindMost, Content.AxeToGrind * w.Grievances.Count(g => g.Holder == Party.Resident && g.WardId == lot.WardId && g.Amount >= 30
             && (g.Target == Party.Gang && g.TargetId == gang.Id || g.Target == Party.Hood && g.TargetId == hood.Id)));
+        // A stool pigeon tells the cops whatever they see.
+        if (chance > 0) chance += Math.Min(Content.StoolSingsMost, Content.StoolSings * w.StoolPigeonsAgainst(gang, lot.WardId));
         if (chance > 0 && w.BeatCopOf(lot.WardId) is { } cop)
             chance -= Math.Min(Content.CopHatedMost, Content.CopHated * w.HeldAgainst(Party.Cop, cop.Id).Count(g => g.Holder == Party.Resident && g.WardId == lot.WardId && g.Amount >= 30));
         if (!w.Rng.Chance(chance)) return;
