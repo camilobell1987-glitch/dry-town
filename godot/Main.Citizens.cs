@@ -168,21 +168,22 @@ public partial class Main
         var man = HoodPicker(men, h => $"Intim. {h.Intimidation} · Muscle {h.Muscle} · Stealth {h.Stealth}");
         if (known != Fact.All)
             AddButton(panel, "Tail them for the week", () => Give(new TailOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who)));
-        // What each would cost and the odds with the man picked; nerve shows only once you know the person.
-        int nerve = W.NerveOf(id);
+        // What each would cost and the odds with the man picked. Until you know the person you can only guess at his nerve.
+        bool reads = W.ReadsNerve(W.Player, id);
+        int nerve = reads ? W.NerveOf(id) : 5;
         var buttons = new List<(Button Button, Lean Lean, Func<string> Label)>();
         void Act(Lean lean, Func<string> label)
         {
-            var b = AddButton(panel, "", () => Give(new LeanOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who, lean, c.Worth)));
+            var b = AddButton(panel, "", () => Give(new LeanOrder(Me, man.GetSelectedId(), id, c.HomeLotId, who, lean, c.Worth, c.OwnsBusinessId, c.Owns.Count)));
             buttons.Add((b, lean, label));
         }
         // What they're good for shows once you know what they do.
         int price = World.BribePrice(c.Worth);
         bool sized = known.HasFlag(Fact.Job) || known.HasFlag(Fact.Owns);
         string Money(int dollars) => sized ? $"${dollars}" : "$???";
-        Act(Lean.Bribe, () => $"Put them on the payroll ({Money(price)})");
+        Act(Lean.Bribe, () => $"Put them on the payroll ({Money(price)}, then {Money(World.Retainer(c.Worth))} a week)");
         Act(Lean.Intimidate, () => "Lean on them");
-        Act(Lean.Extort, () => $"Shake them down (about {Money(Math.Max(5, c.Worth * 3))})");
+        Act(Lean.Extort, () => $"Shake them down (about {Money(Math.Max(5, c.Worth * Content.ShakedownOfWorth))})");
         Act(Lean.Kidnap, () => $"Snatch them for ransom ({Money(Math.Max(50, c.Worth * Content.RansomOfWorth))})");
         Act(Lean.Kill, () => "Have them killed");
         void Odds()
@@ -191,12 +192,15 @@ public partial class Main
             foreach (var (b, lean, label) in buttons)
             {
                 string why = W.CannotLean(W.Player, id, lean) is { } no ? $" · {no}" : "";
-                b.Text = $"{label()} · {Simulation.LeanChance(hood, lean, nerve):P0}{why}";
+                double odds = Simulation.LeanChance(hood, lean, nerve, known);
+                b.Text = $"{label()} · {(reads ? "" : "maybe ")}{odds:P0}{why}";
                 b.Disabled = why != "" || lean == Lean.Bribe && W.Player.Cash < price;
             }
         }
         man.ItemSelected += _ => Odds();
         Odds();
+        if (!reads) AddLabel(panel, $"You can't tell yet how much nerve they have, so the odds are a guess. Learn {Content.NerveFacts} things about them to know for sure.", Palette.InkQuiet, wrap: true);
+        AddLabel(panel, "Knowing where they live makes a threat or a snatch likelier to work, and knowing where they work helps with everything else. A shopkeeper in your pocket takes your protection gladly and resents it less, and anyone you've bought or scared keeps the block quiet when there are witnesses.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "A bribed man tells you what he hears, and so does a frightened one for a while. Shaking someone down pays now; a snatch pays if the family comes up with the money. Every one but a bribe brings heat, and anyone can be seen doing it. A killing makes you feared and the neighbourhood talks of murder.", Palette.InkQuiet, wrap: true);
     }
 

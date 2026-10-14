@@ -384,7 +384,7 @@ public sealed partial class Simulation
         Math.Clamp(0.35 + (hood.Intimidation - biz.Toughness) * 0.08 - Math.Max(0, w.BlocksFromHq(gang, biz) - 2) * 0.04
             + Math.Min(backup, Crew.MaxMembers) * 0.06 + Content.Guns[hood.Weapon].Extort
             + (w.Wards.Count == 0 ? 0 : w.AtHome(hood, biz) ? Content.HomeShakedown : -Content.StrangerShakedown)
-            + gang.Fear * Content.FearShakedown, 0.05, 0.95);
+            + gang.Fear * Content.FearShakedown + (w.OwnerInPocket(gang, biz) ? Content.PocketShakedown : 0), 0.05, 0.95);
 
     private void Extort(Gang gang, ExtortOrder o)
     {
@@ -444,7 +444,8 @@ public sealed partial class Simulation
         double defence = DefenceStrength(w, rival, biz, guarded ? guard.Hood : null, guarded ? guard.Backup : 0);
         // A man inside opens a door for his own side, or warns them who's coming.
         if (w.HasManInside(rival.Id, gang.Id)) defence += Content.TippedOffDefence;
-        double attack = StormingStrength(hood, backup) + (w.HasManInside(gang.Id, rival.Id) ? Content.InsideStorm : 0) + w.Rng.Range(0, 6);
+        double attack = StormingStrength(hood, backup) + (w.HasManInside(gang.Id, rival.Id) ? Content.InsideStorm : 0)
+            + (w.OwnerInPocket(gang, biz) ? Content.PocketStorm : 0) + w.Rng.Range(0, 6);
         double roll = defence + w.Rng.Range(0, 6);
         gang.Heat = Math.Min(100, gang.Heat + 5 + GunHeat(backup.Prepend(hood)));
         rival.Heat = Math.Min(100, rival.Heat + 2);
@@ -613,7 +614,7 @@ public sealed partial class Simulation
             }
 
             // A shopkeeper minds less paying his own people.
-            int home = w.PeopleOf(gang) == w.Neighbourhood(biz) ? Content.HomeResentment : 0;
+            int home = (w.PeopleOf(gang) == w.Neighbourhood(biz) ? Content.HomeResentment : 0) + (w.OwnerInPocket(gang, biz) ? Content.PocketResentment : 0);
             biz.Resentment = own ? 0 : Math.Clamp(biz.Resentment + (biz.ProtectionRate - 12) / 2 - 1 - home, 0, 100);
 
             // A casino or a club is its owners' own business. Whoever takes the place from them gets the rooms, not the tables.

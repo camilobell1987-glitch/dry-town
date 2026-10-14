@@ -13,10 +13,26 @@ public static partial class Content
     public const int ScaredWeeks = 8, ShakedownWeeks = 4;
 
     /// <summary>Weeks his family has to pay a ransom before he's let go anyway, and how many weeks' worth they're asked for.</summary>
-    public const int ResidentRansomWeeks = 3, RansomOfWorth = 6;
+    public const int ResidentRansomWeeks = 3, RansomOfWorth = 4;
+
+    /// <summary>How many times what someone is worth a shakedown takes off him.</summary>
+    public const int ShakedownOfWorth = 2;
 
     /// <summary>How much more a ward's rumours tell you for each man there on your payroll or afraid of you.</summary>
     public const double InformantRumour = 0.1;
+
+    /// <summary>How much less likely a witness is to come forward in a ward for each man there in your pocket, and the most it can fall.</summary>
+    public const double Hush = 0.03, HushMost = 0.15;
+
+    /// <summary>
+    /// A shopkeeper in your pocket: how much likelier he is to take your protection, how much it helps to have him open
+    /// the back door when you take his shop from another gang, and how much less he minds paying you each week.
+    /// </summary>
+    public const double PocketShakedown = 0.25;
+    public const int PocketStorm = 2, PocketResentment = 3;
+
+    /// <summary>How many facts you need about someone before you can judge their nerve.</summary>
+    public const int NerveFacts = 4;
 
     public static string Label(Lean lean) => lean switch
     {
@@ -42,6 +58,14 @@ public sealed partial class Acquaintance
 
     /// <summary>A line for the card: how he died, who has him.</summary>
     public string Note { get; set; } = "";
+
+    /// <summary>What he's worth, the shop he runs and the tenements he owns, noted once you've dealt with him.</summary>
+    public int Worth { get; set; }
+    public int BusinessId { get; set; } = -1;
+    public int Tenements { get; set; }
+
+    /// <summary>Whether he's bought or frightened by this gang just now.</summary>
+    public bool InPocketOf(int gangId) => GangId == gangId && Standing is Standing.Bought or Standing.Scared;
 }
 
 public sealed partial class World
@@ -75,24 +99,55 @@ public sealed partial class World
         };
     }
 
-    /// <summary>What a bribe costs for someone of this worth.</summary>
+    /// <summary>What a bribe costs for someone of this worth, and what keeping him sweet costs each week after.</summary>
     public static int BribePrice(int worth) => 20 + worth * 2;
+    public static int Retainer(int worth) => Math.Max(2, worth / 5);
+
+    /// <summary>Whether you know enough about someone, or have dealt with him, to judge how much nerve he has.</summary>
+    public bool ReadsNerve(Gang g, int citizen) =>
+        Acquaintances.TryGetValue(citizen, out var a) && (a.GangId == g.Id && a.Standing != Standing.None
+            || System.Numerics.BitOperations.PopCount((uint)a.Known) >= Content.NerveFacts);
+
+    /// <summary>Whether the man who runs this shop is bought or frightened by this gang.</summary>
+    public bool OwnerInPocket(Gang g, Business biz) =>
+        g.IsPlayer && Acquaintances.Values.Any(a => a.BusinessId == biz.Id && a.InPocketOf(g.Id));
+
+    /// <summary>How many people in a ward are in a gang's pocket, a landlord counting once more for each building he owns.</summary>
+    public int InPocket(Gang g, int wardId) =>
+        !g.IsPlayer || wardId < 0 ? 0 : Acquaintances.Values.Where(a => a.WardId == wardId && a.InPocketOf(g.Id)).Sum(a => 1 + a.Tenements);
 }
 
 /// <summary>Send a man to deal with a resident.</summary>
-public sealed record LeanOrder(int GangId, int HoodId, int CitizenId, int LotId, string Who, Lean Lean, int Worth) : Order(GangId);
+public sealed record LeanOrder(int GangId, int HoodId, int CitizenId, int LotId, string Who, Lean Lean, int Worth, int BusinessId = -1, int Tenements = 0) : Order(GangId);
 
 public sealed partial class Simulation
 {
-    /// <summary>The chance a man pulls it off against someone with this much nerve.</summary>
-    public static double LeanChance(Hood man, Lean lean, int nerve) => Math.Clamp(lean switch
+    /// <summary>The chance a man pulls it off against someone with this much nerve, knowing what you know about him.</summary>
+    public static double LeanChance(Hood man, Lean lean, int nerve, Fact known = Fact.None) => Math.Clamp(lean switch
     {
         // Money talks, except to the honest few.
         Lean.Bribe => 1.05 - nerve * 0.07 + man.Brains * 0.02,
         Lean.Intimidate or Lean.Extort => 0.35 + man.Intimidation * 0.06 - nerve * 0.04,
         Lean.Kidnap => 0.3 + man.Muscle * 0.04 + man.Stealth * 0.03 - nerve * 0.02,
         _ => 0.5 + man.Muscle * 0.04 + man.Stealth * 0.01 - nerve * 0.01,
-    }, 0.05, 0.95);
+    } + KnowingHelps(lean, known), 0.05, 0.95);
+
+    /// <summary>
+    /// What it's worth knowing about someone before you go to him: where he lives, for a threat or a snatch; where he
+    /// works, to find him alone or know what he can spare; and his people, to talk to him in his own language.
+    /// </summary>
+    public static double KnowingHelps(Lean lean, Fact known)
+    {
+        double home = known.HasFlag(Fact.Home) ? 1 : 0, work = known.HasFlag(Fact.Work) ? 1 : 0, origin = known.HasFlag(Fact.Origin) ? 1 : 0;
+        return lean switch
+        {
+            Lean.Bribe => work * 0.05 + origin * 0.05,
+            Lean.Intimidate => home * 0.08,
+            Lean.Extort => home * 0.05 + work * 0.05,
+            Lean.Kidnap => home * 0.12,
+            _ => home * 0.05 + work * 0.05,
+        };
+    }
 
     /// <summary>The chance someone sees it and thinks about going to the police.</summary>
     public static double WitnessChance(Lean lean, bool ok) => (lean, ok) switch
@@ -115,7 +170,10 @@ public sealed partial class Simulation
         var lot = w.Map.LotAt(o.LotId);
         var a = w.Meet(o.CitizenId, lot.WardId);
         int nerve = w.NerveOf(o.CitizenId);
-        bool ok = w.Rng.Chance(LeanChance(man, o.Lean, nerve));
+        bool ok = w.Rng.Chance(LeanChance(man, o.Lean, nerve, a.Known));
+        a.Worth = o.Worth;
+        a.BusinessId = o.BusinessId;
+        a.Tenements = o.Tenements;
         string text;
         var kind = ActionKind.Extort;
         var result = ok ? ActionResult.Success : ActionResult.Failed;
@@ -128,7 +186,7 @@ public sealed partial class Simulation
                 a.GangId = gang.Id;
                 a.Known = Fact.All;
                 kind = ActionKind.Hire;
-                text = $"{man.Name} put {o.Who} on the payroll for ${price}. They'll tell you what they hear.";
+                text = $"{man.Name} put {o.Who} on the payroll for ${price}, and ${World.Retainer(o.Worth)} a week after. They'll tell you what they hear.";
                 break;
             case Lean.Bribe:
                 gang.Heat = Math.Min(100, gang.Heat + 2);
@@ -142,7 +200,7 @@ public sealed partial class Simulation
                 text = $"{man.Name} leaned on {o.Who}, who told him everything and will be no trouble.";
                 break;
             case Lean.Extort when ok:
-                int take = Math.Max(5, o.Worth * 3);
+                int take = Math.Max(5, o.Worth * Content.ShakedownOfWorth);
                 gang.Cash += take;
                 w.Ledger(gang.Id).Rackets += take;
                 a.ShakenWeek = w.Week;
@@ -209,10 +267,29 @@ public sealed partial class Simulation
     private void Residents()
     {
         var w = World;
+        var payroll = new Dictionary<int, (int Paid, int People, int Quit)>();
         foreach (var (id, a) in w.Acquaintances.OrderBy(kv => kv.Key))
         {
             var gang = w.Gangs.FirstOrDefault(g => g.Id == a.GangId);
             if (a.Standing == Standing.Scared && w.Week >= a.UntilWeek) a.Standing = Standing.None;
+            if (a.Standing == Standing.Bought && gang != null)
+            {
+                // A man on the payroll stays bought as long as the envelope keeps coming.
+                int due = World.Retainer(a.Worth);
+                var sum = payroll.GetValueOrDefault(gang.Id);
+                if (gang.Alive && gang.Cash >= due)
+                {
+                    gang.Cash -= due;
+                    w.Ledger(gang.Id).Spending += due;
+                    payroll[gang.Id] = (sum.Paid + due, sum.People + 1, sum.Quit);
+                }
+                else
+                {
+                    a.Standing = Standing.None;
+                    payroll[gang.Id] = (sum.Paid, sum.People, sum.Quit + 1);
+                }
+                continue;
+            }
             if (a.Standing != Standing.Held) continue;
             if (gang is not { Alive: true })
             {
@@ -233,9 +310,13 @@ public sealed partial class Simulation
             a.UntilWeek = w.Week + Content.ScaredWeeks;
             a.Note = "";
         }
+        foreach (var (gangId, (paid, people, quit)) in payroll)
+        {
+            if (people > 0) w.Log(EventKind.Street, gangId, $"Paid ${paid} to the {(people == 1 ? "one man" : $"{people} people")} on your payroll.");
+            if (quit > 0) w.Log(EventKind.Street, gangId, $"{(quit == 1 ? "Someone" : $"{quit} people")} went off your payroll when the money didn't come.");
+        }
     }
 
     /// <summary>How much more the street tells you about a ward for the people there you've bought or scared.</summary>
-    private double Informants(Gang g, int wardId) =>
-        Content.InformantRumour * World.Acquaintances.Values.Count(a => a.WardId == wardId && a.GangId == g.Id && a.Standing is Standing.Bought or Standing.Scared);
+    private double Informants(Gang g, int wardId) => Content.InformantRumour * World.InPocket(g, wardId);
 }

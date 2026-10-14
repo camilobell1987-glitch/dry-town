@@ -344,6 +344,8 @@ public sealed partial class Simulation
     private void MaybeWitness(Gang gang, Hood hood, Lot lot, string saw, double chance)
     {
         var w = World;
+        // People in your pocket on the block tell the others to keep their mouths shut.
+        chance -= Math.Min(Content.HushMost, Content.Hush * w.InPocket(gang, lot.WardId));
         if (!w.Rng.Chance(chance)) return;
         var witness = w.NewPerson(PersonKind.Witness, lot, 3, gang.Id, hood.Id, saw);
         w.Log(EventKind.Street, gang.Id, $"{witness.Name} saw {saw}, and is thinking about going to the police.");
