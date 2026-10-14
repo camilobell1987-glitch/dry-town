@@ -92,6 +92,10 @@ public partial class Main
                 AddLabel(panel, p.Nerve >= 8 ? "He has the look of a straight arrow. He may not take money." : "He looks like a man with a family to feed.", Palette.InkQuiet, wrap: true);
                 if (p.PaidByGangId >= 0)
                     AddLabel(panel, p.PaidByGangId == Me ? "He's on your money this week." : $"{W.GangById(p.PaidByGangId).Name} has paid him this week.", Palette.Gang(W, p.PaidByGangId), wrap: true);
+                if (W.CopGrudge(W.Player, p.Id) is var sore and > 0)
+                    AddLabel(panel, $"{Content.GrudgeWords(sore)} you{(sore >= 40 ? ", and won't take your money" : "")}. Trouble on his beat is the reason.", Palette.Bad, wrap: true);
+                int hated = W.HeldAgainst(Party.Cop, p.Id).Count(g => g.Known && g.Amount >= 30);
+                if (hated > 0) AddLabel(panel, $"{(hated == 1 ? "Someone you know of hates him" : $"{hated} people you know of hate him")}. Nobody on the block he's hated on talks to him.", Palette.InkQuiet, wrap: true);
                 AddLabel(panel, $"Paid off, he looks away for the week: heat -{Content.CopCooling}, and the police leave your rackets in {ward} alone if they raid you. An honest one writes it up.", Palette.InkQuiet, wrap: true);
                 ShowQueued(panel, Concerns);
                 if (!CanGiveOrders(panel) || p.PaidByGangId >= 0 || AlreadyGiven(Concerns)) return;

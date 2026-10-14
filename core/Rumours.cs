@@ -6,8 +6,14 @@ public static partial class Content
     /// <summary>What it costs to stand a few rounds and ask about someone.</summary>
     public const int AskPrice = 10;
 
+    /// <summary>The chance asking around turns up each grudge someone holds or is held against them, and how much more an enemy tells you.</summary>
+    public const double AskGrudge = 0.3, EnemyTalks = 0.15;
+
     /// <summary>Weekly chance the street fills in one more line on someone you've met, and how much more where you hold turf.</summary>
     public const double RumourChance = 0.15, RumourOnTurf = 0.15;
+
+    /// <summary>The chance the street's word on someone is about a grudge, when there's one to tell.</summary>
+    public const double RumourGrudge = 0.3;
 
     /// <summary>
     /// How easy each thing is to learn by asking: everyone on the block knows a man's name and what he does, fewer know
@@ -108,7 +114,9 @@ public sealed partial class Simulation
         w.Ledger(gang.Id).Spending += Content.AskPrice;
         int ward = w.Map.LotAt(o.LotId).WardId;
         w.Meet(o.CitizenId, ward);
-        double bonus = (w.HoldsTurfIn(gang, ward) ? 0.15 : 0) + w.TalkOf(o.CitizenId);
+        // Someone with a grudge against them is only too glad to talk.
+        bool enemies = w.HasEnemies(o.CitizenId);
+        double bonus = (w.HoldsTurfIn(gang, ward) ? 0.15 : 0) + w.TalkOf(o.CitizenId) + (enemies ? Content.EnemyTalks : 0);
         var unknown = Content.Facts.Where(f => !w.KnownAbout(o.CitizenId).HasFlag(f)).ToList();
         var heard = Fact.None;
         foreach (var fact in unknown)
@@ -119,13 +127,15 @@ public sealed partial class Simulation
         int ties = w.LearnTies(o.CitizenId, Content.AskTie + bonus);
         int secrets = w.LearnSecrets(o.CitizenId, Content.AskSecret + bonus);
         int traits = w.LearnTraits(o.CitizenId, 0.25 + bonus);
+        int grudges = w.LearnGrievances(o.CitizenId, Content.AskGrudge + bonus);
         var heardOf = new List<string>();
         if (fresh != Fact.None) heardOf.Add($"their {World.Describe(fresh)}");
         if (ties > 0) heardOf.Add($"about {World.Ties(ties)}");
         if (secrets > 0) heardOf.Add(World.Secrets(secrets));
         if (traits > 0) heardOf.Add(World.Traits(traits));
+        if (grudges > 0) heardOf.Add(World.BadBloodWords(grudges));
         string about = heardOf.Count == 0 ? "nothing new" : string.Join(", and ", heardOf);
-        w.Log(EventKind.Street, gang.Id, $"You asked around about {o.Who} and heard {about}.");
+        w.Log(EventKind.Street, gang.Id, $"You asked around about {o.Who} and heard {about}.{(enemies ? " Somebody who can't stand them was glad to talk." : "")}");
     }
 
     private void Tail(Gang gang, TailOrder o)
@@ -134,7 +144,7 @@ public sealed partial class Simulation
         if (!TryUseHood(gang, o.HoodId, out var man)) return;
         int ward = w.Map.LotAt(o.LotId).WardId;
         var learned = Fact.None;
-        int ties = 0, secrets = 0, traits = 0;
+        int ties = 0, secrets = 0, traits = 0, grudges = 0;
         string how;
         bool sharp = w.Acquaintances.TryGetValue(o.CitizenId, out var target) && target.Traits.Contains(Trait.Sharp);
         if (w.Rng.Chance(SpottedChance(man) + (sharp ? 0.15 : 0)))
@@ -156,6 +166,8 @@ public sealed partial class Simulation
             // A week on someone's heels shows where they go when they think nobody's looking.
             secrets = w.LearnSecrets(o.CitizenId, TailOdds(man) * 0.7);
             traits = w.LearnTraits(o.CitizenId, TailOdds(man) * 0.6);
+            // And who they cross the street to avoid.
+            grudges = w.LearnGrievances(o.CitizenId, TailOdds(man) * 0.5);
             how = "followed them all week";
         }
         var fresh = w.Learn(o.CitizenId, learned, ward);
@@ -164,6 +176,7 @@ public sealed partial class Simulation
         if (ties > 0) found.Add($"saw {World.Ties(ties)}");
         if (secrets > 0) found.Add($"found out {World.Secrets(secrets)}");
         if (traits > 0) found.Add($"saw {World.Traits(traits)}");
+        if (grudges > 0) found.Add($"learned {World.BadBloodWords(grudges)}");
         string text = $"{man.Name} {how}{(found.Count == 0 ? ", and learned nothing new" : " and " + string.Join(", and ", found))}: {o.Who}.";
         w.Log(EventKind.Street, gang.Id, text);
         w.Act(new ScriptAction(ActionKind.Hire, gang.Id, man.Id, gang.HqLotId, o.LotId, -1, ActionResult.Success, text));
@@ -182,12 +195,15 @@ public sealed partial class Simulation
             var unknownTies = a.UnknownTies.ToList();
             var unknownSecrets = a.UnknownSecrets.ToList();
             var unknownTraits = a.UnknownTraits.ToList();
-            if (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0 && unknownTraits.Count == 0) continue;
+            var unknownGrudges = w.Grievances.Where(g => !g.Known && (g.Holder == Party.Resident && g.HolderId == id || g.Target == Party.Resident && g.TargetId == id)).ToList();
+            if (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0 && unknownTraits.Count == 0 && unknownGrudges.Count == 0) continue;
             double chance = Content.RumourChance + (a.WardId >= 0 && w.HoldsTurfIn(me, a.WardId) ? Content.RumourOnTurf : 0) + Informants(me, a.WardId) + a.Traits.Sum(Content.Talk);
             if (!w.Rng.Chance(chance)) continue;
             // Gossip is mostly about who's whose. Otherwise the easy things get round first.
-            // The street says what sort someone is as often as anything.
-            if (unknownTraits.Count > 0 && (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0 || w.Rng.Chance(0.25)))
+            // The street says what sort someone is as often as anything, and loves a feud.
+            if (unknownGrudges.Count > 0 && (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0 && unknownTraits.Count == 0 || w.Rng.Chance(Content.RumourGrudge)))
+                unknownGrudges[w.Rng.Range(0, unknownGrudges.Count - 1)].Known = true;
+            else if (unknownTraits.Count > 0 && (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0 || w.Rng.Chance(0.25)))
                 w.LearnTrait(id, unknownTraits[w.Rng.Range(0, unknownTraits.Count - 1)]);
             else if (unknownSecrets.Count > 0 && (unknown.Count == 0 && unknownTies.Count == 0 || w.Rng.Chance(Content.RumourSecret))) w.LearnSecret(id, unknownSecrets[w.Rng.Range(0, unknownSecrets.Count - 1)]);
             else if (unknownTies.Count > 0 && (unknown.Count == 0 || w.Rng.Chance(Content.RumourTie))) w.LearnTie(id, unknownTies[w.Rng.Range(0, unknownTies.Count - 1)]);

@@ -43,7 +43,7 @@ public partial class Main
         _overheard = null;
         if (_map.Directory is not { } d || !d.Exists(id)) return;
         var c = d.Get(id);
-        W.Introduce(id, W.Map.LotAt(c.HomeLotId).WardId, c.Ties, d.SecretsOf(id), d.CharacterOf(id));
+        W.Introduce(id, W.Map.LotAt(c.HomeLotId).WardId, c.Ties, d.SecretsOf(id), d.CharacterOf(id), c.OwnsBusinessId);
         int partner = _map.TalkingWith(id);
         if (partner < 0) return;
         var other = d.Get(partner);
@@ -73,7 +73,7 @@ public partial class Main
         var c = directory.Get(id);
         var known = KnownAbout(id);
         var home = W.Map.LotAt(c.HomeLotId);
-        W.Introduce(id, home.WardId, c.Ties, directory.SecretsOf(id), directory.CharacterOf(id));
+        W.Introduce(id, home.WardId, c.Ties, directory.SecretsOf(id), directory.CharacterOf(id), c.OwnsBusinessId);
         var (bx, by, _) = directory.Where(id);
         var seen = _map.WhereIs(id) is { } at
             ? W.Map.LotsOfBlock(bx, by).OrderBy(l => new Vector2(l.X + 0.5f, l.Y + 0.5f).DistanceSquaredTo(at)).First()
@@ -108,25 +108,26 @@ public partial class Main
             AddLabel(lines, stamp, dealt.Standing is Standing.Dead or Standing.Held or Standing.Jailed ? new Color("9a2a22") : new Color("3c6a34"), wrap: true);
         }
 
-        // Two tabs, like the dividers in a card file: the particulars, and what sort of person they are.
+        // Tabs, like the dividers in a card file: the particulars, what sort of person they are, and their grudges.
         var tabs = new HBoxContainer();
         tabs.AddThemeConstantOverride("separation", 14);
         lines.AddChild(tabs);
-        foreach (var (title, character) in new[] { ("Particulars", false), ("Character", true) })
+        foreach (var (title, which) in new[] { ("Particulars", CardTab.Particulars), ("Character", CardTab.Character), ("Grudges", CardTab.Grudges) })
         {
-            bool on = _characterTab == character;
+            bool on = _cardTab == which;
             var tab = new LinkButton { Text = title, Underline = on ? LinkButton.UnderlineMode.Always : LinkButton.UnderlineMode.OnHover, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
             tab.AddThemeColorOverride("font_color", on ? CardInk : CardFaint);
             tab.AddThemeColorOverride("font_hover_color", new Color("9a2a22"));
             tab.AddThemeFontSizeOverride("font_size", 13);
-            tab.Pressed += () => { _characterTab = character; RefreshBusiness(); };
+            tab.Pressed += () => { _cardTab = which; RefreshBusiness(); };
             tabs.AddChild(tab);
         }
-        var grid = new GridContainer { Columns = 2, Visible = !_characterTab };
+        var grid = new GridContainer { Columns = 2, Visible = _cardTab == CardTab.Particulars };
         grid.AddThemeConstantOverride("h_separation", 12);
         grid.AddThemeConstantOverride("v_separation", 3);
         lines.AddChild(grid);
-        if (_characterTab) CharacterTab(lines, id, known);
+        if (_cardTab == CardTab.Character) CharacterTab(lines, id, known);
+        if (_cardTab == CardTab.Grudges) GrudgesTab(lines, id);
         // Each line you know is a link where it leads somewhere: a place moves the map there, a person opens their card.
         void Line(string label, Fact fact, Func<string> value, Action? go = null)
         {
@@ -227,6 +228,14 @@ public partial class Main
         Act(Lean.Kidnap, () => $"Snatch them for ransom ({Money(Math.Max(50, family * Content.RansomOfWorth))})");
         Act(Lean.Kill, () => "Have them killed");
         Act(Lean.Blackmail, () => $"Blackmail them ({Money(World.HushMoney(c.Worth))} a week)");
+        int bad = W.BadBlood(W.Player, id, knownOnly: !_revealCitizens);
+        int squarePrice = Content.SquarePrice(c.Worth, bad);
+        if (bad > 0)
+        {
+            Act(Lean.Square, () => $"Pay them to square things ({Money(squarePrice)})");
+            Act(Lean.Favour, () => "Do them a good turn");
+            if (c.OwnsBusinessId >= 0) Act(Lean.GoodWord, () => $"Put in a good word for {Short(W.BusinessById(c.OwnsBusinessId).Name)}");
+        }
         if (W.KnownCrime(id) is { } crime) Act(Lean.TurnIn, () => $"Turn them in for {Content.Crime(crime)} ({Content.Penalty(Content.Offence(crime)).Least:0} to {Content.Penalty(Content.Offence(crime)).Most:0} years)");
         void Odds()
         {
@@ -234,9 +243,10 @@ public partial class Main
             foreach (var (b, lean, label) in buttons)
             {
                 string why = W.CannotLean(W.Player, id, lean) is { } no ? $" · {no}" : "";
-                double odds = Simulation.LeanChance(hood, lean, nerve, known, leverage, W.TraitOdds(id, lean, knownOnly: !_revealCitizens));
+                double odds = Simulation.LeanChance(hood, lean, nerve, known, leverage,
+                    W.TraitOdds(id, lean, knownOnly: !_revealCitizens) + W.GrudgeOdds(W.Player, id, lean, knownOnly: !_revealCitizens));
                 b.Text = $"{label()} · {(reads ? "" : "maybe ")}{odds:P0}{why}";
-                b.Disabled = why != "" || lean == Lean.Bribe && W.Player.Cash < price;
+                b.Disabled = why != "" || lean == Lean.Bribe && W.Player.Cash < price || lean == Lean.Square && W.Player.Cash < squarePrice;
             }
         }
         man.ItemSelected += _ => Odds();
@@ -244,6 +254,9 @@ public partial class Main
         if (W.HostageFrom(W.Player, id) is int held and >= 0)
             AddLabel(panel, $"You're holding their {Content.Label(W.KnownTiesOf(id).First(t => t.Id == held).Kin, directory.Get(held).Woman).ToLowerInvariant()}. They'll do as they're told.", Palette.Good, wrap: true);
         else if (leverage > 0) AddLabel(panel, "You know who their family are, which makes a threat or a shakedown likelier to work. Snatch one of them and they'll do as they're told.", Palette.InkQuiet, wrap: true);
+        if (W.HasVendetta(W.Player, id, knownOnly: !_revealCitizens))
+            AddLabel(panel, "They've sworn a vendetta against you. It will never fade, nothing will square it, and sooner or later they'll act on it.", Palette.Bad, wrap: true);
+        else if (bad > 0) AddLabel(panel, $"They're {Content.Label(Content.TierOf(bad)).ToLowerInvariant()} with you, which makes them harder to buy or scare. Paying them off eases it most and calms their family too; a good turn or a good word for their business helps, and so does a soup kitchen in your name. Let it reach a vendetta and there's no coming back.", Palette.InkQuiet, wrap: true);
         if (!reads) AddLabel(panel, $"You can't tell yet how much nerve they have, so the odds are a guess. Learn {Content.NerveFacts} things about them to know for sure.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Anything they're hiding makes a threat likelier to work, and is grounds for blackmail. A crime you know of can be handed to the police, which cools them on you. The term fits the crime and how the trial goes: money buys a deal, and reformers want examples made. A shopkeeper taken in leaves his shop shut for a while.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Knowing where they live makes a threat or a snatch likelier to work, and knowing where they work helps with everything else. A shopkeeper in your pocket takes your protection gladly and resents it less, and anyone you've bought or scared keeps the block quiet when there are witnesses.", Palette.InkQuiet, wrap: true);
@@ -280,8 +293,10 @@ public partial class Main
         }
     }
 
+    private enum CardTab { Particulars, Character, Grudges }
+
     /// <summary>Which tab of a resident's card is showing.</summary>
-    private bool _characterTab;
+    private CardTab _cardTab;
 
     /// <summary>The card's second tab: where they came from and what sort they are, as far as you know.</summary>
     private void CharacterTab(VBoxContainer lines, int id, Fact known)
@@ -305,6 +320,64 @@ public partial class Main
         bool told = _revealCitizens || a is { Standing: Standing.Bought } && a.GangId == Me && !a.UnknownTraits.Any();
         if (!told) AddLabel(lines, traits.Count == 0 ? "???" : "More, perhaps: ???", CardFaint);
         AddLabel(lines, "Asking around, tailing them, the street's gossip and dealing with them all show what sort they are.", CardFaint, 12, wrap: true);
+    }
+
+    /// <summary>The card's third tab: who they have it in for, and who has it in for them, as far as you know.</summary>
+    private void GrudgesTab(VBoxContainer lines, int id)
+    {
+        var d = _map.Directory!;
+        bool Shown(Grievance g) => _revealCitizens || g.Known;
+        var held = W.HeldBy(Party.Resident, id).Where(Shown).OrderByDescending(g => g.Amount).ToList();
+        var against = W.HeldAgainst(Party.Resident, id).Where(Shown).OrderByDescending(g => g.Amount).ToList();
+        string Over(Grievance g) => Content.Over(g, g.AboutId >= 0 && d.Exists(g.AboutId) ? d.Get(g.AboutId).Woman : null);
+        string Resident(int other) => !d.Exists(other) ? "someone" : KnownAbout(other).HasFlag(Fact.Name) || _revealCitizens ? d.Get(other).Name : "someone you don't know";
+        Color Heat(int amount) => amount >= Content.BeefingAt ? new Color("9a2a22") : amount >= Content.ScowlingAt ? new Color("7a3a2a") : CardInk;
+        void Reason(string text) => AddLabel(lines, text, CardInk, 13, wrap: true);
+
+        AddLabel(lines, "Holds a grudge against", CardFaint, 13);
+        foreach (var g in held)
+        {
+            string words = Content.GrudgeWords(g.Amount);
+            switch (g.Target)
+            {
+                case Party.Gang:
+                    AddLabel(lines, $"{words} {(g.TargetId == Me ? "you" : W.GangById(g.TargetId).Name)}", Heat(g.Amount), 15, wrap: true);
+                    break;
+                case Party.Hood:
+                    var hood = W.Hoods.FirstOrDefault(x => x.Id == g.TargetId);
+                    AddLabel(lines, $"{words} {(hood == null ? "a gangster" : hood.Name + (hood.GangId == Me ? ", one of yours" : ""))}", Heat(g.Amount), 15, wrap: true);
+                    break;
+                default:
+                    // Someone you can go and look at.
+                    var row = new HBoxContainer();
+                    lines.AddChild(row);
+                    var label = AddLabel(row, words, Heat(g.Amount), 15);
+                    label.AutowrapMode = TextServer.AutowrapMode.Off;
+                    label.CustomMinimumSize = Vector2.Zero;
+                    int other = g.TargetId;
+                    var cop = g.Target == Party.Cop ? W.PersonById(other) : null;
+                    if (cop != null) CardLink(row, cop.Name, () => _map.PanTo(W.Map.LotAt(cop.LotId)));
+                    else if (g.Target == Party.Cop) AddLabel(row, "a cop", Heat(g.Amount), 15);
+                    else CardLink(row, Resident(other), () => OpenCard(other));
+                    break;
+            }
+            string they = g.Target switch { Party.Gang when g.TargetId == Me => "You", Party.Cop or Party.Hood => "He", _ => "They" };
+            Reason($"{they} {Over(g)}.");
+        }
+        if (held.Count == 0) AddLabel(lines, _revealCitizens ? "Nobody" : "Nobody you know of", CardInk);
+        lines.AddChild(new ColorRect { Color = CardRule, CustomMinimumSize = new Vector2(0, 1) });
+        AddLabel(lines, "Who has it in for them", CardFaint, 13);
+        foreach (var g in against)
+        {
+            var row = new HFlowContainer();
+            lines.AddChild(row);
+            int holder = g.HolderId;
+            CardLink(row, Resident(holder), () => OpenCard(holder));
+            AddLabel(row, Content.GrudgeWords(g.Amount).ToLowerInvariant() + " them", Heat(g.Amount), 14);
+            Reason($"They {Over(g)}.");
+        }
+        if (against.Count == 0) AddLabel(lines, _revealCitizens ? "Nobody" : "Nobody you know of", CardInk);
+        AddLabel(lines, "Grudges run from prickly to sore, scowling, beefing and, at the worst, a vendetta, which never fades and can't be squared. Someone with it in for you is harder to buy or scare and quicker to come forward as a witness; once they're beefing they go to the police or the papers, or put a brick through a window. Money, a good turn, a good word for their business or a soup kitchen in your name all ease a grudge before it gets that far. Someone who hates a neighbour is glad to talk about them.", CardFaint, 12, wrap: true);
     }
 
     /// <summary>A link on a card, in the card's ink, turning red under the pointer.</summary>
