@@ -114,13 +114,12 @@ public sealed partial class Simulation
         if (heard == Fact.None && unknown.Count > 0) heard = unknown[0];
         var fresh = w.Learn(o.CitizenId, heard, ward);
         int ties = w.LearnTies(o.CitizenId, Content.AskTie + bonus);
-        string about = (fresh, ties) switch
-        {
-            (Fact.None, 0) => "nothing new",
-            (Fact.None, _) => $"about {World.Ties(ties)}",
-            (_, 0) => $"their {World.Describe(fresh)}",
-            _ => $"their {World.Describe(fresh)}, and about {World.Ties(ties)}",
-        };
+        int secrets = w.LearnSecrets(o.CitizenId, Content.AskSecret + bonus);
+        var heardOf = new List<string>();
+        if (fresh != Fact.None) heardOf.Add($"their {World.Describe(fresh)}");
+        if (ties > 0) heardOf.Add($"about {World.Ties(ties)}");
+        if (secrets > 0) heardOf.Add(World.Secrets(secrets));
+        string about = heardOf.Count == 0 ? "nothing new" : string.Join(", and ", heardOf);
         w.Log(EventKind.Street, gang.Id, $"You asked around about {o.Who} and heard {about}.");
     }
 
@@ -130,7 +129,7 @@ public sealed partial class Simulation
         if (!TryUseHood(gang, o.HoodId, out var man)) return;
         int ward = w.Map.LotAt(o.LotId).WardId;
         var learned = Fact.None;
-        int ties = 0;
+        int ties = 0, secrets = 0;
         string how;
         if (w.Rng.Chance(SpottedChance(man)))
         {
@@ -148,10 +147,16 @@ public sealed partial class Simulation
             // He sees who they work for, and who comes and goes at home.
             w.Meet(o.CitizenId, ward);
             ties = w.LearnTies(o.CitizenId, 1, family: false) + w.LearnTies(o.CitizenId, TailOdds(man), work: false);
+            // A week on someone's heels shows where they go when they think nobody's looking.
+            secrets = w.LearnSecrets(o.CitizenId, TailOdds(man) * 0.7);
             how = "followed them all week";
         }
         var fresh = w.Learn(o.CitizenId, learned, ward);
-        string text = $"{man.Name} {how}{(fresh == Fact.None && ties == 0 ? ", and learned nothing new" : fresh == Fact.None ? $" and saw {World.Ties(ties)}" : $" and learned their {World.Describe(fresh)}{(ties > 0 ? $", and saw {World.Ties(ties)}" : "")}")}: {o.Who}.";
+        var found = new List<string>();
+        if (fresh != Fact.None) found.Add($"learned their {World.Describe(fresh)}");
+        if (ties > 0) found.Add($"saw {World.Ties(ties)}");
+        if (secrets > 0) found.Add($"found out {World.Secrets(secrets)}");
+        string text = $"{man.Name} {how}{(found.Count == 0 ? ", and learned nothing new" : " and " + string.Join(", and ", found))}: {o.Who}.";
         w.Log(EventKind.Street, gang.Id, text);
         w.Act(new ScriptAction(ActionKind.Hire, gang.Id, man.Id, gang.HqLotId, o.LotId, -1, ActionResult.Success, text));
     }
@@ -167,11 +172,13 @@ public sealed partial class Simulation
         {
             var unknown = Content.Facts.Where(f => !a.Known.HasFlag(f)).ToList();
             var unknownTies = a.UnknownTies.ToList();
-            if (unknown.Count == 0 && unknownTies.Count == 0) continue;
+            var unknownSecrets = a.UnknownSecrets.ToList();
+            if (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0) continue;
             double chance = Content.RumourChance + (a.WardId >= 0 && w.HoldsTurfIn(me, a.WardId) ? Content.RumourOnTurf : 0) + Informants(me, a.WardId);
             if (!w.Rng.Chance(chance)) continue;
             // Gossip is mostly about who's whose. Otherwise the easy things get round first.
-            if (unknownTies.Count > 0 && (unknown.Count == 0 || w.Rng.Chance(Content.RumourTie))) w.LearnTie(id, unknownTies[w.Rng.Range(0, unknownTies.Count - 1)]);
+            if (unknownSecrets.Count > 0 && (unknown.Count == 0 && unknownTies.Count == 0 || w.Rng.Chance(Content.RumourSecret))) w.LearnSecret(id, unknownSecrets[w.Rng.Range(0, unknownSecrets.Count - 1)]);
+            else if (unknownTies.Count > 0 && (unknown.Count == 0 || w.Rng.Chance(Content.RumourTie))) w.LearnTie(id, unknownTies[w.Rng.Range(0, unknownTies.Count - 1)]);
             else a.Known |= unknown[w.Rng.Chance(0.6) ? 0 : w.Rng.Range(0, unknown.Count - 1)];
             heard++;
         }

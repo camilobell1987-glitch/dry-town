@@ -1319,6 +1319,9 @@ public partial class Main : Control
                 "landlord" => W.Map.Lots.OrderBy(l => W.Map.Distance(hq, l)).Select(l => directory.LandlordOf(l.Id)).First(i => i >= 0),
                 "walking" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
                     .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n)).First(i => _map.WhereIs(i) != null),
+                "secret" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
+                    .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n))
+                    .OrderByDescending(i => directory.SecretsOf(i).Count(s => s.Vice == Vice.Lover) * 2 + directory.SecretsOf(i).Count).First(),
                 _ => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, 0),
             };
             _map.Select(citizen: pick);

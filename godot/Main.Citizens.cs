@@ -43,7 +43,7 @@ public partial class Main
         _overheard = null;
         if (_map.Directory is not { } d || !d.Exists(id)) return;
         var c = d.Get(id);
-        W.Introduce(id, W.Map.LotAt(c.HomeLotId).WardId, c.Ties);
+        W.Introduce(id, W.Map.LotAt(c.HomeLotId).WardId, c.Ties, d.SecretsOf(id));
         int partner = _map.TalkingWith(id);
         if (partner < 0) return;
         var other = d.Get(partner);
@@ -73,7 +73,7 @@ public partial class Main
         var c = directory.Get(id);
         var known = KnownAbout(id);
         var home = W.Map.LotAt(c.HomeLotId);
-        W.Introduce(id, home.WardId, c.Ties);
+        W.Introduce(id, home.WardId, c.Ties, directory.SecretsOf(id));
         var (bx, by, _) = directory.Where(id);
         var seen = _map.WhereIs(id) is { } at
             ? W.Map.LotsOfBlock(bx, by).OrderBy(l => new Vector2(l.X + 0.5f, l.Y + 0.5f).DistanceSquaredTo(at)).First()
@@ -101,10 +101,11 @@ public partial class Main
             {
                 Standing.Bought => dealt.GangId == Me ? "On your payroll" : "On someone's payroll",
                 Standing.Scared => dealt.GangId == Me ? "Scared of you" : "Scared",
-                Standing.Held => dealt.Note,
+                Standing.Held or Standing.Jailed => dealt.Note,
+                Standing.Blackmailed => dealt.GangId == Me ? $"Paying you ${World.HushMoney(dealt.Worth)} a week to keep quiet" : "Being blackmailed",
                 _ => $"Dead. {dealt.Note}",
             };
-            AddLabel(lines, stamp, dealt.Standing is Standing.Dead or Standing.Held ? new Color("9a2a22") : new Color("3c6a34"), wrap: true);
+            AddLabel(lines, stamp, dealt.Standing is Standing.Dead or Standing.Held or Standing.Jailed ? new Color("9a2a22") : new Color("3c6a34"), wrap: true);
         }
 
         var grid = new GridContainer { Columns = 2 };
@@ -130,6 +131,7 @@ public partial class Main
             : c.Owns.Count > 0 ? $"{(c.Owns.Count == 1 ? "A tenement" : $"{c.Owns.Count} tenements")}: {string.Join("; ", c.Owns.Select(l => Address(W.Map.LotAt(l))))}"
             : "Nothing to speak of");
         Family(grid, id, c, known);
+        Secrets(grid, id, c);
 
         if (_map.WhereIs(id) == null) AddLabel(panel, "Indoors just now.", Palette.InkQuiet);
         else AddLabel(panel, $"Seen on {W.Map.StreetOf(seen)} St in {W.Wards.ElementAtOrDefault(seen.WardId)?.Name ?? "the district"}.", Palette.InkQuiet, wrap: true);
@@ -158,7 +160,7 @@ public partial class Main
         }
         var hoods = FreeHoods().ToList();
         if (hoods.Count == 0) { AddLabel(panel, "All your men are busy, so nobody can go to them.", Palette.InkQuiet, wrap: true); return; }
-        if (standing?.Standing == Standing.Held) return;
+        if (standing?.Standing is Standing.Held or Standing.Jailed) return;
         bool tailing = AlreadyGiven(o => o is TailOrder t && t.CitizenId == id), leaning = AlreadyGiven(o => o is LeanOrder l && l.CitizenId == id);
         if (tailing || leaning) return;
 
@@ -191,6 +193,8 @@ public partial class Main
         Act(Lean.Extort, () => $"Shake them down (about {Money(Math.Max(5, c.Worth * Content.ShakedownOfWorth))})");
         Act(Lean.Kidnap, () => $"Snatch them for ransom ({Money(Math.Max(50, family * Content.RansomOfWorth))})");
         Act(Lean.Kill, () => "Have them killed");
+        Act(Lean.Blackmail, () => $"Blackmail them ({Money(World.HushMoney(c.Worth))} a week)");
+        if (W.KnownCrime(id) is { } crime) Act(Lean.TurnIn, () => $"Turn them in for {Content.Crime(crime)}");
         void Odds()
         {
             var hood = W.HoodById(man.GetSelectedId());
@@ -208,6 +212,7 @@ public partial class Main
             AddLabel(panel, $"You're holding their {Content.Label(W.KnownTiesOf(id).First(t => t.Id == held).Kin, directory.Get(held).Woman).ToLowerInvariant()}. They'll do as they're told.", Palette.Good, wrap: true);
         else if (leverage > 0) AddLabel(panel, "You know who their family are, which makes a threat or a shakedown likelier to work. Snatch one of them and they'll do as they're told.", Palette.InkQuiet, wrap: true);
         if (!reads) AddLabel(panel, $"You can't tell yet how much nerve they have, so the odds are a guess. Learn {Content.NerveFacts} things about them to know for sure.", Palette.InkQuiet, wrap: true);
+        AddLabel(panel, "Anything they're hiding makes a threat likelier to work, and is grounds for blackmail. A crime you know of can be handed to the police, which cools them on you; a shopkeeper taken in leaves his shop shut.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "Knowing where they live makes a threat or a snatch likelier to work, and knowing where they work helps with everything else. A shopkeeper in your pocket takes your protection gladly and resents it less, and anyone you've bought or scared keeps the block quiet when there are witnesses.", Palette.InkQuiet, wrap: true);
         AddLabel(panel, "A bribed man tells you what he hears, and so does a frightened one for a while. Shaking someone down pays now; a snatch pays if the family comes up with the money. Every one but a bribe brings heat, and anyone can be seen doing it. A killing makes you feared and the neighbourhood talks of murder.", Palette.InkQuiet, wrap: true);
     }
@@ -251,6 +256,47 @@ public partial class Main
             AddLabel(grid, "???", CardFaint);
         }
     }
+
+    /// <summary>A line on the card for each thing you've found out that they're hiding.</summary>
+    private void Secrets(GridContainer grid, int id, Citizen c)
+    {
+        var d = _map.Directory!;
+        var secrets = _revealCitizens ? d.SecretsOf(id).ToList() : W.KnownSecretsOf(id).ToList();
+        foreach (var s in secrets)
+        {
+            AddLabel(grid, Content.Label(s.Vice), new Color("9a2a22"));
+            AddLabel(grid, SecretText(s, c), CardInk, wrap: true).SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        }
+        if (_revealCitizens && secrets.Count == 0)
+        {
+            AddLabel(grid, "Secrets", CardFaint);
+            AddLabel(grid, "Clean as a whistle", CardInk);
+        }
+        else if (!_revealCitizens)
+        {
+            AddLabel(grid, secrets.Count == 0 ? "Secrets" : "Others", CardFaint);
+            AddLabel(grid, "???", CardFaint);
+        }
+    }
+
+    /// <summary>A secret in a few words, naming whoever and wherever you know of.</summary>
+    private string SecretText(Secret s, Citizen c)
+    {
+        var d = _map.Directory!;
+        string Place() => s.Other >= 0 ? Short(W.BusinessById(s.Other).Name) : "a place nearby";
+        bool married = c.Ties.Any(t => t.Kin == Kin.Spouse);
+        return s.Vice switch
+        {
+            Vice.Lover => $"Seeing {(s.Other >= 0 && KnownAbout(s.Other).HasFlag(Fact.Name) ? d.Get(s.Other).Name : "someone on the block")} on the quiet{(married ? $", behind their {(c.Woman ? "husband's" : "wife's")} back" : "")}",
+            Vice.Drink => $"Drinks in the back room at {Place()}",
+            Vice.Gambling => $"Loses more than they earn at cards at {Place()}",
+            Vice.Debt => "Owes a loan shark more than they can pay",
+            Vice.Thief => s.Other >= 0 ? $"Has a hand in the till at {Place()}" : "Fences stolen goods",
+            _ => $"Wanted for {Content.Crime(s)}",
+        };
+    }
+
+    private static string Short(string name) => name.IndexOf(", ", StringComparison.Ordinal) is int comma and > 0 ? name[..comma] : name;
 
     /// <summary>The people you know something about, so you can find their cards again.</summary>
     private void Acquaintances(VBoxContainer panel)
