@@ -112,24 +112,42 @@ public partial class Main
         grid.AddThemeConstantOverride("h_separation", 12);
         grid.AddThemeConstantOverride("v_separation", 3);
         lines.AddChild(grid);
-        void Line(string label, Fact fact, Func<string> value)
+        // Each line you know is a link where it leads somewhere: a place moves the map there, a person opens their card.
+        void Line(string label, Fact fact, Func<string> value, Action? go = null)
         {
             AddLabel(grid, label, CardFaint);
             bool have = known.HasFlag(fact);
+            if (have && go != null) { CardLink(grid, value(), go); return; }
             var text = AddLabel(grid, have ? value() : "???", have ? CardInk : CardFaint, wrap: true);
             text.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         }
+        Action ToBusiness(int biz) => () => _map.PanTo(W.LotOf(W.BusinessById(biz)));
         Line("Age", Fact.Age, () => c.Age.ToString());
         Line("People", Fact.Origin, () => Content.Label(c.Origin));
         Line("Job", Fact.Job, () => c.Job);
         Line("Works at", Fact.Work, () => c.WorkBusinessId >= 0 ? W.BusinessById(c.WorkBusinessId).Name
-            : c.OwnsBusinessId >= 0 ? "Runs the place" : "Nowhere in particular");
-        Line("Lives at", Fact.Home, () => Address(home));
-        Line("Landlord", Fact.Landlord, () => c.LandlordId >= 0 && c.LandlordId != c.Id ? directory.Get(c.LandlordId).Name
-            : c.LandlordId == c.Id || c.OwnsBusinessId >= 0 && W.LotOf(W.BusinessById(c.OwnsBusinessId)).Id == c.HomeLotId ? "Owns the building" : "None");
-        Line("Owns", Fact.Owns, () => c.OwnsBusinessId >= 0 ? W.BusinessById(c.OwnsBusinessId).Name
-            : c.Owns.Count > 0 ? $"{(c.Owns.Count == 1 ? "A tenement" : $"{c.Owns.Count} tenements")}: {string.Join("; ", c.Owns.Select(l => Address(W.Map.LotAt(l))))}"
-            : "Nothing to speak of");
+            : c.OwnsBusinessId >= 0 ? "Runs the place" : "Nowhere in particular",
+            c.WorkBusinessId >= 0 ? ToBusiness(c.WorkBusinessId) : c.OwnsBusinessId >= 0 ? ToBusiness(c.OwnsBusinessId) : null);
+        Line("Lives at", Fact.Home, () => Address(home), () => _map.PanTo(home));
+        bool rents = c.LandlordId >= 0 && c.LandlordId != c.Id;
+        Line("Landlord", Fact.Landlord, () => rents ? directory.Get(c.LandlordId).Name
+            : c.LandlordId == c.Id || c.OwnsBusinessId >= 0 && W.LotOf(W.BusinessById(c.OwnsBusinessId)).Id == c.HomeLotId ? "Owns the building" : "None",
+            rents ? () => OpenCard(c.LandlordId) : null);
+        if (c.Owns.Count > 0 && known.HasFlag(Fact.Owns))
+        {
+            // A landlord's buildings, one link each.
+            AddLabel(grid, "Owns", CardFaint);
+            var flow = new HFlowContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+            flow.AddThemeConstantOverride("h_separation", 8);
+            grid.AddChild(flow);
+            foreach (int building in c.Owns)
+            {
+                var lot = W.Map.LotAt(building);
+                CardLink(flow, Address(lot), () => _map.PanTo(lot));
+            }
+        }
+        else Line("Owns", Fact.Owns, () => c.OwnsBusinessId >= 0 ? W.BusinessById(c.OwnsBusinessId).Name : "Nothing to speak of",
+            c.OwnsBusinessId >= 0 ? ToBusiness(c.OwnsBusinessId) : null);
         Family(grid, id, c, known);
         Secrets(grid, id, c);
 
@@ -232,18 +250,8 @@ public partial class Main
             string surname = them.Name[(them.Name.IndexOf(' ') + 1)..];
             string name = KnownAbout(tie.Id).HasFlag(Fact.Name) ? them.Name
                 : tie.Kin != Kin.Employer && known.HasFlag(Fact.Name) && c.Name.EndsWith(surname) ? $"??? {surname}" : "Name unknown";
-            var link = new LinkButton { Text = name, Underline = LinkButton.UnderlineMode.OnHover };
-            link.AddThemeColorOverride("font_color", CardInk);
-            link.AddThemeColorOverride("font_hover_color", new Color("9a2a22"));
-            link.AddThemeFontSizeOverride("font_size", 14);
             int other = tie.Id;
-            link.Pressed += () =>
-            {
-                _map.Select(citizen: other);
-                _overheard = null;
-                RefreshBusiness();
-            };
-            grid.AddChild(link);
+            CardLink(grid, name, () => OpenCard(other));
         }
         if (told && ties.Count == 0)
         {
@@ -257,6 +265,32 @@ public partial class Main
         }
     }
 
+    /// <summary>A link on a card, in the card's ink, turning red under the pointer.</summary>
+    private static LinkButton CardLink(Container parent, string text, Action go)
+    {
+        var link = new LinkButton { Text = text, Underline = LinkButton.UnderlineMode.Always, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
+        link.AddThemeColorOverride("font_color", CardInk);
+        link.AddThemeColorOverride("font_hover_color", new Color("9a2a22"));
+        link.AddThemeColorOverride("font_pressed_color", new Color("9a2a22"));
+        link.AddThemeFontSizeOverride("font_size", 14);
+        link.Pressed += go;
+        parent.AddChild(link);
+        return link;
+    }
+
+    /// <summary>Open someone's card and bring the map to where they are, or to their home if they're indoors.</summary>
+    private void OpenCard(int citizen)
+    {
+        if (_map.Directory is not { } d || !d.Exists(citizen)) return;
+        _map.Select(citizen: citizen);
+        _overheard = null;
+        RefreshBusiness();
+        // Out on the street the ring round them marks them; indoors, their front door is marked.
+        if (_map.WhereIs(citizen) is { } at)
+            _map.PanTo(W.Map.LotsOfBlock(d.Where(citizen).Bx, d.Where(citizen).By).OrderBy(l => new Vector2(l.X + 0.5f, l.Y + 0.5f).DistanceSquaredTo(at)).First(), mark: false);
+        else _map.PanTo(W.Map.LotAt(d.Get(citizen).HomeLotId));
+    }
+
     /// <summary>A line on the card for each thing you've found out that they're hiding.</summary>
     private void Secrets(GridContainer grid, int id, Citizen c)
     {
@@ -265,7 +299,15 @@ public partial class Main
         foreach (var s in secrets)
         {
             AddLabel(grid, Content.Label(s.Vice), new Color("9a2a22"));
-            AddLabel(grid, SecretText(s, c), CardInk, wrap: true).SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            var secret = s;
+            Action? go = s.Vice switch
+            {
+                Vice.Lover when s.Other >= 0 => () => OpenCard(secret.Other),
+                Vice.Drink or Vice.Gambling or Vice.Thief when s.Other >= 0 => () => _map.PanTo(W.LotOf(W.BusinessById(secret.Other))),
+                _ => null,
+            };
+            if (go != null) CardLink(grid, SecretText(s, c), go);
+            else AddLabel(grid, SecretText(s, c), CardInk, wrap: true).SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         }
         if (_revealCitizens && secrets.Count == 0)
         {
@@ -312,13 +354,7 @@ public partial class Main
             var c = d.Get(id);
             string name = a.Known.HasFlag(Fact.Name) ? c.Name : "Name unknown";
             string job = a.Known.HasFlag(Fact.Job) ? $", {c.Job.ToLowerInvariant()[0]}{c.Job[1..]}" : "";
-            AddButton(panel, $"{name}{job}", () =>
-            {
-                _map.Select(citizen: id);
-                _map.ResetView(W.Map.LotAt(c.HomeLotId));
-                _overheard = null;
-                RefreshBusiness();
-            });
+            AddButton(panel, $"{name}{job}", () => OpenCard(id));
         }
     }
 
