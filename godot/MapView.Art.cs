@@ -433,6 +433,7 @@ public partial class MapView
             {
                 P(fx0, fy0), P(fx1, fy0), P(fx1 + dx, fy0 + dy), P(fx1 + dx, fy1 + dy), P(fx0 + dx, fy1 + dy), P(fx0, fy1),
             }, Shadow with { A = Fine ? 0.24f : Shadow.A });
+            if (Fine) DrawContactShadow(fx0, fy0, fx1, fy1);
         }
         if (Fine) DressStreet(bx, by);
     }

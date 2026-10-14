@@ -484,6 +484,7 @@ public partial class MapView : Control
     {
         foreach (var rid in _items) RenderingServer.FreeRid(rid);
         _items.Clear();
+        _grade = null;
         _builtFor = null;
     }
 
@@ -528,6 +529,7 @@ public partial class MapView : Control
         _lampGlow = NewPen(_world);
         _frameGlow = NewPen(_world);
         _marks = NewPen(_world);
+        DressForRealism();
         _screen = NewPen(GetCanvasItem());
 
         _signature = new long[map.Lots.Count];
@@ -702,6 +704,7 @@ public partial class MapView : Control
         DrawHeadquartersSigns(font, view);
         DrawCornerSigns(font, view);
         DrawWards(font);
+        DrawGrade();
         foreach (var pen in _dyn) pen.Flush();
         _frameGlow.Flush();
         _marks.Flush();

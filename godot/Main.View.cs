@@ -4,7 +4,7 @@ using Godot;
 public partial class Main
 {
     private const string ViewSettingsPath = "user://settings.cfg";
-    private const int AngledMenuId = 30;
+    private const int AngledMenuId = 30, FilmMenuId = 31;
 
     private void LoadView()
     {
@@ -12,6 +12,17 @@ public partial class Main
         bool angled = config.Load(ViewSettingsPath) == Error.Ok && (bool)config.GetValue("view", "angled", false);
         if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--angled") >= 0) angled = true;
         _map.Angled = angled;
+        _map.FilmLook = config.GetValue("view", "film", true).AsBool();
+        if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-film") >= 0) _map.FilmLook = false;
+    }
+
+    private void SetFilmLook(bool on)
+    {
+        _map.FilmLook = on;
+        var config = new ConfigFile();
+        config.Load(ViewSettingsPath);
+        config.SetValue("view", "film", on);
+        config.Save(ViewSettingsPath);
     }
 
     private void SetAngled(bool angled)
