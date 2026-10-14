@@ -151,26 +151,30 @@ public partial class MapView
             if (!view.HasPoint(new Vector2(lot.X, lot.Y))) continue;
             float h = HeightCached(lot);
             var (x0, y0, x1, y1) = Footprint(lot);
+            // In a row of shops, only the one that burned.
+            if (lot.Shops.Count > 1) (x0, x1) = UnitSpan(lot, lot.Shops.IndexOf(b.Id), lot.Shops.Count);
+            float mid = (x0 + x1) / 2;
+            int flames = Mathf.Clamp(Mathf.RoundToInt((x1 - x0) / 0.17f), 2, 5);
             C = DynAt(lot.Y + 0.95f);
             bool burning = _burntNow.Contains(b.Id) || b.BurnedWeek == w.Week - 1;
             if (burning)
             {
-                for (int k = 0; k < 5; k++)
+                for (int k = 0; k < flames; k++)
                 {
-                    float x = x0 + 0.12f + k * (x1 - x0 - 0.24f) / 4;
+                    float x = flames == 5 ? x0 + 0.12f + k * (x1 - x0 - 0.24f) / 4 : x0 + (x1 - x0) * (k + 0.5f) / flames;
                     float flick = 0.7f + 0.3f * Mathf.Sin(_anim * (9 + k) + k * 1.7f);
                     var base0 = Q(x, (y0 + y1) / 2, h);
                     float fw = 0.09f * _t, fh = (0.22f + 0.12f * Hash(b.Id, k)) * flick * _t;
                     C.DrawColoredPolygon(new[] { base0 + new Vector2(-fw, 0), base0 + new Vector2(0, -fh), base0 + new Vector2(fw, 0) }, new Color("e8601c") with { A = 0.9f });
                     C.DrawColoredPolygon(new[] { base0 + new Vector2(-fw * 0.5f, 0), base0 + new Vector2(0, -fh * 0.6f), base0 + new Vector2(fw * 0.5f, 0) }, new Color("ffd25a"));
                 }
-                Glow(Q(lot.X + 0.5f, (y0 + y1) / 2, h), _t * 0.9f, new Color("ff8a3a"), 0.7f);
+                Glow(Q(mid, (y0 + y1) / 2, h), _t * 0.9f, new Color("ff8a3a"), 0.7f);
             }
             if (!Fine) continue;
             for (int k = 0; k < 4; k++)
             {
                 float phase = (_anim * 0.25f + k / 4f + Hash(b.Id, 720)) % 1;
-                var at = Q(lot.X + 0.5f, (y0 + y1) / 2, h + 0.1f) + new Vector2(phase * 0.4f, -phase * 1.1f) * _t;
+                var at = Q(mid, (y0 + y1) / 2, h + 0.1f) + new Vector2(phase * 0.4f, -phase * 1.1f) * _t;
                 C.DrawCircle(at, (0.06f + 0.16f * phase) * _t, new Color(burning ? "4a4440" : "7a7670") with { A = 0.5f * (1 - phase) });
             }
         }

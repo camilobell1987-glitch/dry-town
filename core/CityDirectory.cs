@@ -73,7 +73,8 @@ public sealed partial class CityDirectory
             var lot = w.LotOf(biz);
             if (!_businessesInWard.TryGetValue(lot.WardId, out var list)) _businessesInWard[lot.WardId] = list = new();
             list.Add(biz.Id);
-            if (FirstResidentOf(lot) is int owner and >= 0 && !_businessOfOwner.ContainsKey(owner))
+            // Each shop in a row is kept by a different family living over it.
+            if (HeadOf(lot, w.UnitOf(biz).Unit) is int owner and >= 0 && !_businessOfOwner.ContainsKey(owner))
             {
                 _ownerOf[biz.Id] = owner;
                 _businessOfOwner[owner] = biz.Id;
@@ -331,12 +332,18 @@ public sealed partial class CityDirectory
         return _homes[block].Length > 0 ? _homes[block][^1].LotId : -1;
     }
 
-    private int FirstResidentOf(Lot lot)
+    /// <summary>The head of the k-th household living in a building, or -1 if there aren't that many.</summary>
+    private int HeadOf(Lot lot, int k = 0)
     {
         int b = BlockOf(lot), n = 0;
         foreach (var (id, people) in _homes[b])
         {
-            if (id == lot.Id) return b * PerBlock + n;
+            if (id == lot.Id)
+            {
+                int at = n;
+                for (int i = 0; i < k && at < n + people; i++) at += HouseholdAt(b, at).Size;
+                return at < n + people ? b * PerBlock + at : -1;
+            }
             n += people;
         }
         return -1;
@@ -365,6 +372,8 @@ public sealed partial class CityDirectory
         BusinessKind.PoolHall => "Rack boy",
         BusinessKind.Warehouse => "Loader",
         BusinessKind.Laundry => "Presser",
+        BusinessKind.Hardware => "Hardware clerk",
+        BusinessKind.Haberdasher => "Salesman",
         _ => "Clerk",
     };
 

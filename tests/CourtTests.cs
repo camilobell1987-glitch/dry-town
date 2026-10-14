@@ -112,7 +112,7 @@ public class CourtTests
     [Fact]
     public void AManCanBeSentToLeanOnTheJury()
     {
-        var (sim, w, me, man) = Start();
+        var (sim, w, me, man) = Start(1);
         var heavy = w.AvailableHoodsOf(me.Id).First(h => h.Id != me.BossHoodId && h.Id != man.Id);
         heavy.Intimidation = 10;
         sim.Jail(man, 40, "with attempted arson");

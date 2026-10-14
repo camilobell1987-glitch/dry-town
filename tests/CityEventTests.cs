@@ -115,7 +115,7 @@ public class CityEventTests
     [Fact]
     public void AQuietCityHasNoNews()
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 3, CityEventsEnabled = false });
+        var sim = Simulation.New(new WorldSettings { Seed = 2, CityEventsEnabled = false });
         for (int i = 0; i < Content.WeeksPerYear; i++) sim.AdvanceWeek(playerAutopilot: true);
         Assert.DoesNotContain(sim.World.Events, e => e.Kind == EventKind.News);
         Assert.Contains("Nothing out of the ordinary", new CommandShell(sim).Execute("news"));

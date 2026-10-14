@@ -103,6 +103,14 @@ Rival outfits do all of this too. They hire good drifters, buy their own stories
 ![A drifter looking for work](docs/screenshots/street.png)
 ![Hold-up at the bank](docs/screenshots/bank-job.png)
 
+## Shop rows
+
+Small shops often share a building: two or three side by side along the ground floor, a barber, a hardware store and a haberdashery under one roof with flats above. Each has its own door, window and awning and its own sign on the roof, and each is a business of its own. You lean on them one at a time, an outfit can protect one and not its neighbour, and a fire or a police padlock shuts only the shop it hits. Click or hover over a shop in a row to pick out that one; its panel names the shops next door, and each is kept by a different family living upstairs. Hotels, warehouses, motor garages and the tenement courts always have a building to themselves, and so do about half the small shops, a grocer or a hardware store taking the whole front. Every trade is somewhere in every city.
+
+Two trades come with the rows. A **hardware store** takes $130 to $240 a week and can hide a numbers game, a loan book or a still in the back; its clerks are Teamsters. A **haberdashery** takes $100 to $190 and suits a bookie or a loan shark, and its salesmen belong to the Laundry Workers' local with the tailors.
+
+![A row of three shops, one of them burnt out](docs/screenshots/shop-row.png)
+
 ## Guns and cars
 
 Every other ward has a sporting-goods store with rifles on its sign, and every fourth a motor dealer with cars on the forecourt and pennants strung over them. Click one and the **Selected** tab sells to whichever of your men you pick. You can also click a man's card on the rolodex and press **Find a gun shop** or **Find a car dealer**. Whatever he has already is traded in for half what it cost.

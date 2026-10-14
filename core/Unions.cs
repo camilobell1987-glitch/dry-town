@@ -7,9 +7,9 @@ public static partial class Content
     public static readonly (string Name, BusinessKind[] Trades, int Toughness, int DuesPerShop)[] Locals =
     {
         ("the Longshoremen's Local 791", new[] { BusinessKind.Warehouse }, 7, 10),
-        ("Teamsters Local 710", new[] { BusinessKind.Garage, BusinessKind.Grocer, BusinessKind.Pharmacy }, 6, 4),
+        ("Teamsters Local 710", new[] { BusinessKind.Garage, BusinessKind.Grocer, BusinessKind.Pharmacy, BusinessKind.Hardware }, 6, 4),
         ("the Hotel and Restaurant Workers' Local 6", new[] { BusinessKind.Hotel, BusinessKind.Diner }, 5, 5),
-        ("the Laundry Workers' Local 3", new[] { BusinessKind.Laundry, BusinessKind.Tailor }, 4, 4),
+        ("the Laundry Workers' Local 3", new[] { BusinessKind.Laundry, BusinessKind.Tailor, BusinessKind.Haberdasher }, 4, 4),
         ("the Barbers' and Pool Room Local 21", new[] { BusinessKind.Barber, BusinessKind.PoolHall }, 4, 4),
     };
 
@@ -26,6 +26,7 @@ public static partial class Content
     {
         BusinessKind.Pharmacy => "pharmacies",
         BusinessKind.Laundry => "laundries",
+        BusinessKind.Haberdasher => "haberdasheries",
         _ => Label(kind).ToLowerInvariant() + "s",
     };
 

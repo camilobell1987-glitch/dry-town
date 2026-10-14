@@ -141,10 +141,19 @@ public static partial class Content
         BusinessKind.Garage or BusinessKind.Laundry => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.Counterfeit },
         BusinessKind.Barber => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Bookie, RacketKind.Slots },
         BusinessKind.Grocer or BusinessKind.Pharmacy => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Slots },
-        BusinessKind.Tailor => new[] { RacketKind.LoanShark, RacketKind.Bookie },
+        BusinessKind.Tailor or BusinessKind.Haberdasher => new[] { RacketKind.LoanShark, RacketKind.Bookie },
+        BusinessKind.Hardware => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Still },
         BusinessKind.Court => new[] { RacketKind.Speakeasy, RacketKind.Still, RacketKind.Numbers, RacketKind.GamblingDen, RacketKind.LoanShark },
         _ => new[] { RacketKind.LoanShark, RacketKind.Slots },
     };
+
+    /// <summary>The small shops that can share a building's ground floor in a row, and how often a row is built.</summary>
+    public static readonly BusinessKind[] ShopRowKinds =
+    {
+        BusinessKind.Grocer, BusinessKind.Diner, BusinessKind.Barber, BusinessKind.Tailor, BusinessKind.Laundry,
+        BusinessKind.Pharmacy, BusinessKind.PoolHall, BusinessKind.Hardware, BusinessKind.Haberdasher,
+    };
+    public const double ShopRowChance = 0.5;
 
     public static (int min, int max) TakingsFor(BusinessKind kind) => kind switch
     {
@@ -158,6 +167,8 @@ public static partial class Content
         BusinessKind.Grocer => (140, 260),
         BusinessKind.Laundry => (120, 220),
         BusinessKind.Tailor => (110, 200),
+        BusinessKind.Hardware => (130, 240),
+        BusinessKind.Haberdasher => (100, 190),
         _ => (90, 170),
     };
 
@@ -292,6 +303,8 @@ public static partial class Content
     public static string Label(BusinessKind kind) => kind switch
     {
         BusinessKind.PoolHall => "Pool Hall",
+        BusinessKind.Hardware => "Hardware Store",
+        BusinessKind.Haberdasher => "Haberdashery",
         _ => kind.ToString(),
     };
 

@@ -354,7 +354,7 @@ public partial class MapView : Control
             int lotId = LotUnder(click.Position);
             if (lotId < 0) return;
             var lot = World.Map.LotAt(lotId);
-            if (lot.BusinessId is int biz and >= 0)
+            if (BusinessUnder(lot, click.Position) is int biz and >= 0)
             {
                 Select(business: biz);
                 BusinessClicked?.Invoke(biz);
@@ -406,13 +406,13 @@ public partial class MapView : Control
         switch (lot.Use)
         {
             case LotUse.Business:
-                var b = World.BusinessById(lot.BusinessId);
+                var b = World.BusinessById(BusinessUnder(lot, atPosition));
                 string owner = b.IsProtected ? World.GangById(b.ProtectorGangId).Name : "Nobody's paying anyone";
                 string racket = b.Racket != RacketKind.None ? $"\nBack room: {Content.Rackets[b.Racket].Label}" : "";
                 string shut = b.IsOpen ? "" : $"\nClosed by police for {b.ShutWeeks} more weeks";
                 string front = b.IsFront ? $"\nA front for {World.GangById(b.OwnerGangId).Name}" : "";
                 string takes = b.Kind == BusinessKind.Court ? $"A tenement court · the block pays ${b.Takings} a week" : $"Takes ${b.Takings} a week · owner toughness {b.Toughness}/10";
-                return $"{b.Name}\n{takes}\n{owner}{front}{racket}{shut}{GarageLine(lot)}{WardLine(lot)}";
+                return $"{b.Name}\n{takes}\n{owner}{front}{racket}{shut}{RowLine(lot, b)}{GarageLine(lot)}{WardLine(lot)}";
             case LotUse.Headquarters:
                 var g = World.Gangs.First(x => x.Id == lot.GangId);
                 return g.IsSmall ? CornerTip(g) : $"Headquarters of {g.Name}";
@@ -555,9 +555,8 @@ public partial class MapView : Control
     private long Signature(Lot lot)
     {
         long s = (long)lot.Use * 1_000_003 + lot.GangId * 7919 + lot.BusinessId;
-        if (lot.Use == LotUse.Business)
+        foreach (var b in lot.Use == LotUse.Business ? World!.ShopsAt(lot) : System.Array.Empty<Business>())
         {
-            var b = World!.BusinessById(lot.BusinessId);
             var (gang, racket) = ShownState(b);
             s = s * 31 + gang;
             s = s * 31 + (int)racket;
@@ -720,7 +719,8 @@ public partial class MapView : Control
         var w = World!;
         float width = Px(2);
         Color? rim = null;
-        if (lot.Use == LotUse.Business)
+        if (lot.Use == LotUse.Business && lot.Shops.Count > 1) DrawUnitRims(lot);
+        else if (lot.Use == LotUse.Business)
         {
             var (protector, _) = ShownState(w.BusinessById(lot.BusinessId));
             if (protector >= 0) rim = Palette.Gang(w, protector);
@@ -735,6 +735,14 @@ public partial class MapView : Control
         var closed = outline.Append(outline[0]).ToArray();
         if (rim is Color r) C.DrawPolyline(closed, r with { A = 0.9f }, width);
 
+        int unit = lot.Shops.IndexOf(SelectedBusiness);
+        if (unit >= 0 && lot.Shops.Count > 1)
+        {
+            float pulse = 0.75f + 0.25f * Mathf.Sin(_anim * 4);
+            var grown = Grow(UnitOutline(lot, unit), Px(4));
+            C.DrawPolyline(grown.Append(grown[0]).ToArray(), Palette.Ink with { A = pulse }, Px(2.5f));
+            return;
+        }
         bool selected = (lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness)
             || (lot.Use == LotUse.Bank && SelectedBank >= 0 && w.BankById(SelectedBank)?.LotId == lot.Id)
             || lot.Id == SelectedShop;

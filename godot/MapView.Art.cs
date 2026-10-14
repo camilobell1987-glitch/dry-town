@@ -599,6 +599,9 @@ public partial class MapView
         DrawRamp(lot);
         switch (lot.Use)
         {
+            case LotUse.Business when lot.Shops.Count > 1:
+                DrawShopRow(lot, w.ShopsAt(lot));
+                break;
             case LotUse.Business:
             {
                 var b = w.BusinessById(lot.BusinessId);
@@ -799,9 +802,14 @@ public partial class MapView
     }
 
     /// <summary>The ground floor of a shop that faces the viewer: a big window, a door, and an awning in the protector's colours.</summary>
-    private void DrawShopfront(Lot lot, Business b, Color? gang, bool open)
+    private void DrawShopfront(Lot lot, Business b, Color? gang, bool open) =>
+        DrawShopfront(lot, b, gang, open, Footprint(lot).X0, Footprint(lot).X1);
+
+    /// <summary>A shopfront across part of a building's front, for one of a row of shops.</summary>
+    private void DrawShopfront(Lot lot, Business b, Color? gang, bool open, float x0, float x1, int salt = 0)
     {
-        var (x0, _, x1, y1) = Footprint(lot);
+        float y1 = Footprint(lot).Y1;
+        int id = lot.Id + salt * 7919;
         if (b.Kind == BusinessKind.Garage)
         {
             Face(x0 + 0.12f, x1 - 0.12f, y1, 0, 0.17f, new Color("2a2622"));
@@ -814,18 +822,20 @@ public partial class MapView
         }
         else
         {
-            Face(x0 + 0.08f, x1 - 0.3f, y1, 0.02f, 0.13f, new Color("56636e"));
-            Face(x1 - 0.24f, x1 - 0.1f, y1, 0, 0.14f, new Color("3e2c20"));
-            if (Fine) DressShopfront(lot, x0, x1, y1);
+            var (gx0, gx1, dx0, dx1) = ShopfrontBays(x0, x1);
+            Face(gx0, gx1, y1, 0.02f, 0.13f, new Color("56636e"));
+            Face(dx0, dx1, y1, 0, 0.14f, new Color("3e2c20"));
+            if (Fine) DressShopfront(lot, x0, x1, y1, salt);
             // The shop window is under the awning; after dark its light shows through the canvas instead.
-            if (open && Hash(lot.Id, 13) < 0.7f)
+            float wide = (x1 - x0) / 0.84f;
+            if (open && Hash(id, 13) < 0.7f)
                 Lit(() => C.DrawColoredPolygon(new[] { Q(x0 + 0.04f, y1 + 0.13f, 0.12f), Q(x1 - 0.04f, y1 + 0.13f, 0.12f), Q(x1 - 0.04f, y1 + 0.13f, 0.08f), Q(x0 + 0.04f, y1 + 0.13f, 0.08f) }, WindowLit with { A = 0.4f }));
-            if (open) Lit(() => Glow(P(lot.X + 0.5f, lot.Y + 1.05f), _t * 0.4f, Lamplight, 0.55f));
+            if (open) Lit(() => Glow(P((x0 + x1) / 2, lot.Y + 1.05f), _t * 0.4f * Mathf.Sqrt(Mathf.Min(1, wide)), Lamplight, 0.55f));
 
             // The awning: striped in the protector's colours, plain canvas otherwise.
-            var canvas = Awnings[(int)(Hash(lot.Id, 9) * Awnings.Length)];
-            int stripes = Fine ? 6 : 1;
-            float ax0 = x0 + 0.04f, ax1 = x1 - 0.04f;
+            var canvas = Awnings[(int)(Hash(id, 9) * Awnings.Length)];
+            int stripes = Fine ? Mathf.Max(2, Mathf.RoundToInt(6 * wide)) : 1;
+            float ax0 = x0 + 0.03f, ax1 = x1 - 0.03f;
             for (int i = 0; i < stripes; i++)
             {
                 float a = ax0 + (ax1 - ax0) * i / stripes, z = ax0 + (ax1 - ax0) * (i + 1) / stripes;
@@ -839,20 +849,27 @@ public partial class MapView
     }
 
     /// <summary>Where the sign on a building's roof is centred, as drawn.</summary>
-    private Vector2 SignCentre(Lot lot, float h)
+    private Vector2 SignCentre(Lot lot, float h) => SignCentre(lot, h, lot.X + 0.5f);
+
+    /// <summary>Where a sign centred along the roof at <paramref name="x"/> is centred, as drawn.</summary>
+    private Vector2 SignCentre(Lot lot, float h, float x)
     {
         var (_, _, _, y1) = Footprint(lot);
-        return Angled ? Q(lot.X + 0.5f, y1 - 0.12f, h + 0.19f) : P(lot.X + 0.5f, y1 - 0.27f);
+        return Angled ? Q(x, y1 - 0.12f, h + 0.19f) : P(x, y1 - 0.27f);
     }
 
     /// <summary>
     /// A sign standing on the roof, facing the street the viewer looks from, framed in the protector's
     /// colours. The trade's pictogram, or whatever else belongs there, is drawn on its face.
     /// </summary>
-    private void DrawBillboard(Lot lot, float h, Color frame, float frameWidth, bool open, Action face)
+    private void DrawBillboard(Lot lot, float h, Color frame, float frameWidth, bool open, Action face) =>
+        DrawBillboard(lot, h, frame, frameWidth, open, face, lot.X + 0.24f, lot.X + 0.76f);
+
+    /// <summary>A sign on the roof between two points along it, for one of a row of shops.</summary>
+    private void DrawBillboard(Lot lot, float h, Color frame, float frameWidth, bool open, Action face, float xa, float xb)
     {
         var (_, _, _, y1) = Footprint(lot);
-        float y = y1 - 0.12f, xa = lot.X + 0.24f, xb = lot.X + 0.76f;
+        float y = y1 - 0.12f;
         var paper = open ? new Color("e6dcc2") : new Color("8a826e");
         if (!Angled)
         {
@@ -978,6 +995,22 @@ public partial class MapView
                 C.DrawRect(new Rect2(c.X + h * 0.05f, c.Y - h * 0.5f, h * 0.7f, h * 0.8f), ink with { A = 0.5f }, false, 1);
                 break;
             }
+            case BusinessKind.Hardware:
+                // A claw hammer, head up.
+                C.DrawLine(c + new Vector2(-h * 0.55f, h * 0.85f), c + new Vector2(h * 0.25f, -h * 0.4f), new Color("9a6a3a"), lw * 1.6f);
+                C.DrawColoredPolygon(new[]
+                {
+                    c + new Vector2(-h * 0.25f, -h * 0.75f), c + new Vector2(h * 0.75f, -h * 0.1f), c + new Vector2(h * 0.55f, h * 0.18f),
+                    c + new Vector2(-h * 0.45f, -h * 0.47f),
+                }, new Color("4a4e52"));
+                C.DrawLine(c + new Vector2(-h * 0.35f, -h * 0.6f), c + new Vector2(-h * 0.75f, -h * 0.55f), new Color("4a4e52"), lw * 1.2f);
+                break;
+            case BusinessKind.Haberdasher:
+                // A top hat with a band round it.
+                C.DrawRect(new Rect2(c.X - h * 0.9f, c.Y + h * 0.45f, h * 1.8f, h * 0.22f), ink);
+                C.DrawRect(new Rect2(c.X - h * 0.5f, c.Y - h * 0.85f, h * 1.0f, h * 1.32f), ink);
+                C.DrawRect(new Rect2(c.X - h * 0.5f, c.Y + h * 0.1f, h * 1.0f, h * 0.22f), new Color("a8332c"));
+                break;
             case BusinessKind.Warehouse:
                 foreach (var (dx, dy) in new[] { (-0.85f, 0.0f), (0.0f, 0.0f), (-0.42f, -0.8f) })
                 {

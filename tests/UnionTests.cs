@@ -6,9 +6,9 @@ namespace DryTown.Core.Tests;
 public class UnionTests
 {
     /// <summary>A quiet city: no news, no new outfits, and by default nobody else to get in the way.</summary>
-    private static (Simulation Sim, World W, Gang Me) Start(int gangs = 1, CitySize size = CitySize.Small)
+    private static (Simulation Sim, World W, Gang Me) Start(int gangs = 1, CitySize size = CitySize.Small, ulong seed = 4)
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 4, Size = size, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false });
+        var sim = Simulation.New(new WorldSettings { Seed = seed, Size = size, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false });
         return (sim, sim.World, sim.World.Player);
     }
 
@@ -41,10 +41,10 @@ public class UnionTests
     [Fact]
     public void TakingOverALocalBringsInItsDues()
     {
-        var (sim, w, me) = Start();
+        var (sim, w, me) = Start(seed: 2);
         var local = w.LocalById(1)!;
         var men = w.AvailableHoodsOf(me.Id).Where(h => h.Id != me.BossHoodId).Take(2).ToList();
-        foreach (var h in men) h.Intimidation = h.Muscle = 10;
+        foreach (var h in men) h.Intimidation = h.Muscle = h.Stealth = 10;
         for (int i = 0; i < 10 && local.OwnerGangId < 0 && men.All(h => h.IsAvailable); i++)
             sim.AdvanceWeek(Mine(w, new UnionOrder(me.Id, men[0].Id, local.Id, new[] { men[1].Id })));
         Assert.Equal(me.Id, local.OwnerGangId);

@@ -20,6 +20,12 @@ public sealed class Lot
 
     public LotUse Use { get; set; }
     public int BusinessId { get; set; } = -1;
+
+    /// <summary>
+    /// A row of shops sharing the ground floor, west to east, when there's more than one; empty when one business
+    /// has the whole building. <see cref="BusinessId"/> is the first of them.
+    /// </summary>
+    public List<int> Shops { get; set; } = new();
     public int GangId { get; set; } = -1;
 
     /// <summary>The ward the lot votes in.</summary>
