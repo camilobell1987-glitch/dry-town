@@ -819,7 +819,7 @@ public partial class MapView : Control
                     ActionResult.Arrested => Palette.Police,
                     _ => Palette.Neutral,
                 };
-                float pulse = 1 + 0.35f * Mathf.Sin((now - actor.Arrive) * 9);
+                float pulse = 1 + 0.35f * Mathf.Sin(_anim * 6);
                 FlatRing(target * t, t * 0.4f * pulse, ring, Px(2.5f));
             }
 
@@ -929,4 +929,14 @@ public partial class MapView : Control
     }
 
     public static string ClockText(float tick) => Reports.Hour((int)tick);
+
+    /// <summary>The live clock to ten minutes, as the hours go by slowly enough to want them: "Monday, 9:40 AM".</summary>
+    public static string ClockMinutes(float tick)
+    {
+        string[] days = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+        int minutes = (int)(Mathf.Max(0, tick) * 6) * 10;
+        int day = Math.Clamp(minutes / 1440, 0, 6), hour = minutes / 60 % 24, minute = minutes % 60;
+        int twelve = hour % 12 == 0 ? 12 : hour % 12;
+        return $"{days[day]}, {twelve}:{minute:00} {(hour < 12 ? "AM" : "PM")}";
+    }
 }

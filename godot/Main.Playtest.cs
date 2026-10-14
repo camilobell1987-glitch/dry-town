@@ -29,7 +29,7 @@ public partial class Main
                 ulong now = Time.GetTicksUsec();
                 frames.Add((now - last) / 1000.0);
                 last = now;
-                if (Time.GetTicksMsec() - started > 600_000) { GD.Print($"PLAYTEST week {W.Week} stuck after 10 minutes"); GetTree().Quit(1); return; }
+                if (Time.GetTicksMsec() - started > 1_200_000) { GD.Print($"PLAYTEST week {W.Week} stuck after 20 minutes"); GetTree().Quit(1); return; }
             }
             // Let the Sunday report settle before the next Monday.
             for (int i = 0; i < 3; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
