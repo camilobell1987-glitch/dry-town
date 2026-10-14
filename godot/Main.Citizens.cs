@@ -43,7 +43,7 @@ public partial class Main
         _overheard = null;
         if (_map.Directory is not { } d || !d.Exists(id)) return;
         var c = d.Get(id);
-        W.Introduce(id, W.Map.LotAt(c.HomeLotId).WardId, c.Ties, d.SecretsOf(id));
+        W.Introduce(id, W.Map.LotAt(c.HomeLotId).WardId, c.Ties, d.SecretsOf(id), d.CharacterOf(id));
         int partner = _map.TalkingWith(id);
         if (partner < 0) return;
         var other = d.Get(partner);
@@ -73,7 +73,7 @@ public partial class Main
         var c = directory.Get(id);
         var known = KnownAbout(id);
         var home = W.Map.LotAt(c.HomeLotId);
-        W.Introduce(id, home.WardId, c.Ties, directory.SecretsOf(id));
+        W.Introduce(id, home.WardId, c.Ties, directory.SecretsOf(id), directory.CharacterOf(id));
         var (bx, by, _) = directory.Where(id);
         var seen = _map.WhereIs(id) is { } at
             ? W.Map.LotsOfBlock(bx, by).OrderBy(l => new Vector2(l.X + 0.5f, l.Y + 0.5f).DistanceSquaredTo(at)).First()
@@ -108,10 +108,25 @@ public partial class Main
             AddLabel(lines, stamp, dealt.Standing is Standing.Dead or Standing.Held or Standing.Jailed ? new Color("9a2a22") : new Color("3c6a34"), wrap: true);
         }
 
-        var grid = new GridContainer { Columns = 2 };
+        // Two tabs, like the dividers in a card file: the particulars, and what sort of person they are.
+        var tabs = new HBoxContainer();
+        tabs.AddThemeConstantOverride("separation", 14);
+        lines.AddChild(tabs);
+        foreach (var (title, character) in new[] { ("Particulars", false), ("Character", true) })
+        {
+            bool on = _characterTab == character;
+            var tab = new LinkButton { Text = title, Underline = on ? LinkButton.UnderlineMode.Always : LinkButton.UnderlineMode.OnHover, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
+            tab.AddThemeColorOverride("font_color", on ? CardInk : CardFaint);
+            tab.AddThemeColorOverride("font_hover_color", new Color("9a2a22"));
+            tab.AddThemeFontSizeOverride("font_size", 13);
+            tab.Pressed += () => { _characterTab = character; RefreshBusiness(); };
+            tabs.AddChild(tab);
+        }
+        var grid = new GridContainer { Columns = 2, Visible = !_characterTab };
         grid.AddThemeConstantOverride("h_separation", 12);
         grid.AddThemeConstantOverride("v_separation", 3);
         lines.AddChild(grid);
+        if (_characterTab) CharacterTab(lines, id, known);
         // Each line you know is a link where it leads somewhere: a place moves the map there, a person opens their card.
         void Line(string label, Fact fact, Func<string> value, Action? go = null)
         {
@@ -219,7 +234,7 @@ public partial class Main
             foreach (var (b, lean, label) in buttons)
             {
                 string why = W.CannotLean(W.Player, id, lean) is { } no ? $" · {no}" : "";
-                double odds = Simulation.LeanChance(hood, lean, nerve, known, leverage);
+                double odds = Simulation.LeanChance(hood, lean, nerve, known, leverage, W.TraitOdds(id, lean, knownOnly: !_revealCitizens));
                 b.Text = $"{label()} · {(reads ? "" : "maybe ")}{odds:P0}{why}";
                 b.Disabled = why != "" || lean == Lean.Bribe && W.Player.Cash < price;
             }
@@ -263,6 +278,33 @@ public partial class Main
             AddLabel(grid, ties.Count == 0 ? "Family" : "Others", CardFaint);
             AddLabel(grid, "???", CardFaint);
         }
+    }
+
+    /// <summary>Which tab of a resident's card is showing.</summary>
+    private bool _characterTab;
+
+    /// <summary>The card's second tab: where they came from and what sort they are, as far as you know.</summary>
+    private void CharacterTab(VBoxContainer lines, int id, Fact known)
+    {
+        var d = _map.Directory!;
+        var a = W.Acquaintances.GetValueOrDefault(id);
+        var character = d.CharacterOf(id);
+        void Entry(string label, string meaning, Color colour)
+        {
+            AddLabel(lines, label, colour, 15);
+            if (meaning != "") AddLabel(lines, meaning, CardInk, 13, wrap: true);
+        }
+        AddLabel(lines, "Background", CardFaint, 13);
+        if (_revealCitizens || known.HasFlag(Fact.Past)) Entry(Content.Label(character.Background), Content.Meaning(character.Background), CardInk);
+        else AddLabel(lines, "???", CardFaint);
+        lines.AddChild(new ColorRect { Color = CardRule, CustomMinimumSize = new Vector2(0, 1) });
+        AddLabel(lines, "Character", CardFaint, 13);
+        var traits = _revealCitizens ? character.Traits.ToList() : W.KnownTraitsOf(id).ToList();
+        foreach (var t in traits) Entry(Content.Label(t), Content.Meaning(t), new Color("7a3a2a"));
+        // Someone who has told you everything has nothing more to show; anyone else may.
+        bool told = _revealCitizens || a is { Standing: Standing.Bought } && a.GangId == Me && !a.UnknownTraits.Any();
+        if (!told) AddLabel(lines, traits.Count == 0 ? "???" : "More, perhaps: ???", CardFaint);
+        AddLabel(lines, "Asking around, tailing them, the street's gossip and dealing with them all show what sort they are.", CardFaint, 12, wrap: true);
     }
 
     /// <summary>A link on a card, in the card's ink, turning red under the pointer.</summary>

@@ -119,8 +119,8 @@ public sealed partial class World
         g.IsPlayer && Acquaintances.Values.Any(a => a.BusinessId == biz.Id && a.InPocketOf(g.Id));
 
     /// <summary>How many people in a ward are in a gang's pocket, a landlord counting once more for each building he owns.</summary>
-    public int InPocket(Gang g, int wardId) =>
-        !g.IsPlayer || wardId < 0 ? 0 : Acquaintances.Values.Where(a => a.WardId == wardId && a.InPocketOf(g.Id)).Sum(a => 1 + a.Tenements);
+    public double InPocket(Gang g, int wardId) =>
+        !g.IsPlayer || wardId < 0 ? 0 : Acquaintances.Values.Where(a => a.WardId == wardId && a.InPocketOf(g.Id)).Sum(a => (1 + a.Tenements) * Content.AsInformant(a.Traits));
 }
 
 /// <summary>Send a man to deal with a resident.</summary>
@@ -129,7 +129,7 @@ public sealed record LeanOrder(int GangId, int HoodId, int CitizenId, int LotId,
 public sealed partial class Simulation
 {
     /// <summary>The chance a man pulls it off against someone with this much nerve, knowing what you know about him.</summary>
-    public static double LeanChance(Hood man, Lean lean, int nerve, Fact known = Fact.None, double leverage = 0) => Math.Clamp(lean switch
+    public static double LeanChance(Hood man, Lean lean, int nerve, Fact known = Fact.None, double leverage = 0, double traits = 0) => Math.Clamp(traits + lean switch
     {
         // Money talks, except to the honest few.
         Lean.Bribe => 1.05 - nerve * 0.07 + man.Brains * 0.02,
@@ -180,7 +180,10 @@ public sealed partial class Simulation
         var lot = w.Map.LotAt(o.LotId);
         var a = w.Meet(o.CitizenId, lot.WardId);
         int nerve = w.NerveOf(o.CitizenId);
-        bool ok = w.Rng.Chance(LeanChance(man, o.Lean, nerve, a.Known, w.Leverage(gang, o.CitizenId)));
+        bool ok = w.Rng.Chance(LeanChance(man, o.Lean, nerve, a.Known, w.Leverage(gang, o.CitizenId), w.TraitOdds(o.CitizenId, o.Lean, knownOnly: false)));
+        // However it goes, you see what they're made of where it counts.
+        foreach (var t in a.Traits.Where(t => Content.TraitOdds(t, o.Lean) != 0).ToList()) w.LearnTrait(o.CitizenId, t);
+        if (!ok && o.Lean != Lean.TurnIn) gang.Heat = Math.Clamp(gang.Heat + Content.FailHeat(a.Traits, a.Background), 0, 100);
         a.Worth = o.Worth;
         a.BusinessId = o.BusinessId;
         a.Tenements = o.Tenements;
@@ -196,6 +199,7 @@ public sealed partial class Simulation
                 a.GangId = gang.Id;
                 a.Known = Fact.All;
                 foreach (var tie in a.Ties.ToList()) w.LearnTie(o.CitizenId, tie);
+                foreach (var t in a.Traits) w.LearnTrait(o.CitizenId, t);
                 kind = ActionKind.Hire;
                 text = $"{man.Name} put {o.Who} on the payroll for ${price}, and ${World.Retainer(o.Worth)} a week after. They'll tell you what they hear.";
                 break;
@@ -348,7 +352,7 @@ public sealed partial class Simulation
             if (a.Standing == Standing.Blackmailed && gang != null)
             {
                 if (!gang.Alive || w.Week >= a.UntilWeek) a.Standing = Standing.None;
-                else if (w.Rng.Chance(Content.HushSnaps))
+                else if (w.Rng.Chance(Content.HushSnaps * (a.Traits.Contains(Trait.HardBoiled) ? 2 : 1) * (a.Traits.Contains(Trait.Hothead) ? 1.5 : 1) * (a.Traits.Contains(Trait.Yellow) ? 0.5 : 1)))
                 {
                     // He'd sooner face the shame than keep paying.
                     a.Standing = Standing.None;

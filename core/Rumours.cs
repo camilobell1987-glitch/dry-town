@@ -19,11 +19,12 @@ public static partial class Content
         Fact.Age or Fact.Origin => 0.6,
         Fact.Job => 0.55,
         Fact.Home or Fact.Work => 0.35,
+        Fact.Past => 0.3,
         _ => 0.2,
     };
 
     /// <summary>Every thing there is to know, one at a time, easiest first.</summary>
-    public static readonly Fact[] Facts = { Fact.Name, Fact.Age, Fact.Origin, Fact.Job, Fact.Home, Fact.Work, Fact.Landlord, Fact.Owns };
+    public static readonly Fact[] Facts = { Fact.Name, Fact.Age, Fact.Origin, Fact.Job, Fact.Home, Fact.Work, Fact.Landlord, Fact.Owns, Fact.Past };
 
     public static string Label(Fact fact) => fact switch
     {
@@ -35,6 +36,7 @@ public static partial class Content
         Fact.Work => "workplace",
         Fact.Landlord => "landlord",
         Fact.Owns => "property",
+        Fact.Past => "past",
         _ => "business",
     };
 }
@@ -105,7 +107,8 @@ public sealed partial class Simulation
         gang.Cash -= Content.AskPrice;
         w.Ledger(gang.Id).Spending += Content.AskPrice;
         int ward = w.Map.LotAt(o.LotId).WardId;
-        double bonus = w.HoldsTurfIn(gang, ward) ? 0.15 : 0;
+        w.Meet(o.CitizenId, ward);
+        double bonus = (w.HoldsTurfIn(gang, ward) ? 0.15 : 0) + w.TalkOf(o.CitizenId);
         var unknown = Content.Facts.Where(f => !w.KnownAbout(o.CitizenId).HasFlag(f)).ToList();
         var heard = Fact.None;
         foreach (var fact in unknown)
@@ -115,10 +118,12 @@ public sealed partial class Simulation
         var fresh = w.Learn(o.CitizenId, heard, ward);
         int ties = w.LearnTies(o.CitizenId, Content.AskTie + bonus);
         int secrets = w.LearnSecrets(o.CitizenId, Content.AskSecret + bonus);
+        int traits = w.LearnTraits(o.CitizenId, 0.25 + bonus);
         var heardOf = new List<string>();
         if (fresh != Fact.None) heardOf.Add($"their {World.Describe(fresh)}");
         if (ties > 0) heardOf.Add($"about {World.Ties(ties)}");
         if (secrets > 0) heardOf.Add(World.Secrets(secrets));
+        if (traits > 0) heardOf.Add(World.Traits(traits));
         string about = heardOf.Count == 0 ? "nothing new" : string.Join(", and ", heardOf);
         w.Log(EventKind.Street, gang.Id, $"You asked around about {o.Who} and heard {about}.");
     }
@@ -129,9 +134,10 @@ public sealed partial class Simulation
         if (!TryUseHood(gang, o.HoodId, out var man)) return;
         int ward = w.Map.LotAt(o.LotId).WardId;
         var learned = Fact.None;
-        int ties = 0, secrets = 0;
+        int ties = 0, secrets = 0, traits = 0;
         string how;
-        if (w.Rng.Chance(SpottedChance(man)))
+        bool sharp = w.Acquaintances.TryGetValue(o.CitizenId, out var target) && target.Traits.Contains(Trait.Sharp);
+        if (w.Rng.Chance(SpottedChance(man) + (sharp ? 0.15 : 0)))
         {
             // He only got as far as the front door before they made him.
             learned = Fact.Home;
@@ -149,6 +155,7 @@ public sealed partial class Simulation
             ties = w.LearnTies(o.CitizenId, 1, family: false) + w.LearnTies(o.CitizenId, TailOdds(man), work: false);
             // A week on someone's heels shows where they go when they think nobody's looking.
             secrets = w.LearnSecrets(o.CitizenId, TailOdds(man) * 0.7);
+            traits = w.LearnTraits(o.CitizenId, TailOdds(man) * 0.6);
             how = "followed them all week";
         }
         var fresh = w.Learn(o.CitizenId, learned, ward);
@@ -156,6 +163,7 @@ public sealed partial class Simulation
         if (fresh != Fact.None) found.Add($"learned their {World.Describe(fresh)}");
         if (ties > 0) found.Add($"saw {World.Ties(ties)}");
         if (secrets > 0) found.Add($"found out {World.Secrets(secrets)}");
+        if (traits > 0) found.Add($"saw {World.Traits(traits)}");
         string text = $"{man.Name} {how}{(found.Count == 0 ? ", and learned nothing new" : " and " + string.Join(", and ", found))}: {o.Who}.";
         w.Log(EventKind.Street, gang.Id, text);
         w.Act(new ScriptAction(ActionKind.Hire, gang.Id, man.Id, gang.HqLotId, o.LotId, -1, ActionResult.Success, text));
@@ -173,11 +181,15 @@ public sealed partial class Simulation
             var unknown = Content.Facts.Where(f => !a.Known.HasFlag(f)).ToList();
             var unknownTies = a.UnknownTies.ToList();
             var unknownSecrets = a.UnknownSecrets.ToList();
-            if (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0) continue;
-            double chance = Content.RumourChance + (a.WardId >= 0 && w.HoldsTurfIn(me, a.WardId) ? Content.RumourOnTurf : 0) + Informants(me, a.WardId);
+            var unknownTraits = a.UnknownTraits.ToList();
+            if (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0 && unknownTraits.Count == 0) continue;
+            double chance = Content.RumourChance + (a.WardId >= 0 && w.HoldsTurfIn(me, a.WardId) ? Content.RumourOnTurf : 0) + Informants(me, a.WardId) + a.Traits.Sum(Content.Talk);
             if (!w.Rng.Chance(chance)) continue;
             // Gossip is mostly about who's whose. Otherwise the easy things get round first.
-            if (unknownSecrets.Count > 0 && (unknown.Count == 0 && unknownTies.Count == 0 || w.Rng.Chance(Content.RumourSecret))) w.LearnSecret(id, unknownSecrets[w.Rng.Range(0, unknownSecrets.Count - 1)]);
+            // The street says what sort someone is as often as anything.
+            if (unknownTraits.Count > 0 && (unknown.Count == 0 && unknownTies.Count == 0 && unknownSecrets.Count == 0 || w.Rng.Chance(0.25)))
+                w.LearnTrait(id, unknownTraits[w.Rng.Range(0, unknownTraits.Count - 1)]);
+            else if (unknownSecrets.Count > 0 && (unknown.Count == 0 && unknownTies.Count == 0 || w.Rng.Chance(Content.RumourSecret))) w.LearnSecret(id, unknownSecrets[w.Rng.Range(0, unknownSecrets.Count - 1)]);
             else if (unknownTies.Count > 0 && (unknown.Count == 0 || w.Rng.Chance(Content.RumourTie))) w.LearnTie(id, unknownTies[w.Rng.Range(0, unknownTies.Count - 1)]);
             else a.Known |= unknown[w.Rng.Chance(0.6) ? 0 : w.Rng.Range(0, unknown.Count - 1)];
             heard++;
