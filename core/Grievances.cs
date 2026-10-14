@@ -223,8 +223,9 @@ public sealed partial class World
     public IEnumerable<Grievance> HeldAgainst(Party target, int id) => Grievances.Where(g => g.Target == target && g.TargetId == id);
 
     /// <summary>A resident's traits, as far as the city knows them.</summary>
-    private IEnumerable<Trait> TraitsOf(Party who, int id) =>
-        who == Party.Resident && Acquaintances.TryGetValue(id, out var a) ? a.Traits : Enumerable.Empty<Trait>();
+    internal IEnumerable<Trait> TraitsOf(Party who, int id) =>
+        who == Party.Resident && Acquaintances.TryGetValue(id, out var a) ? a.Traits
+        : who == Party.Hood && Hoods.FirstOrDefault(h => h.Id == id) is { } man ? man.Traits : Enumerable.Empty<Trait>();
 
     /// <summary>
     /// Someone takes against someone else, or takes against them more. How hard depends on the sort they are. Returns the
@@ -248,7 +249,7 @@ public sealed partial class World
             g.Vendetta = true;
             g.Amount = g.Floor = 100;
             if (known && (target == Party.Gang && targetId == Player.Id || target == Party.Hood && Hoods.FirstOrDefault(h => h.Id == targetId)?.GangId == Player.Id))
-                Log(EventKind.Street, Player.Id, $"Someone has sworn a vendetta against {(target == Party.Gang ? "you" : Hoods.First(h => h.Id == targetId).Name)}. Nothing will square it now.");
+                Log(EventKind.Street, Player.Id, $"{(holder == Party.Hood ? Hoods.First(h => h.Id == holderId).Name : "Someone")} has sworn a vendetta against {(target == Party.Gang ? "you" : Hoods.First(h => h.Id == targetId).Name)}. Nothing will square it now.");
         }
         g.Why = why;
         g.AboutId = aboutId;
@@ -388,13 +389,14 @@ public sealed partial class Simulation
         {
             if (!w.Grievances.Contains(g)) continue;
             if (Revenge(g)) continue;
-            w.Ease(g, g.Holder == Party.Cop ? 2 : Content.GrievanceFade(TraitsOfResident(g.HolderId)));
+            w.Ease(g, g.Holder == Party.Cop ? 2 : Content.GrievanceFade(w.TraitsOf(g.Holder, g.HolderId)));
         }
         // The dead hold no grudges, and nobody holds one against a man who's gone.
         w.Grievances.RemoveAll(g => g.Holder == Party.Resident && w.StandingOf(g.HolderId) == Standing.Dead
             || g.Target == Party.Hood && w.Hoods.FirstOrDefault(h => h.Id == g.TargetId) is not { IsActive: true }
             || g.Target == Party.Gang && w.GangById(g.TargetId) is not { Alive: true }
-            || g.Holder == Party.Cop && w.PersonById(g.HolderId) == null);
+            || g.Holder == Party.Cop && w.PersonById(g.HolderId) == null
+            || g.Holder == Party.Hood && w.Hoods.FirstOrDefault(h => h.Id == g.HolderId) is not { IsActive: true });
     }
 
     private IEnumerable<Trait> TraitsOfResident(int id) => World.Acquaintances.TryGetValue(id, out var a) ? a.Traits : Enumerable.Empty<Trait>();

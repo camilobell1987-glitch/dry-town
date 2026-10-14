@@ -75,7 +75,7 @@ public sealed partial class Simulation
             string text = $"{gang.Name} pushed {rival.Name} out of {local.Name}.";
             w.Log(EventKind.Union, gang.Id, text);
             int casualty = -1;
-            if (president != null && w.Rng.Chance(0.3)) { Kill(president, $"in a fight at the hall of {local.Name}"); casualty = president.Id; hood.Deeds.Kills++; }
+            if (president != null && w.Rng.Chance(0.3)) { Kill(president, $"in a fight at the hall of {local.Name}", gang, hood); casualty = president.Id; hood.Deeds.Kills++; }
             w.Act(BackedBy(backupIds, new ScriptAction(ActionKind.Union, gang.Id, hood.Id, hq, hall, -1, ActionResult.Won, text, rival.Id, president?.Id ?? -1, casualty)));
         }
         else
@@ -86,7 +86,7 @@ public sealed partial class Simulation
             if (w.Rng.Chance(0.25 * (1 - Getaway(backup.Prepend(hood)))))
             {
                 var fallen = backup.Count > 0 && w.Rng.Chance(0.5) ? w.Rng.Pick(backup) : hood;
-                Kill(fallen, $"trying to take over {local.Name}");
+                Kill(fallen, $"trying to take over {local.Name}", rival, president);
                 casualty = fallen.Id;
                 if (president != null) president.Deeds.Kills++;
             }

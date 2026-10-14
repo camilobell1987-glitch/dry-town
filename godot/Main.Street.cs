@@ -143,15 +143,7 @@ public partial class Main
         var panel = _businessPanel;
         var gang = W.GangById(target.GangId);
         bool boss = gang.BossHoodId == target.Id;
-        AddLabel(panel, target.Name, Palette.Gang(W, gang.Id), 18);
-        AddLabel(panel, $"{(boss ? "Boss of" : "With")} {gang.Name}, {target.Age(W.Week)}, {Content.Label(target.Origin)}.", Palette.InkQuiet);
-        AddLabel(panel, $"Intimidation {target.Intimidation} · Muscle {target.Muscle} · Brains {target.Brains} · Stealth {target.Stealth}", Palette.Ink);
-        int handles = W.Businesses.Count(b => b.HandlerHoodId == target.Id && b.ProtectorGangId == gang.Id);
-        if (handles > 0) AddLabel(panel, $"Collects from {handles} business{(handles == 1 ? "" : "es")}.", Palette.InkQuiet);
-        if (target.GangId != Me && W.CrewOfHood(target.Id) is { } crew)
-            AddLabel(panel, crew.LieutenantHoodId == target.Id
-                ? $"Lieutenant, with {crew.MemberIds.Count} men under him. If he goes, the best of them takes over the crew."
-                : $"In {W.HoodById(crew.LieutenantHoodId).Name}'s crew.", Palette.InkQuiet, wrap: true);
+        HoodCard(panel, target);
         RapSheet(panel, target);
         if (target.GangId == Me && W.HostageOf(target) is { } taken)
         {

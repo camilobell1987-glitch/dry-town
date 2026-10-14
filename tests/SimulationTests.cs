@@ -229,7 +229,7 @@ public class Phase3Tests
     [Fact]
     public void SavedGameCarriesOnExactlyAsIfNeverStopped()
     {
-        var original = Run(11, 40);
+        var original = Run(12, 40);
         var w = original.World;
         var crew = w.FormCrew(w.HoodsOf(w.Player.Id).First());
         var pending = new List<Order> { new RecruitOrder(w.Player.Id), new BribeOrder(w.Player.Id, 200) };

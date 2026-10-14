@@ -365,6 +365,7 @@ public sealed partial class World
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
+        Characterise(hood);
         People.Remove(p);
         return hood;
     }
@@ -455,6 +456,7 @@ public sealed partial class World
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
+        Characterise(hood);
         return hood;
     }
 
@@ -482,6 +484,7 @@ public sealed partial class World
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
+        Characterise(hood);
         Log(EventKind.Family, gang.Id, $"{boss.Name} brought his {relation} {first} into {gang.Name}.");
         return hood;
     }
@@ -591,6 +594,8 @@ public sealed partial class World
         w.PlaceLines();
         w.PlaceLocals();
         w.GiveOrigins();
+        // Men from saves before gangsters had characters get theirs now.
+        foreach (var h in w.Hoods) w.Characterise(h);
         return w;
     }
 

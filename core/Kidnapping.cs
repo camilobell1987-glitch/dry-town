@@ -199,7 +199,7 @@ public sealed partial class Simulation
             if (!kill) { w.LetGo(holder, h, unpaid: true); continue; }
             w.Hostages.Remove(h);
             man.State = HoodState.Free;
-            Kill(man, $"by {holder.Name}, when his ransom wasn't paid");
+            Kill(man, $"by {holder.Name}, when his ransom wasn't paid", holder);
             w.AddGrudge(victim.Id, holder.Id, Content.GrudgeUnpaid);
             w.Renown(holder, fear: Content.FearHit);
             holder.Heat = Math.Min(100, holder.Heat + 10);

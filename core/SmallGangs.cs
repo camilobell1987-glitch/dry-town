@@ -168,7 +168,7 @@ public sealed partial class World
 
     /// <summary>The chance a man walks out on his small gang: the less he thinks of it and the more he thinks of you, the likelier.</summary>
     public double PoachChance(Gang g, Hood man) =>
-        Math.Clamp(0.3 + (70 - man.Loyalty) / 100.0 + g.Respect / 300, 0.05, 0.9);
+        Math.Clamp(0.3 + (70 - man.Loyalty) / 100.0 + g.Respect / 300 + Content.Buyable(man), 0.05, 0.9);
 
     /// <summary>Why an outfit can't send men to wipe out a small gang, or null.</summary>
     public string? CannotWipeOut(Gang g, Gang small)
@@ -293,7 +293,7 @@ public sealed partial class Simulation
             int dead = 0;
             foreach (var man in w.Hoods.Where(h => h.GangId == small.Id && h.IsActive).ToList())
             {
-                if (man.IsAvailable && w.Rng.Chance(0.5)) { Kill(man, $"when {gang.Name} wiped out {small.Name}"); dead++; hood.Deeds.Kills++; }
+                if (man.IsAvailable && w.Rng.Chance(0.5)) { Kill(man, $"when {gang.Name} wiped out {small.Name}", gang, hood); dead++; hood.Deeds.Kills++; }
                 else { w.LeaveCrew(man.Id); man.State = HoodState.Gone; }
             }
             foreach (var biz in w.TurfOf(small.Id).ToList()) { biz.ProtectorGangId = -1; biz.HandlerHoodId = -1; }

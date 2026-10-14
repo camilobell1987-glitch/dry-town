@@ -222,7 +222,7 @@ public sealed partial class Simulation
             foreach (var man in w.AvailableHoodsOf(gang.Id).Where(h => h.Id != gang.BossHoodId && !h.Family).ToList())
             {
                 if (man.Informer && man.Loyalty >= Content.InformerQuits && !man.Exposed) { man.Informer = false; continue; }
-                if (!man.Informer && man.Loyalty < Content.InformerLoyalty && w.Rng.Chance(0.02 * (0.5 + gang.Heat / 100.0) * wanted))
+                if (!man.Informer && man.Loyalty < Content.InformerLoyalty && w.Rng.Chance(0.02 * (0.5 + gang.Heat / 100.0) * wanted * Content.Leaky(man)))
                     man.Informer = true;
             }
 
@@ -272,7 +272,7 @@ public sealed partial class Simulation
                 w.Log(EventKind.Whisper, owner.Id, $"{host.Name} has found out {man.Name} is ours. He'll have to get out.");
                 continue;
             }
-            Kill(man, $"after {host.Name} found out he was working for {owner.Name}");
+            Kill(man, $"after {host.Name} found out he was working for {owner.Name}", host);
             w.Log(EventKind.Whisper, owner.Id, $"{man.Name} was pulled out of the river. {host.Name} had found out he was ours.");
         }
     }

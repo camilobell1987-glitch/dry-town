@@ -79,22 +79,7 @@ public partial class Main
             ? W.Map.LotsOfBlock(bx, by).OrderBy(l => new Vector2(l.X + 0.5f, l.Y + 0.5f).DistanceSquaredTo(at)).First()
             : home;
 
-        var card = new PanelContainer();
-        card.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = CardPaper, BorderColor = CardEdge, BorderWidthBottom = 2, BorderWidthLeft = 1, BorderWidthRight = 1, BorderWidthTop = 1,
-            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3, CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
-            ContentMarginLeft = 12, ContentMarginRight = 12, ContentMarginTop = 8, ContentMarginBottom = 10,
-        });
-        panel.AddChild(card);
-        var lines = new VBoxContainer();
-        lines.AddThemeConstantOverride("separation", 2);
-        card.AddChild(lines);
-
-        var head = AddLabel(lines, (known.HasFlag(Fact.Name) ? c.Name : "???"), CardInk, 18);
-        head.AddThemeColorOverride("font_color", CardInk);
-        var rule = new ColorRect { Color = CardRule, CustomMinimumSize = new Vector2(0, 2) };
-        lines.AddChild(rule);
+        var lines = NewCard(panel, known.HasFlag(Fact.Name) ? c.Name : "???");
         if (W.Acquaintances.GetValueOrDefault(id) is { Standing: not Standing.None } dealt)
         {
             string stamp = dealt.Standing switch
@@ -108,31 +93,13 @@ public partial class Main
             AddLabel(lines, stamp, dealt.Standing is Standing.Dead or Standing.Held or Standing.Jailed ? new Color("9a2a22") : new Color("3c6a34"), wrap: true);
         }
 
-        // Tabs, like the dividers in a card file: the particulars, what sort of person they are, and their grudges.
-        var tabs = new HBoxContainer();
-        tabs.AddThemeConstantOverride("separation", 14);
-        lines.AddChild(tabs);
-        foreach (var (title, which) in new[] { ("Particulars", CardTab.Particulars), ("Character", CardTab.Character), ("Grudges", CardTab.Grudges) })
-        {
-            bool on = _cardTab == which;
-            // The grudges tab explains itself when the pointer rests on it, rather than taking room on the card.
-            var tab = which == CardTab.Grudges ? new HelpLink { Heading = "Grudges", Lines = GrudgeHelp, TooltipText = "Grudges" } : new LinkButton();
-            tab.Text = title;
-            tab.Underline = on ? LinkButton.UnderlineMode.Always : LinkButton.UnderlineMode.OnHover;
-            tab.MouseDefaultCursorShape = Control.CursorShape.PointingHand;
-            tab.AddThemeColorOverride("font_color", on ? CardInk : CardFaint);
-            tab.AddThemeColorOverride("font_hover_color", new Color("9a2a22"));
-            tab.AddThemeFontSizeOverride("font_size", 13);
-            tab.Pressed += () => { _cardTab = which; RefreshBusiness(); };
-            if (tab is HelpLink help && _pinGrudgeHelp) PinHelp(help);
-            tabs.AddChild(tab);
-        }
+        CardTabs(lines);
         var grid = new GridContainer { Columns = 2, Visible = _cardTab == CardTab.Particulars };
         grid.AddThemeConstantOverride("h_separation", 12);
         grid.AddThemeConstantOverride("v_separation", 3);
         lines.AddChild(grid);
         if (_cardTab == CardTab.Character) CharacterTab(lines, id, known);
-        if (_cardTab == CardTab.Grudges) GrudgesTab(lines, id);
+        if (_cardTab == CardTab.Grudges) GrudgesTab(lines, Party.Resident, id);
         // Each line you know is a link where it leads somewhere: a place moves the map there, a person opens their card.
         void Line(string label, Fact fact, Func<string> value, Action? go = null)
         {
@@ -273,6 +240,48 @@ public partial class Main
         AddLabel(panel, "A bribed man tells you what he hears, and so does a frightened one for a while. Shaking someone down pays now; a snatch pays if the family comes up with the money. Every one but a bribe brings heat, and anyone can be seen doing it. A killing makes you feared and the neighbourhood talks of murder.", Palette.InkQuiet, wrap: true);
     }
 
+    /// <summary>A blank index card in the side panel with a name across the top. Returns where its lines go.</summary>
+    private static VBoxContainer NewCard(VBoxContainer panel, string name)
+    {
+        var card = new PanelContainer();
+        card.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = CardPaper, BorderColor = CardEdge, BorderWidthBottom = 2, BorderWidthLeft = 1, BorderWidthRight = 1, BorderWidthTop = 1,
+            CornerRadiusBottomLeft = 3, CornerRadiusBottomRight = 3, CornerRadiusTopLeft = 3, CornerRadiusTopRight = 3,
+            ContentMarginLeft = 12, ContentMarginRight = 12, ContentMarginTop = 8, ContentMarginBottom = 10,
+        });
+        panel.AddChild(card);
+        var lines = new VBoxContainer();
+        lines.AddThemeConstantOverride("separation", 2);
+        card.AddChild(lines);
+        AddLabel(lines, name, CardInk, 18);
+        lines.AddChild(new ColorRect { Color = CardRule, CustomMinimumSize = new Vector2(0, 2) });
+        return lines;
+    }
+
+    /// <summary>Tabs, like the dividers in a card file: the particulars, what sort of person they are, and their grudges.</summary>
+    private void CardTabs(VBoxContainer lines)
+    {
+        var tabs = new HBoxContainer();
+        tabs.AddThemeConstantOverride("separation", 14);
+        lines.AddChild(tabs);
+        foreach (var (title, which) in new[] { ("Particulars", CardTab.Particulars), ("Character", CardTab.Character), ("Grudges", CardTab.Grudges) })
+        {
+            bool on = _cardTab == which;
+            // The grudges tab explains itself when the pointer rests on it, rather than taking room on the card.
+            var tab = which == CardTab.Grudges ? new HelpLink { Heading = "Grudges", Lines = GrudgeHelp, TooltipText = "Grudges" } : new LinkButton();
+            tab.Text = title;
+            tab.Underline = on ? LinkButton.UnderlineMode.Always : LinkButton.UnderlineMode.OnHover;
+            tab.MouseDefaultCursorShape = Control.CursorShape.PointingHand;
+            tab.AddThemeColorOverride("font_color", on ? CardInk : CardFaint);
+            tab.AddThemeColorOverride("font_hover_color", new Color("9a2a22"));
+            tab.AddThemeFontSizeOverride("font_size", 13);
+            tab.Pressed += () => { _cardTab = which; RefreshBusiness(); };
+            if (tab is HelpLink help && _pinGrudgeHelp) PinHelp(help);
+            tabs.AddChild(tab);
+        }
+    }
+
     /// <summary>A line on the card for each of the people someone is close to that you know of, each one a way to their card.</summary>
     private void Family(GridContainer grid, int id, Citizen c, Fact known)
     {
@@ -357,16 +366,18 @@ public partial class Main
     };
 
     /// <summary>The card's third tab: who they have it in for, and who has it in for them, as far as you know.</summary>
-    private void GrudgesTab(VBoxContainer lines, int id)
+    private void GrudgesTab(VBoxContainer lines, Party who, int id)
     {
-        var d = _map.Directory!;
+        var d = _map.Directory;
         bool Shown(Grievance g) => _revealCitizens || g.Known;
-        var held = W.HeldBy(Party.Resident, id).Where(Shown).OrderByDescending(g => g.Amount).ToList();
-        var against = W.HeldAgainst(Party.Resident, id).Where(Shown).OrderByDescending(g => g.Amount).ToList();
-        string Over(Grievance g) => Content.Over(g, g.AboutId >= 0 && d.Exists(g.AboutId) ? d.Get(g.AboutId).Woman : null);
-        string Resident(int other) => !d.Exists(other) ? "someone" : KnownAbout(other).HasFlag(Fact.Name) || _revealCitizens ? d.Get(other).Name : "someone you don't know";
+        var held = W.HeldBy(who, id).Where(Shown).OrderByDescending(g => g.Amount).ToList();
+        var against = W.HeldAgainst(who, id).Where(Shown).OrderByDescending(g => g.Amount).ToList();
+        string Over(Grievance g) => Content.Over(g, g.AboutId >= 0 && d != null && d.Exists(g.AboutId) ? d.Get(g.AboutId).Woman : null);
+        string Resident(int other) => d == null || !d.Exists(other) ? "someone" : KnownAbout(other).HasFlag(Fact.Name) || _revealCitizens ? d.Get(other).Name : "someone you don't know";
         Color Heat(int amount) => amount >= Content.BeefingAt ? new Color("9a2a22") : amount >= Content.ScowlingAt ? new Color("7a3a2a") : CardInk;
         void Reason(string text) => AddLabel(lines, text, CardInk, 13, wrap: true);
+        // A gangster's card speaks of him; a resident's of them.
+        string subject = who == Party.Hood ? "He" : "They";
 
         AddLabel(lines, "Holds a grudge against", CardFaint, 13);
         foreach (var g in held)
@@ -377,10 +388,6 @@ public partial class Main
                 case Party.Gang:
                     AddLabel(lines, $"{words} {(g.TargetId == Me ? "you" : W.GangById(g.TargetId).Name)}", Heat(g.Amount), 15, wrap: true);
                     break;
-                case Party.Hood:
-                    var hood = W.Hoods.FirstOrDefault(x => x.Id == g.TargetId);
-                    AddLabel(lines, $"{words} {(hood == null ? "a gangster" : hood.Name + (hood.GangId == Me ? ", one of yours" : ""))}", Heat(g.Amount), 15, wrap: true);
-                    break;
                 default:
                     // Someone you can go and look at.
                     var row = new HBoxContainer();
@@ -390,27 +397,53 @@ public partial class Main
                     label.CustomMinimumSize = Vector2.Zero;
                     int other = g.TargetId;
                     var cop = g.Target == Party.Cop ? W.PersonById(other) : null;
+                    var hood = g.Target == Party.Hood ? W.Hoods.FirstOrDefault(x => x.Id == other) : null;
                     if (cop != null) CardLink(row, cop.Name, () => _map.PanTo(W.Map.LotAt(cop.LotId)));
                     else if (g.Target == Party.Cop) AddLabel(row, "a cop", Heat(g.Amount), 15);
+                    else if (hood != null) CardLink(row, hood.Name + (hood.GangId == Me && who != Party.Hood ? ", one of yours" : ""), () => OpenHood(other));
+                    else if (g.Target == Party.Hood) AddLabel(row, "a gangster", Heat(g.Amount), 15);
                     else CardLink(row, Resident(other), () => OpenCard(other));
                     break;
             }
             string they = g.Target switch { Party.Gang when g.TargetId == Me => "You", Party.Cop or Party.Hood => "He", _ => "They" };
             Reason($"{they} {Over(g)}.");
         }
-        if (held.Count == 0) AddLabel(lines, _revealCitizens ? "Nobody" : "Nobody you know of", CardInk);
+        if (held.Count == 0) AddLabel(lines, _revealCitizens || who == Party.Hood && W.HoodById(id).GangId == Me ? "Nobody" : "Nobody you know of", CardInk);
         lines.AddChild(new ColorRect { Color = CardRule, CustomMinimumSize = new Vector2(0, 1) });
-        AddLabel(lines, "Who has it in for them", CardFaint, 13);
-        foreach (var g in against)
+        AddLabel(lines, who == Party.Hood ? "Who has it in for him" : "Who has it in for them", CardFaint, 13);
+        // When a whole outfit mourns a man, its men are one line: the worst of them, and how many more.
+        int OutfitOf(Grievance g) => g.Holder == Party.Hood && W.Hoods.FirstOrDefault(x => x.Id == g.HolderId) is { } h ? h.GangId : -1;
+        foreach (var group in against.GroupBy(g => OutfitOf(g) >= 0 ? $"{OutfitOf(g)}|{g.Why}" : $"{g.Holder}|{g.HolderId}"))
         {
+            var g = group.First();
+            int others = group.Count() - 1;
             var row = new HFlowContainer();
             lines.AddChild(row);
             int holder = g.HolderId;
-            CardLink(row, Resident(holder), () => OpenCard(holder));
-            AddLabel(row, Content.GrudgeWords(g.Amount).ToLowerInvariant() + " them", Heat(g.Amount), 14);
-            Reason($"They {Over(g)}.");
+            if (g.Holder == Party.Hood && W.Hoods.FirstOrDefault(x => x.Id == holder) is { } man)
+            {
+                string outfit = man.GangId == Me ? "yours" : W.GangById(man.GangId).Name;
+                CardLink(row, man.Name + (others > 0 ? "" : man.GangId == Me ? ", one of yours" : $" of {outfit}"), () => OpenHood(holder));
+                if (others > 0)
+                {
+                    var more = AddLabel(row, $"and {others} more {(man.GangId == Me ? "of yours" : $"of {outfit}")}", CardInk, 14);
+                    more.AutowrapMode = TextServer.AutowrapMode.Off;
+                    more.CustomMinimumSize = Vector2.Zero;
+                }
+            }
+            else if (g.Holder == Party.Cop && W.PersonById(holder) is { } cop) CardLink(row, cop.Name, () => _map.PanTo(W.Map.LotAt(cop.LotId)));
+            else CardLink(row, Resident(holder), () => OpenCard(holder));
+            AddLabel(row, Content.GrudgeWords(g.Amount).ToLowerInvariant() + (who == Party.Hood ? " him" : " them"), Heat(g.Amount), 14);
+            Reason($"{subject} {Over(g)}.");
         }
         if (against.Count == 0) AddLabel(lines, _revealCitizens ? "Nobody" : "Nobody you know of", CardInk);
+    }
+
+    /// <summary>Open a gangster's card, and turn the rolodex to him if he's one of yours.</summary>
+    private void OpenHood(int hood)
+    {
+        _map.Select(hood: hood);
+        OnMapSelection();
     }
 
     /// <summary>A link on a card, in the card's ink, turning red under the pointer.</summary>

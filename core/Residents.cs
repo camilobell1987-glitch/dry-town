@@ -162,6 +162,7 @@ public sealed partial class World
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
+        Characterise(hood);
         return hood;
     }
 
@@ -373,6 +374,7 @@ public sealed partial class Simulation
             case Lean.Recruit when ok:
             {
                 var recruit = w.SignOn(gang, o.Who, o.Origin, o.Age, nerve);
+                w.BringAlong(recruit, o.CitizenId);
                 a.Standing = Standing.Joined;
                 a.GangId = gang.Id;
                 a.Note = $"Joined {gang.Name} in week {w.Week}.";

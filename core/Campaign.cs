@@ -157,6 +157,7 @@ public sealed partial class World
         };
         hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
         Hoods.Add(hood);
+        Characterise(hood);
         return hood;
     }
 }
