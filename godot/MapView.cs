@@ -112,6 +112,37 @@ public partial class MapView : Control
         ClampPan();
     }
 
+    /// <summary>
+    /// Bring a lot to the middle of the view without changing the zoom, close enough in to see who's on the street,
+    /// and ring it for a few seconds so the eye finds it.
+    /// </summary>
+    public void PanTo(Lot lot, bool mark = true)
+    {
+        if (_zoom < 6) ZoomAt(Origin + new Vector2(lot.X + 0.5f, lot.Y + 0.5f) * Tile, 6 / _zoom);
+        _pan += Size / 2 - (Origin + new Vector2(lot.X + 0.5f, lot.Y + 0.5f) * Tile);
+        ClampPan();
+        if (!mark) return;
+        _markLot = lot.Id;
+        _markedAt = _anim;
+    }
+
+    private int _markLot = -1;
+    private float _markedAt;
+
+    private void DrawMark()
+    {
+        if (_markLot < 0 || World == null) return;
+        float age = _anim - _markedAt;
+        if (age > 4) { _markLot = -1; return; }
+        var lot = Map.LotAt(_markLot);
+        var at = new Vector2(lot.X + 0.5f, lot.Y + 0.5f);
+        float pulse = 0.6f + 0.4f * Mathf.Sin(age * 6), fade = Mathf.Clamp(4 - age, 0, 1);
+        var keep = C;
+        C = DynAt(at.Y);
+        C.DrawArc(at * _t, _t * (0.7f + 0.1f * pulse), 0, Mathf.Tau, 32, new Color(Palette.Bad, fade * pulse), Px(3));
+        C = keep;
+    }
+
     /// <summary>Zoom about the middle of the map, for screenshots.</summary>
     public void ZoomCentre(float zoom) => ZoomAt(Size / 2, zoom / _zoom);
 
@@ -624,6 +655,7 @@ public partial class MapView : Control
         DrawLoiterers(view);
         DrawChatter(view);
         DrawCitizenRing();
+        DrawMark();
         DrawFires(view);
         DrawRiverTraffic(view);
         DrawTrain(night, view);

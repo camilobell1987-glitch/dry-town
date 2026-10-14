@@ -1499,6 +1499,8 @@ public partial class Main : Control
                     _ => hq,
                 };
                 _map.ResetView(lot, float.Parse(Arg("--zoom") ?? "4"));
+                // Ring the spot as a link on a card would, to see the mark.
+                if (Flag("--mark")) _map.PanTo(lot);
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
             else if (Arg("--zoom") is string zoom) { _map.ZoomCentre(float.Parse(zoom)); await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }
