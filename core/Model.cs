@@ -63,6 +63,12 @@ public sealed class Hood
     public Weapon Weapon { get; set; }
     public Car Car { get; set; }
 
+    /// <summary>Weeks the police go on looking for his car after it was seen at a job, or 0 when nobody's looking for it.</summary>
+    public int CarWanted { get; set; }
+
+    /// <summary>The job his car was seen at, while the police are looking for it.</summary>
+    public string CarWantedFor { get; set; } = "";
+
     /// <summary>The charge he's held on until his trial, or null. While it's open, JailWeeks counts down to the trial.</summary>
     public Case? Case { get; set; }
 
@@ -454,6 +460,15 @@ public sealed record ScriptAction(
 
     /// <summary>A raid by the Untouchables rather than the police.</summary>
     public bool Federal { get; init; }
+
+    /// <summary>The car the men drove to the job, as it was then: it may be in a lockup by the time they're home.</summary>
+    public Car Drove { get; init; }
+
+    /// <summary>The lockup the car, or a hijacked truck, was put away in on the way home, or -1.</summary>
+    public int LockupId { get; init; } = -1;
+
+    /// <summary>What went into the lockup was the hijacked truck, not the car.</summary>
+    public bool Truck { get; init; }
 }
 
 /// <summary>Who someone on the street is. Shopkeepers and gangsters are clicked through their businesses and gangs.</summary>

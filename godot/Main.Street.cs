@@ -15,6 +15,7 @@ public partial class Main
         if (_map.SelectedHood >= 0) { HoodPanel(W.HoodById(_map.SelectedHood)); return true; }
         if (_map.SelectedBank >= 0 && W.BankById(_map.SelectedBank) is { } bank) { BankPanel(bank); return true; }
         if (_map.SelectedShop >= 0) { ShopPanel(W.Map.LotAt(_map.SelectedShop)); return true; }
+        if (W.LockupById(_map.SelectedLockup) is { } lockup) { LockupPanel(lockup); return true; }
         return false;
     }
 

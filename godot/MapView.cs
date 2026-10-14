@@ -162,7 +162,7 @@ public partial class MapView : Control
 
     // ---- Live replay ----------------------------------------------------------
 
-    private sealed record Actor(ScriptAction Action, List<Vector2> Path, float Depart, float Arrive, float Leave, float Home, Color Colour, int Order);
+    private sealed record Actor(ScriptAction Action, List<Vector2> Path, float Depart, float Arrive, float Leave, float Home, Color Colour, int Order, Trip? Via = null);
 
     /// <summary>The simulation running the week, which the map steps forward as the clock moves.</summary>
     private Simulation? _sim;
@@ -209,7 +209,8 @@ public partial class MapView : Control
         {
             var a = World.Script[i];
             var path = StreetPath(a.FromLot, a.ToLot);
-            float hours = Simulation.TravelHours(World, a.FromLot, a.ToLot, Men(a.Backup.Prepend(a.HoodId)));
+            var ride = RideOf(a);
+            float hours = Simulation.WalkHours(World, a.FromLot, a.ToLot) / Content.Cars[ride].Speed;
             float arrive = a.Tick;
             // Sunday collectors set out in waves rather than all at once.
             if (a.Kind == ActionKind.Collect) arrive += (_collectIndex++ % 10) * 0.6f;
@@ -217,8 +218,11 @@ public partial class MapView : Control
             float leave = a.Kind == ActionKind.Guard ? Content.HoursPerWeek : arrive + linger;
             bool comesHome = (a.Result is not (ActionResult.Killed or ActionResult.Arrested) && a.CasualtyHoodId != a.HoodId) || a.Backup.Count > 0;
             float home = comesHome ? leave + hours : leave;
+            // Home by way of a lockup, when the car or a hijacked truck goes into one.
+            var via = comesHome ? TripVia(a, leave, ride) : null;
+            if (via != null) home = via.Shut + HomeFrom(via, a);
             var colour = a.Kind == ActionKind.Raid ? Palette.Police : Palette.Gang(World, a.GangId);
-            _actors.Add(new Actor(a, path, arrive - hours, arrive, leave, home, colour, i));
+            _actors.Add(new Actor(a, path, arrive - hours, arrive, leave, home, colour, i, via));
             _fired.Add(false);
         }
     }
@@ -336,6 +340,12 @@ public partial class MapView : Control
                 CitizenClicked?.Invoke(passerby);
                 return;
             }
+            if (!ShowWards && LockupUnder(click.Position) is int lockup and >= 0)
+            {
+                Select(lockup: lockup);
+                LockupClicked?.Invoke(lockup);
+                return;
+            }
             int lotId = LotUnder(click.Position);
             if (lotId < 0) return;
             var lot = World.Map.LotAt(lotId);
@@ -384,6 +394,7 @@ public partial class MapView : Control
     {
         if (World == null) return "";
         if (PickAt(atPosition) is { } who) return PersonTooltip(who);
+        if (World.LockupById(LockupUnder(atPosition)) is { } lockup) return LockupTooltip(lockup);
         int lotId = LotUnder(atPosition);
         if (lotId < 0) return "";
         var lot = World.Map.LotAt(lotId);
@@ -674,6 +685,7 @@ public partial class MapView : Control
         foreach (var lot in World!.Map.Lots)
             if (lot.Use != LotUse.Empty && view.HasPoint(new Vector2(lot.X, lot.Y))) DrawLotOutline(lot);
         if (Live) DrawActors();
+        DrawLockups(view);
         C = _frameGlow;
         foreach (var (at, strength) in _headlights) Glow(at, _t * 0.2f, new Color("fff2c0"), strength * 0.8f);
         _headlights.Clear();
@@ -775,6 +787,7 @@ public partial class MapView : Control
         if (now < actor.Depart || now > actor.Home + 0.01f) return null;
         if (now < actor.Arrive) return Along(actor.Path, (now - actor.Depart) / (actor.Arrive - actor.Depart));
         if (now <= actor.Leave) return actor.Path[^1];
+        if (actor.Via is { } via) return TripAt(actor, via, now);
         return Along(actor.Path, 1 - (now - actor.Leave) / Mathf.Max(0.01f, actor.Home - actor.Leave));
     }
 
@@ -788,6 +801,7 @@ public partial class MapView : Control
             if (now < actor.Depart || now > actor.Home + 0.01f) continue;
             var a = actor.Action;
             var target = actor.Path[^1];
+            if (actor.Via is { } via && now > actor.Leave) { DrawTripHome(actor, via, now, radius); continue; }
             Vector2 at, ahead;
             bool walking = true;
             if (now < actor.Arrive)
@@ -822,7 +836,7 @@ public partial class MapView : Control
             }
 
             // Men with a car drive there and back, and get out at the door.
-            if (walking && a.Kind is not (ActionKind.Raid or ActionKind.Collect) && CarFor(a.Backup.Prepend(a.HoodId)) is var car and not Car.None)
+            if (walking && a.Kind is not (ActionKind.Raid or ActionKind.Collect) && RideOf(a) is var car and not Car.None)
             {
                 DrawGangCar(at, ahead, actor.Colour, car);
                 continue;

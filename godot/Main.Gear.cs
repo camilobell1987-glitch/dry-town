@@ -12,8 +12,18 @@ public partial class Main
 
     private List<Hood> MyMen() => W.HoodsOf(Me).OrderBy(h => h.Id == W.Player.BossHoodId ? 0 : 1).ThenByDescending(h => h.Strength).ThenBy(h => h.Id).ToList();
 
-    private static string GearLine(Hood h) =>
-        $"Carries {(h.Weapon == Weapon.None ? "nothing" : "a " + Content.Guns[h.Weapon].Label)}; {(h.Car == Car.None ? "walks" : "drives a " + Content.Cars[h.Car].Label)}.";
+    private string GearLine(Hood h) =>
+        $"Carries {(h.Weapon == Weapon.None ? "nothing" : "a " + Content.Guns[h.Weapon].Label)}; {Driving(h)}.";
+
+    /// <summary>What a man drives, whether the police are after it, or where it's hidden.</summary>
+    private string Driving(Hood h)
+    {
+        if (h.Car != Car.None)
+            return $"drives a {Content.Cars[h.Car].Label}" + (h.CarWanted > 0 ? $" the police are looking for" : "");
+        return W.LockupWithCarOf(h) is { } l && l.GangId == h.GangId && h.GangId == Me
+            ? $"walks while his {Content.Cars[l.Car].Label} waits in a lockup"
+            : "walks";
+    }
 
     private void ShopPanel(Lot lot)
     {
@@ -97,6 +107,7 @@ public partial class Main
         var buttons = new HBoxContainer();
         AddButton(buttons, "Find a gun shop", () => GoShopping(man, LotUse.GunShop));
         AddButton(buttons, "Find a car dealer", () => GoShopping(man, LotUse.CarDealer));
+        AddButton(buttons, "Lockups", FindLockup);
         panel.AddChild(buttons);
     }
 

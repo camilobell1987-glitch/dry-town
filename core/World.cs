@@ -215,6 +215,7 @@ public sealed partial class World
         }
         world.PlaceSmallGangs();
         world.PlaceShops();
+        world.PlaceLockups();
         world.PlaceLines();
         world.PlaceLocals();
         return world;
@@ -541,6 +542,7 @@ public sealed partial class World
         Hostages = Hostages,
         Contracts = Contracts,
         Funerals = Funerals,
+        Lockups = Lockups,
         Acquaintances = Acquaintances,
         Wars = Wars,
         Goal = Goal,
@@ -591,6 +593,8 @@ public sealed partial class World
         w.Locals.AddRange(d.Locals);
         w.PlaceBanks();
         w.PlaceShops();
+        w.Lockups.AddRange(d.Lockups);
+        w.PlaceLockups();
         w.PlaceLines();
         w.PlaceLocals();
         w.GiveOrigins();

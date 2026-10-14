@@ -80,6 +80,8 @@ public sealed partial class World
         gang.Cash -= cost;
         Ledger(gang.Id).Spending += cost;
         hood.Car = car;
+        hood.CarWanted = 0;
+        hood.CarWantedFor = "";
         Log(EventKind.Gear, gang.Id, $"{hood.Name} of {gang.Name} drove a {Content.Cars[car].Label} off the lot.");
         return cost;
     }
@@ -92,6 +94,8 @@ public sealed partial class World
         {
             if (from.Car == Car.None) return false;
             (from.Car, to.Car) = (to.Car, from.Car);
+            (from.CarWanted, to.CarWanted) = (to.CarWanted, from.CarWanted);
+            (from.CarWantedFor, to.CarWantedFor) = (to.CarWantedFor, from.CarWantedFor);
         }
         else
         {

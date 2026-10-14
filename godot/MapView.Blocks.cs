@@ -40,23 +40,13 @@ public partial class MapView
         _alley = new int[Map.BlocksX, Map.BlocksY];
         _backAlley = new bool[Map.BlocksX, Map.BlocksY];
         _courtBlock = new bool[Map.BlocksX, Map.BlocksY];
-        var plain = new bool[Map.BlocksX, Map.BlocksY];
-        for (int by = 0; by < Map.BlocksY; by++)
-        for (int bx = 0; bx < Map.BlocksX; bx++)
-            plain[bx, by] = true;
         foreach (var lot in Map.Lots)
-        {
-            int bx = (lot.X - 1) / CityMap.StrideX, by = (lot.Y - 1) / CityMap.StrideY;
-            if (lot.Terrain != Terrain.Land || lot.Court) plain[bx, by] = false;
-            if (lot.Court) _courtBlock[bx, by] = true;
-        }
+            if (lot.Court) _courtBlock[(lot.X - 1) / CityMap.StrideX, (lot.Y - 1) / CityMap.StrideY] = true;
         for (int by = 0; by < Map.BlocksY; by++)
         for (int bx = 0; bx < Map.BlocksX; bx++)
         {
-            int k = bx * 131 + by;
-            if (!plain[bx, by] || Hash(k, 900) >= 0.55f) continue;
-            _alley[bx, by] = 1 + (int)(Hash(k, 901) * (CityMap.LotsPerBlockX - 1));
-            _backAlley[bx, by] = Hash(k, 902) < 0.5f;
+            _alley[bx, by] = Map.AlleyOf(bx, by);
+            _backAlley[bx, by] = Map.HasBackAlley(bx, by);
         }
     }
 
@@ -83,10 +73,11 @@ public partial class MapView
         if (a == 0) return (x0, y0, x1, y1);
         if (lx == a - 1) x1 = lot.X + 0.8f;
         if (lx == a) x0 = lot.X + 0.2f;
+        // Along a back alley the buildings stand back to make room for the lockups and the lane in front of them.
         if (_backAlley[bx, by])
         {
-            if (row == 0) y1 = lot.Y + 0.8f;
-            else y0 = lot.Y + 0.2f;
+            if (row == 0) y1 = lot.Y + CityMap.LockupFront;
+            else y0 = lot.Y + CityMap.LaneEdge - 1;
         }
         return (x0, y0, x1, y1);
     }
@@ -122,7 +113,7 @@ public partial class MapView
         var lane = Cobbles.Lightened(0.04f);
         float ax = x0 + a - 0.2f;
         C.DrawRect(R(ax, y0 - 0.02f, 0.4f, CityMap.LotsPerBlockY + 0.04f), lane);
-        if (_backAlley[bx, by]) C.DrawRect(R(x0, y0 + 0.8f, CityMap.LotsPerBlockX, 0.4f), lane);
+        if (_backAlley[bx, by]) C.DrawRect(R(x0, y0 + CityMap.LockupFront, CityMap.LotsPerBlockX, CityMap.LaneEdge - CityMap.LockupFront), lane);
         if (!Fine) return;
         // A gutter down the middle, and a puddle.
         C.DrawLine(P(ax + 0.2f, y0 + 0.05f), P(ax + 0.2f, y0 + CityMap.LotsPerBlockY - 0.05f), lane.Darkened(0.35f), Hair(0.03f));
