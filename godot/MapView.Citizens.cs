@@ -29,9 +29,18 @@ public partial class MapView
     /// <summary>Where resident n of a block is on the pavement now, in tiles, and whether he's out at all.</summary>
     private (Vector2 At, bool Out) CrowdSpot(int bx, int by, int n)
     {
+        // Someone with somewhere to be is where their day has taken them.
+        if (_crowdStart.Length > 0)
+        {
+            int index = _crowdStart[bx, by] + n;
+            int k = index * PlanFloats;
+            if (k + PlanFloats <= _plans.Length && _plans[k + 15] > 0)
+                return PlanSpot(index, CrowdHour) is { } spot && !Gone(bx, by, n) ? (spot, true) : (default, false);
+        }
         int salt = by * 7919 + bx * 104729 + n;
         float across = (Hash(salt, 910) - 0.5f) * 0.14f;
-        float outRoll = Hash(salt, 914), barRoll = Hash(salt, 915);
+        int who = Directory?.IdOf(bx, by, n) ?? -1;
+        float outRoll = Hash(salt, 914), barRoll = Directory is { } dir && dir.Exists(who) && dir.Get(who).Age < 18 ? 1 : Hash(salt, 915);
         float start = Hash(salt, 911) * CrowdPerimeter;
         float pace = (0.15f + Hash(salt, 912) * 0.12f) * (Hash(salt, 913) < 0.5f ? 1 : -1);
         float door = _crowdDoors.Length > 0 ? _crowdDoors[bx, by] : 0;
