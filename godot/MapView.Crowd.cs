@@ -119,7 +119,7 @@ void fragment() {
 
     /// <summary>Whether resident n of a block is held somewhere or dead.</summary>
     private bool Gone(int bx, int by, int n) =>
-        World!.StandingOf(by * World.Map.BlocksX * CityDirectory.PerBlock + bx * CityDirectory.PerBlock + n) is Standing.Held or Standing.Dead;
+        World!.StandingOf(by * World.Map.BlocksX * CityDirectory.PerBlock + bx * CityDirectory.PerBlock + n) is Standing.Held or Standing.Dead or Standing.Jailed;
     private const float CrowdW = 4.2f, CrowdH = 2.2f, CrowdPerimeter = 2 * (CrowdW + CrowdH);
 
     /// <summary>How far round a block's pavement a lot's front door is, from its north-west corner.</summary>
@@ -194,7 +194,7 @@ void fragment() {
     {
         if (_crowdMaterial == null) return;
         // Someone was snatched, killed or let go: take them off the street, or put them back.
-        int gone = World!.Acquaintances.Count(kv => kv.Value.Standing is Standing.Held or Standing.Dead);
+        int gone = World!.Acquaintances.Count(kv => kv.Value.Standing is Standing.Held or Standing.Dead or Standing.Jailed);
         if (gone != _goneCount)
         {
             _goneCount = gone;

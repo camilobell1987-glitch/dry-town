@@ -18,6 +18,7 @@ public static partial class Content
         Kin.Child => woman ? "Daughter" : "Son",
         Kin.Parent => woman ? "Mother" : "Father",
         Kin.Sibling => woman ? "Sister" : "Brother",
+        Kin.Lover => "Sweetheart",
         _ => "Works for",
     };
 }
@@ -74,7 +75,7 @@ public sealed partial class World
     public double Leverage(Gang g, int citizen)
     {
         var family = KnownTiesOf(citizen).Where(t => t.Kin != Kin.Employer).ToList();
-        double threat = Math.Min(Content.FamilyThreatMost, family.Count * Content.FamilyThreat);
+        double threat = Math.Min(Content.FamilyThreatMost, family.Count * Content.FamilyThreat) + Shame(citizen);
         if (family.Any(t => Acquaintances.TryGetValue(t.Id, out var r) && r.Standing == Standing.Held && r.GangId == g.Id)) threat += Content.HostageThreat;
         return threat;
     }

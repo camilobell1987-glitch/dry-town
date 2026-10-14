@@ -7,7 +7,16 @@ public sealed record Citizen(
     IReadOnlyList<Tie> Ties);
 
 /// <summary>How one resident is bound to another.</summary>
-public enum Kin { Spouse, Child, Parent, Sibling, Employer }
+public enum Kin { Spouse, Child, Parent, Sibling, Employer, Lover }
+
+/// <summary>What someone would rather nobody knew.</summary>
+public enum Vice { Lover, Drink, Gambling, Debt, Thief, Wanted }
+
+/// <summary>
+/// One of someone's secrets. What it concerns depends on the vice: the lover, the place they drink or gamble, the
+/// business they steal from (or -1 if they fence instead), or which crime and city they're wanted for.
+/// </summary>
+public readonly record struct Secret(Vice Vice, int Other);
 
 /// <summary>Someone a resident is bound to, and how: his wife, his son, the man he works for.</summary>
 public readonly record struct Tie(int Id, Kin Kin);
@@ -39,6 +48,7 @@ public sealed class CityDirectory
     private readonly Dictionary<int, int> _businessOfOwner = new();
     private readonly Dictionary<int, List<int>> _businessesInWard = new();
     private readonly Dictionary<int, Citizen> _cache = new();
+    private readonly Dictionary<int, IReadOnlyList<Secret>> _secrets = new();
 
     public CityDirectory(World w, Func<Lot, int> population, Func<Lot, bool> tenement)
     {
@@ -197,6 +207,55 @@ public sealed class CityDirectory
         var citizen = new Citizen(id, $"{first} {last}", woman, age, origin, job, homeLot, work, LandlordOf(homeLot), buildings, owns, worth, ties);
         _cache[id] = citizen;
         return citizen;
+    }
+
+    /// <summary>
+    /// What someone is hiding. About a third of grown-ups have something: a lover, a thirst, a habit at the tables,
+    /// a debt, a hand in the till, or a warrant out for them somewhere else.
+    /// </summary>
+    public IReadOnlyList<Secret> SecretsOf(int id)
+    {
+        if (_secrets.TryGetValue(id, out var known)) return known;
+        var c = Get(id);
+        var secrets = new List<Secret>();
+        if (c.Age >= 18 && Roll(id, 400) < 0.35)
+        {
+            int count = Roll(id, 401) < 0.25 ? 2 : 1;
+            var ward = _w.Map.LotAt(c.HomeLotId).WardId;
+            var nearby = _businessesInWard.GetValueOrDefault(ward);
+            for (int k = 0; k < count; k++)
+            {
+                double r = Roll(id, 402 + k);
+                var vice = r < 0.25 ? Vice.Lover : r < 0.5 ? Vice.Drink : r < 0.7 ? Vice.Gambling : r < 0.8 ? Vice.Debt : r < 0.9 ? Vice.Thief : Vice.Wanted;
+                int other = vice switch
+                {
+                    Vice.Lover => LoverFor(c, k),
+                    Vice.Drink or Vice.Gambling => nearby is { Count: > 0 } ? nearby[(int)(Roll(id, 410 + k) * nearby.Count)] : -1,
+                    Vice.Thief => c.WorkBusinessId,
+                    Vice.Wanted => (int)(Roll(id, 412 + k) * Content.WantedFor.Length) * 16 + (int)(Roll(id, 414 + k) * Content.WantedIn.Length),
+                    _ => -1,
+                };
+                if (vice == Vice.Lover && other < 0 || (vice is Vice.Drink or Vice.Gambling) && other < 0) vice = Vice.Debt;
+                if (secrets.Any(x => x.Vice == vice)) continue;
+                secrets.Add(new Secret(vice, other));
+            }
+        }
+        _secrets[id] = secrets;
+        return secrets;
+    }
+
+    /// <summary>A grown-up of the other sex from another household on the same block, or -1.</summary>
+    private int LoverFor(Citizen c, int k)
+    {
+        int block = c.Id / PerBlock, people = _blockPopulation[block];
+        for (int tries = 0; tries < 8; tries++)
+        {
+            int other = block * PerBlock + (int)(Roll(c.Id, 420 + k * 8 + tries) * people);
+            if (other == c.Id || c.Ties.Any(t => t.Id == other)) continue;
+            var them = Get(other);
+            if (them.Woman != c.Woman && them.Age >= 18 && Math.Abs(them.Age - c.Age) < 20) return other;
+        }
+        return -1;
     }
 
     /// <summary>

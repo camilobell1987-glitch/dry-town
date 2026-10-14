@@ -1,10 +1,10 @@
 namespace DryTown.Core;
 
 /// <summary>What a gang can do to one of the city's residents.</summary>
-public enum Lean { Bribe, Intimidate, Extort, Kidnap, Kill }
+public enum Lean { Bribe, Intimidate, Extort, Kidnap, Kill, Blackmail, TurnIn }
 
 /// <summary>Where a resident stands with you after you've dealt with him.</summary>
-public enum Standing { None, Bought, Scared, Held, Dead }
+public enum Standing { None, Bought, Scared, Held, Dead, Blackmailed, Jailed }
 
 /// <summary>Dealing with residents: buying them, scaring them, shaking them down, snatching them, or killing them.</summary>
 public static partial class Content
@@ -40,6 +40,8 @@ public static partial class Content
         Lean.Intimidate => "lean on",
         Lean.Extort => "shake down",
         Lean.Kidnap => "snatch",
+        Lean.Blackmail => "blackmail",
+        Lean.TurnIn => "turn in",
         _ => "kill",
     };
 }
@@ -65,7 +67,7 @@ public sealed partial class Acquaintance
     public int Tenements { get; set; }
 
     /// <summary>Whether he's bought or frightened by this gang just now.</summary>
-    public bool InPocketOf(int gangId) => GangId == gangId && Standing is Standing.Bought or Standing.Scared;
+    public bool InPocketOf(int gangId) => GangId == gangId && Standing is Standing.Bought or Standing.Scared or Standing.Blackmailed;
 }
 
 public sealed partial class World
@@ -92,8 +94,12 @@ public sealed partial class World
         return a?.Standing switch
         {
             Standing.Dead => "They're dead.",
+            Standing.Jailed => "They're in jail.",
             Standing.Held => a.GangId == g.Id ? "You're holding them already." : "Somebody else is holding them.",
             Standing.Bought when lean == Lean.Bribe => "They're on your payroll already.",
+            Standing.Blackmailed when lean == Lean.Blackmail => "They're paying you already.",
+            _ when lean == Lean.Blackmail && !KnownSecretsOf(citizen).Any() => "You've nothing on them yet.",
+            _ when lean == Lean.TurnIn && KnownCrime(citizen) == null => "You know of no crime to turn them in for.",
             _ when lean == Lean.Extort && a != null && Week - a.ShakenWeek < Content.ShakedownWeeks => "They were shaken down only lately. Give it a few weeks.",
             _ => null,
         };
@@ -129,8 +135,11 @@ public sealed partial class Simulation
         Lean.Bribe => 1.05 - nerve * 0.07 + man.Brains * 0.02,
         Lean.Intimidate or Lean.Extort => 0.35 + man.Intimidation * 0.06 - nerve * 0.04,
         Lean.Kidnap => 0.3 + man.Muscle * 0.04 + man.Stealth * 0.03 - nerve * 0.02,
+        Lean.Blackmail => 0.45 + man.Brains * 0.03 - nerve * 0.03,
+        // The police are glad of a tip, whoever it comes from.
+        Lean.TurnIn => 0.85 + man.Brains * 0.01,
         _ => 0.5 + man.Muscle * 0.04 + man.Stealth * 0.01 - nerve * 0.01,
-    } + KnowingHelps(lean, known) + (lean is Lean.Intimidate or Lean.Extort ? leverage : 0), 0.05, 0.95);
+    } + KnowingHelps(lean, known) + (lean is Lean.Intimidate or Lean.Extort or Lean.Blackmail ? leverage : 0), 0.05, 0.95);
 
     /// <summary>
     /// What it's worth knowing about someone before you go to him: where he lives, for a threat or a snatch; where he
@@ -145,6 +154,7 @@ public sealed partial class Simulation
             Lean.Intimidate => home * 0.08,
             Lean.Extort => home * 0.05 + work * 0.05,
             Lean.Kidnap => home * 0.12,
+            Lean.Blackmail or Lean.TurnIn => 0,
             _ => home * 0.05 + work * 0.05,
         };
     }
@@ -155,7 +165,7 @@ public sealed partial class Simulation
         (Lean.Kill, true) => 0.35,
         (Lean.Kill, false) => 0.6,
         (Lean.Kidnap, _) => 0.3,
-        (Lean.Bribe, _) => 0,
+        (Lean.Bribe or Lean.Blackmail or Lean.TurnIn, _) => 0,
         (_, false) => 0.15,
         _ => 0.05,
     };
@@ -243,6 +253,42 @@ public sealed partial class Simulation
                 result = ActionResult.Killed;
                 text = $"{man.Name} killed {o.Who} in the street.";
                 break;
+            case Lean.Blackmail when ok:
+                a.Standing = Standing.Blackmailed;
+                a.GangId = gang.Id;
+                a.UntilWeek = w.Week + Content.HushWeeks;
+                a.Known |= Fact.Name | Fact.Job | Fact.Work | Fact.Home;
+                w.Renown(gang, fear: 0.2);
+                text = $"{man.Name} let {o.Who} know what he knows. They'll pay ${World.HushMoney(o.Worth)} a week to keep it quiet.";
+                break;
+            case Lean.Blackmail:
+                gang.Heat = Math.Min(100, gang.Heat + 3);
+                text = $"{o.Who} called {man.Name}'s bluff and went to the police.";
+                break;
+            case Lean.TurnIn when ok:
+                var crime = w.KnownCrime(o.CitizenId)!.Value;
+                var (months, verdict) = Sentence(crime, o.Worth);
+                a.Standing = Standing.Jailed;
+                a.GangId = gang.Id;
+                a.UntilWeek = w.Week + Math.Max(1, months * Content.WeeksPerYear / 12);
+                int outYear = Content.StartYear + a.UntilWeek / Content.WeeksPerYear;
+                a.Note = $"Serving {Content.Term(months)} for {Content.Crime(crime)}. Due out in {outYear}.";
+                string trial = verdict switch
+                {
+                    Content.Verdict.Deal => "pleaded guilty for a lighter term and got",
+                    Content.Verdict.Harsh => "drew a hanging judge and got",
+                    _ => "got",
+                };
+                gang.Heat = Math.Max(0, gang.Heat - Content.TipHeat);
+                var shop = o.BusinessId >= 0 ? w.Businesses.FirstOrDefault(b => b.Id == o.BusinessId) : null;
+                if (shop != null) shop.ShutWeeks = Math.Max(shop.ShutWeeks, Content.ShutForOwner);
+                kind = ActionKind.Hire;
+                text = $"{man.Name} tipped off the precinct, and {o.Who} was taken in for {Content.Crime(crime)}. They {trial} {Content.Term(months)}.{(shop != null ? $" {shop.Name} is shut for a month while the family sorts things out." : "")} The police owe you one.";
+                break;
+            case Lean.TurnIn:
+                kind = ActionKind.Hire;
+                text = $"{man.Name} tipped off the precinct about {o.Who}, but the police couldn't make it stick.";
+                break;
             default:
                 gang.Heat = Math.Min(100, gang.Heat + 6);
                 Scare(o.CitizenId, a, gang);
@@ -253,6 +299,24 @@ public sealed partial class Simulation
         w.Log(EventKind.Street, gang.Id, text);
         w.Act(new ScriptAction(kind, gang.Id, man.Id, gang.HqLotId, o.LotId, -1, result, text));
         MaybeWitness(gang, man, lot, $"{man.Name} {Content.Label(o.Lean)} {o.Who}", WitnessChance(o.Lean, ok));
+    }
+
+    /// <summary>What the court gives someone for a crime, in months, and how the trial went.</summary>
+    private (int Months, Content.Verdict Verdict) Sentence(Secret crime, int worth)
+    {
+        var (least, most) = Content.Penalty(Content.Offence(crime));
+        var (deal, harsh) = Content.VerdictOdds(worth, World.Hall.Reform);
+        double roll = World.Rng.NextDouble();
+        var verdict = roll < deal ? Content.Verdict.Deal : roll < deal + harsh ? Content.Verdict.Harsh : Content.Verdict.Fair;
+        // A deal lands in the bottom third of the range, a hanging judge in the top third, anyone else in the middle.
+        double third = (most - least) / 3, at = World.Rng.NextDouble();
+        double years = verdict switch
+        {
+            Content.Verdict.Deal => least + at * third,
+            Content.Verdict.Harsh => most - third + at * third,
+            _ => least + third + at * third,
+        };
+        return ((int)Math.Round(years * 12), verdict);
     }
 
     private void Scare(int citizen, Acquaintance a, Gang gang)
@@ -271,10 +335,36 @@ public sealed partial class Simulation
     {
         var w = World;
         var payroll = new Dictionary<int, (int Paid, int People, int Quit)>();
+        var hush = new Dictionary<int, (int Paid, int People)>();
         foreach (var (id, a) in w.Acquaintances.OrderBy(kv => kv.Key))
         {
             var gang = w.Gangs.FirstOrDefault(g => g.Id == a.GangId);
             if (a.Standing == Standing.Scared && w.Week >= a.UntilWeek) a.Standing = Standing.None;
+            if (a.Standing == Standing.Jailed && w.Week >= a.UntilWeek)
+            {
+                a.Standing = Standing.None;
+                a.Note = "";
+            }
+            if (a.Standing == Standing.Blackmailed && gang != null)
+            {
+                if (!gang.Alive || w.Week >= a.UntilWeek) a.Standing = Standing.None;
+                else if (w.Rng.Chance(Content.HushSnaps))
+                {
+                    // He'd sooner face the shame than keep paying.
+                    a.Standing = Standing.None;
+                    gang.Heat = Math.Min(100, gang.Heat + 4);
+                    w.Log(EventKind.Street, gang.Id, "Someone you were blackmailing stopped paying and went to the police.");
+                }
+                else
+                {
+                    int paid = World.HushMoney(a.Worth);
+                    gang.Cash += paid;
+                    w.Ledger(gang.Id).Rackets += paid;
+                    var sum = hush.GetValueOrDefault(gang.Id);
+                    hush[gang.Id] = (sum.Paid + paid, sum.People + 1);
+                }
+                continue;
+            }
             if (a.Standing == Standing.Bought && gang != null)
             {
                 // A man on the payroll stays bought as long as the envelope keeps coming.
@@ -313,6 +403,8 @@ public sealed partial class Simulation
             a.UntilWeek = w.Week + Content.ScaredWeeks;
             a.Note = "";
         }
+        foreach (var (gangId, (paid, people)) in hush)
+            w.Log(EventKind.Street, gangId, $"Collected ${paid} in hush money from {(people == 1 ? "the one person" : $"the {people} people")} you're blackmailing.");
         foreach (var (gangId, (paid, people, quit)) in payroll)
         {
             if (people > 0) w.Log(EventKind.Street, gangId, $"Paid ${paid} to the {(people == 1 ? "one man" : $"{people} people")} on your payroll.");
