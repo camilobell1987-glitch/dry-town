@@ -1322,6 +1322,9 @@ public partial class Main : Control
                 "secret" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
                     .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n))
                     .OrderByDescending(i => directory.SecretsOf(i).Count(s => s.Vice == Vice.Lover) * 2 + directory.SecretsOf(i).Count).First(),
+                "torpedo" => directory.Population > 0 ? Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
+                    .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n))
+                    .OrderByDescending(i => directory.CharacterOf(i).Traits.Contains(Trait.WannabeTorpedo) ? 2 : directory.CharacterOf(i).Traits.Count(t => t >= Trait.StoolPigeon)).First() : 0,
                 "feud" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
                     .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n))
                     .First(i => directory.Get(i).Age >= 25 && directory.Get(i).Ties.Count(t => t.Kin != Kin.Employer) >= 2),

@@ -160,4 +160,99 @@ public class CharacterTests
         Assert.Equal(new[] { Trait.HardBoiled, Trait.Hothead }, a.Traits);
         Assert.Equal(new[] { Trait.Hothead }, a.KnownTraits);
     }
+
+    [Fact]
+    public void OnlyYoungMenWantToBeTorpedoes()
+    {
+        var (d, people) = Directory();
+        Assert.Contains(people, p => d.CharacterOf(p.Id).Traits.Contains(Trait.WannabeTorpedo));
+        Assert.All(people.Where(p => d.CharacterOf(p.Id).Traits.Contains(Trait.WannabeTorpedo)), p =>
+        {
+            Assert.False(p.Woman);
+            Assert.InRange(p.Age, 16, 30);
+        });
+        Assert.Equal("Flapper", Content.Label(Trait.Sheik, woman: true));
+        Assert.Equal("Sheik", Content.Label(Trait.Sheik, woman: false));
+    }
+
+    [Fact]
+    public void SportsGambleAndSheiksCarryOn()
+    {
+        var (d, people) = Directory();
+        var grown = people.Where(p => p.Age >= 18).ToList();
+        Assert.All(grown.Where(p => d.CharacterOf(p.Id).Traits.Contains(Trait.Sport)),
+            p => Assert.Contains(d.SecretsOf(p.Id), s => s.Vice == Vice.Gambling));
+        double Lovers(Func<Character, bool> f)
+        {
+            var group = grown.Where(p => f(d.CharacterOf(p.Id))).ToList();
+            return group.Count == 0 ? 0 : group.Count(p => d.SecretsOf(p.Id).Any(s => s.Vice == Vice.Lover)) / (double)group.Count;
+        }
+        Assert.True(Lovers(c => c.Traits.Contains(Trait.Sheik)) > Lovers(c => !c.Traits.Contains(Trait.Sheik)));
+    }
+
+    [Fact]
+    public void AWannabeTorpedoCanBeSignedOn()
+    {
+        var (sim, w, me, man) = Start();
+        int who = Enumerable.Range(1000, 500).First(id => w.NerveOf(id) >= 5);
+        w.Introduce(who, 1, Array.Empty<Tie>(), Array.Empty<Secret>(), Of(Background.Orphan, Trait.Sharp));
+        Assert.Equal("They've no wish to join an outfit.", w.CannotLean(me, who, Lean.Recruit));
+        w.Introduce(who + 1, 1, Array.Empty<Tie>(), Array.Empty<Secret>(), Of(Background.Orphan, Trait.WannabeTorpedo));
+        Assert.Null(w.CannotLean(me, who + 1, Lean.Recruit));
+        int men = w.HoodsOf(me.Id).Count();
+        var order = new LeanOrder(me.Id, man.Id, who + 1, w.HqOf(me).Id, "Vito Russo", Lean.Recruit, 10) { Origin = Ethnicity.Italian, Age = 19 };
+        sim.AdvanceWeek(new Dictionary<int, List<Order>> { [me.Id] = new() { order } });
+        if (w.StandingOf(who + 1) != Standing.Joined) return;
+        var recruit = w.HoodsOf(me.Id).Single(h => h.Name == "Vito Russo");
+        Assert.Equal(Ethnicity.Italian, recruit.Origin);
+        Assert.Equal("They're one of yours now.", w.CannotLean(me, who + 1, Lean.Kill));
+        Assert.True(w.HoodsOf(me.Id).Count() > men);
+    }
+
+    [Fact]
+    public void AStoolPigeonSingsToWhoeverPays()
+    {
+        var (_, w, me, _) = Start();
+        w.Introduce(7000, 2, Array.Empty<Tie>(), Array.Empty<Secret>(), Of(Background.Jailbird, Trait.StoolPigeon));
+        Assert.Equal(1, w.StoolPigeonsAgainst(me, 2));
+        Assert.False(w.StoolTipsOff(me, 2));
+        var a = w.Acquaintances[7000];
+        a.Standing = Standing.Bought;
+        a.GangId = me.Id;
+        Assert.Equal(0, w.StoolPigeonsAgainst(me, 2));
+        Assert.True(w.StoolTipsOff(me, 2));
+        Assert.True(Content.FailHeat(new[] { Trait.StoolPigeon }, Background.None) > 0);
+    }
+
+    [Fact]
+    public void ATwoTimerGoesOverToARivalAndAStandUpGuyStaysBought()
+    {
+        var sim = Simulation.New(new WorldSettings { Seed = 4, StartingGangs = 3, CityEventsEnabled = false, DirectorEnabled = false });
+        var w = sim.World;
+        var me = w.Player;
+        me.Cash = 100_000;
+        foreach (var g in w.Gangs) g.Cash = Math.Max(g.Cash, 5000);
+        w.Introduce(7000, 1, Array.Empty<Tie>(), Array.Empty<Secret>(), Of(Background.None, Trait.TwoTimer));
+        w.Introduce(7001, 1, Array.Empty<Tie>(), Array.Empty<Secret>(), Of(Background.None, Trait.StandUpGuy));
+        foreach (int id in new[] { 7000, 7001 })
+        {
+            var a = w.Acquaintances[id];
+            a.Standing = Standing.Bought;
+            a.GangId = me.Id;
+            a.Worth = 10;
+        }
+        w.Bear(Party.Resident, 7001, Party.Gang, me.Id, 80, "shook them down");
+        for (int i = 0; i < 60 && w.Acquaintances[7000].GangId == me.Id; i++) sim.AdvanceWeek(new Dictionary<int, List<Order>>());
+        Assert.NotEqual(me.Id, w.Acquaintances[7000].GangId);
+        Assert.Equal(Standing.Bought, w.Acquaintances[7001].Standing);
+        Assert.Equal(me.Id, w.Acquaintances[7001].GangId);
+    }
+
+    [Fact]
+    public void SomeoneWhoHoldsAGrudgeNeverLetsGo()
+    {
+        Assert.Equal(0, Content.GrievanceFade(new[] { Trait.HoldsAGrudge }));
+        Assert.True(Content.GrudgeTaken(new[] { Trait.HoldsAGrudge }, false) > 1);
+        Assert.True(Content.AsInformant(new[] { Trait.NosyParker }) > 1);
+    }
 }

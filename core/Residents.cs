@@ -1,10 +1,10 @@
 namespace DryTown.Core;
 
 /// <summary>What a gang can do to one of the city's residents.</summary>
-public enum Lean { Bribe, Intimidate, Extort, Kidnap, Kill, Blackmail, TurnIn, Square, Favour, GoodWord }
+public enum Lean { Bribe, Intimidate, Extort, Kidnap, Kill, Blackmail, TurnIn, Square, Favour, GoodWord, Recruit }
 
 /// <summary>Where a resident stands with you after you've dealt with him.</summary>
-public enum Standing { None, Bought, Scared, Held, Dead, Blackmailed, Jailed }
+public enum Standing { None, Bought, Scared, Held, Dead, Blackmailed, Jailed, Joined }
 
 /// <summary>Dealing with residents: buying them, scaring them, shaking them down, snatching them, or killing them.</summary>
 public static partial class Content
@@ -31,6 +31,12 @@ public static partial class Content
     public const double PocketShakedown = 0.25;
     public const int PocketStorm = 2, PocketResentment = 3;
 
+    /// <summary>The weekly chance a two-timer on someone's payroll goes over to a rival.</summary>
+    public const double TwoTimes = 0.08;
+
+    /// <summary>How much likelier a witness comes forward for each stool pigeon on the block not in the gang's pocket, and the most.</summary>
+    public const double StoolSings = 0.05, StoolSingsMost = 0.1;
+
     /// <summary>How many facts you need about someone before you can judge their nerve.</summary>
     public const int NerveFacts = 4;
 
@@ -45,6 +51,7 @@ public static partial class Content
         Lean.Square => "square things with",
         Lean.Favour => "do a good turn for",
         Lean.GoodWord => "put in a good word for",
+        Lean.Recruit => "sign on",
         _ => "kill",
     };
 }
@@ -98,6 +105,8 @@ public sealed partial class World
         {
             Standing.Dead => "They're dead.",
             Standing.Jailed => "They're in jail.",
+            Standing.Joined => a.GangId == g.Id ? "They're one of yours now." : "They've joined another outfit.",
+            _ when lean == Lean.Recruit && a?.Traits.Contains(Trait.WannabeTorpedo) != true => "They've no wish to join an outfit.",
             Standing.Held => a.GangId == g.Id ? "You're holding them already." : "Somebody else is holding them.",
             Standing.Bought when lean == Lean.Bribe => "They're on your payroll already.",
             Standing.Blackmailed when lean == Lean.Blackmail => "They're paying you already.",
@@ -124,13 +133,50 @@ public sealed partial class World
     public bool OwnerInPocket(Gang g, Business biz) =>
         g.IsPlayer && Acquaintances.Values.Any(a => a.BusinessId == biz.Id && a.InPocketOf(g.Id));
 
+    /// <summary>Whether a gang has a stool pigeon in a ward on its payroll, who hears from the cops before a raid.</summary>
+    public bool StoolTipsOff(Gang g, int wardId) =>
+        Acquaintances.Values.Any(a => a.WardId == wardId && a.Standing == Standing.Bought && a.GangId == g.Id && a.Traits.Contains(Trait.StoolPigeon));
+
+    /// <summary>How many stool pigeons on a block aren't in a gang's pocket, to tell the cops what it does.</summary>
+    public int StoolPigeonsAgainst(Gang g, int wardId) =>
+        Acquaintances.Values.Count(a => a.WardId == wardId && a.Traits.Contains(Trait.StoolPigeon) && !a.InPocketOf(g.Id)
+            && a.Standing is not (Standing.Dead or Standing.Jailed or Standing.Held or Standing.Joined));
+
+    /// <summary>A young tough from the neighbourhood joins the outfit, with the nerve he showed on the street.</summary>
+    public Hood SignOn(Gang gang, string name, Ethnicity origin, int age, int nerve)
+    {
+        var hood = new Hood
+        {
+            Id = _nextHoodId++,
+            Name = name,
+            GangId = gang.Id,
+            Intimidation = Math.Clamp(nerve / 2 + Rng.Range(1, 5), 1, 10),
+            Muscle = Rng.Range(3, 8),
+            Brains = Rng.Range(1, 6),
+            Stealth = Rng.Range(2, 7),
+            Loyalty = StartingLoyalty(gang.Id, origin, Rng.Range(60, 90)),
+            Ambition = Rng.Range(40, 90),
+            JoinedWeek = Week,
+            BornWeek = Week - age * Content.WeeksPerYear,
+            Origin = origin,
+        };
+        hood.Wage = 14 + (hood.Strength + hood.Brains) * 2;
+        Hoods.Add(hood);
+        return hood;
+    }
+
     /// <summary>How many people in a ward are in a gang's pocket, a landlord counting once more for each building he owns.</summary>
     public double InPocket(Gang g, int wardId) =>
         !g.IsPlayer || wardId < 0 ? 0 : Acquaintances.Values.Where(a => a.WardId == wardId && a.InPocketOf(g.Id)).Sum(a => (1 + a.Tenements) * Content.AsInformant(a.Traits));
 }
 
 /// <summary>Send a man to deal with a resident.</summary>
-public sealed record LeanOrder(int GangId, int HoodId, int CitizenId, int LotId, string Who, Lean Lean, int Worth, int BusinessId = -1, int Tenements = 0) : Order(GangId);
+public sealed record LeanOrder(int GangId, int HoodId, int CitizenId, int LotId, string Who, Lean Lean, int Worth, int BusinessId = -1, int Tenements = 0) : Order(GangId)
+{
+    /// <summary>For a recruit: where his people came from, and how old he is.</summary>
+    public Ethnicity Origin { get; init; }
+    public int Age { get; init; } = 20;
+}
 
 public sealed partial class Simulation
 {
@@ -149,6 +195,8 @@ public sealed partial class Simulation
         // A good turn costs nothing but the man's week, and most people take one.
         Lean.Favour => 0.7 + man.Brains * 0.02 - nerve * 0.01,
         Lean.GoodWord => 0.45 + man.Brains * 0.03,
+        // A young tough is glad to be asked by a man who looks the part.
+        Lean.Recruit => 0.4 + man.Intimidation * 0.03,
         _ => 0.5 + man.Muscle * 0.04 + man.Stealth * 0.01 - nerve * 0.01,
     } + KnowingHelps(lean, known) + (lean is Lean.Intimidate or Lean.Extort or Lean.Blackmail ? leverage : 0), 0.05, 0.95);
 
@@ -167,6 +215,7 @@ public sealed partial class Simulation
             Lean.Kidnap => home * 0.12,
             Lean.Blackmail or Lean.TurnIn or Lean.Square => 0,
             Lean.Favour => home * 0.05,
+            Lean.Recruit => origin * 0.1,
             Lean.GoodWord => work * 0.1,
             _ => home * 0.05 + work * 0.05,
         };
@@ -178,7 +227,7 @@ public sealed partial class Simulation
         (Lean.Kill, true) => 0.35,
         (Lean.Kill, false) => 0.6,
         (Lean.Kidnap, _) => 0.3,
-        (Lean.Bribe or Lean.Blackmail or Lean.TurnIn or Lean.Square or Lean.Favour or Lean.GoodWord, _) => 0,
+        (Lean.Bribe or Lean.Blackmail or Lean.TurnIn or Lean.Square or Lean.Favour or Lean.GoodWord or Lean.Recruit, _) => 0,
         (_, false) => 0.15,
         _ => 0.05,
     };
@@ -321,6 +370,21 @@ public sealed partial class Simulation
                 kind = ActionKind.Hire;
                 text = $"{man.Name} squared things with {o.Who} for ${price}. They'll let it lie.";
                 break;
+            case Lean.Recruit when ok:
+            {
+                var recruit = w.SignOn(gang, o.Who, o.Origin, o.Age, nerve);
+                a.Standing = Standing.Joined;
+                a.GangId = gang.Id;
+                a.Note = $"Joined {gang.Name} in week {w.Week}.";
+                kind = ActionKind.Hire;
+                text = $"{man.Name} signed on {recruit.Name}, who has been wanting in for a long while.";
+                w.Log(EventKind.Recruited, gang.Id, text);
+                break;
+            }
+            case Lean.Recruit:
+                kind = ActionKind.Hire;
+                text = $"{o.Who} talked big, but backed out when {man.Name} offered him a place.";
+                break;
             case Lean.Favour when ok:
                 foreach (var g in w.AgainstGang(gang, Party.Resident, o.CitizenId).ToList())
                 {
@@ -368,7 +432,7 @@ public sealed partial class Simulation
                 text = $"{man.Name} went after {o.Who}, who got away hurt and terrified.";
                 break;
         }
-        if (o.Lean is not (Lean.Square or Lean.Favour or Lean.GoodWord)) Wronged(gang, man, a, o.CitizenId, o.Lean, ok, lot.WardId);
+        if (o.Lean is not (Lean.Square or Lean.Favour or Lean.GoodWord or Lean.Recruit)) Wronged(gang, man, a, o.CitizenId, o.Lean, ok, lot.WardId);
         w.Log(EventKind.Street, gang.Id, text);
         w.Act(new ScriptAction(kind, gang.Id, man.Id, gang.HqLotId, o.LotId, -1, result, text));
         MaybeWitness(gang, man, lot, $"{man.Name} {Content.Label(o.Lean)} {o.Who}", WitnessChance(o.Lean, ok));
@@ -394,7 +458,7 @@ public sealed partial class Simulation
 
     private void Scare(int citizen, Acquaintance a, Gang gang)
     {
-        if (a.Standing is Standing.Bought or Standing.Held or Standing.Dead) return;
+        if (a.Standing is Standing.Bought or Standing.Held or Standing.Dead or Standing.Joined) return;
         a.Standing = Standing.Scared;
         a.GangId = gang.Id;
         a.UntilWeek = World.Week + Content.ScaredWeeks;
@@ -421,7 +485,7 @@ public sealed partial class Simulation
             if (a.Standing == Standing.Blackmailed && gang != null)
             {
                 if (!gang.Alive || w.Week >= a.UntilWeek) a.Standing = Standing.None;
-                else if (w.Rng.Chance(Content.HushSnaps * (a.Traits.Contains(Trait.HardBoiled) ? 2 : 1) * (a.Traits.Contains(Trait.Hothead) ? 1.5 : 1) * (a.Traits.Contains(Trait.Yellow) ? 0.5 : 1)))
+                else if (!a.Traits.Contains(Trait.StandUpGuy) && w.Rng.Chance(Content.HushSnaps * (a.Traits.Contains(Trait.HardBoiled) ? 2 : 1) * (a.Traits.Contains(Trait.Hothead) ? 1.5 : 1) * (a.Traits.Contains(Trait.Yellow) ? 0.5 : 1)))
                 {
                     // He'd sooner face the shame than keep paying.
                     a.Standing = Standing.None;
@@ -444,7 +508,17 @@ public sealed partial class Simulation
                 int due = World.Retainer(a.Worth);
                 var sum = payroll.GetValueOrDefault(gang.Id);
                 int grudge = w.BadBlood(gang, id);
-                if (grudge >= Content.QuitGrudge && w.Rng.Chance(grudge / 800.0))
+                // A stand-up guy stays bought. A two-timer takes a better offer when one comes.
+                var rival = a.Traits.Contains(Trait.TwoTimer) && w.Rng.Chance(Content.TwoTimes)
+                    ? w.LivingGangs.Where(x => x.Id != gang.Id && x.Cash >= World.BribePrice(a.Worth)).OrderBy(x => x.Id).FirstOrDefault() : null;
+                if (rival != null)
+                {
+                    a.GangId = rival.Id;
+                    rival.Cash -= World.BribePrice(a.Worth);
+                    if (gang.IsPlayer) w.Log(EventKind.Street, gang.Id, $"Someone on your payroll took {rival.Name}'s money too, and works for them now.");
+                    continue;
+                }
+                if (!a.Traits.Contains(Trait.StandUpGuy) && grudge >= Content.QuitGrudge && w.Rng.Chance(grudge / 800.0))
                 {
                     // The money never made up for what was done to them.
                     a.Standing = Standing.None;

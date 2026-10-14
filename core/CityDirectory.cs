@@ -248,6 +248,15 @@ public sealed partial class CityDirectory
         var bars = _businessesInWard.GetValueOrDefault(_w.Map.LotAt(c.HomeLotId).WardId);
         if (c.Age >= 18 && character.Traits.Contains(Trait.Souse) && !secrets.Any(x => x.Vice == Vice.Drink) && bars is { Count: > 0 })
             secrets.Add(new Secret(Vice.Drink, bars[(int)(Roll(id, 430) * bars.Count)]));
+        // A sport gambles somewhere, and often owes for it.
+        if (c.Age >= 18 && character.Traits.Contains(Trait.Sport))
+        {
+            if (!secrets.Any(x => x.Vice == Vice.Gambling) && bars is { Count: > 0 }) secrets.Add(new Secret(Vice.Gambling, bars[(int)(Roll(id, 431) * bars.Count)]));
+            if (!secrets.Any(x => x.Vice == Vice.Debt) && Roll(id, 432) < 0.5) secrets.Add(new Secret(Vice.Debt, -1));
+        }
+        // A sheik or a flapper is usually seeing somebody.
+        if (c.Age >= 18 && character.Traits.Contains(Trait.Sheik) && !secrets.Any(x => x.Vice == Vice.Lover) && Roll(id, 433) < 0.7 && LoverFor(c, 5) is int lover and >= 0)
+            secrets.Add(new Secret(Vice.Lover, lover));
         _secrets[id] = secrets;
         return secrets;
     }

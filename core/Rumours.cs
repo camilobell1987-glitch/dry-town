@@ -116,7 +116,9 @@ public sealed partial class Simulation
         w.Meet(o.CitizenId, ward);
         // Someone with a grudge against them is only too glad to talk.
         bool enemies = w.HasEnemies(o.CitizenId);
-        double bonus = (w.HoldsTurfIn(gang, ward) ? 0.15 : 0) + w.TalkOf(o.CitizenId) + (enemies ? Content.EnemyTalks : 0);
+        // A nosy parker on your payroll on the block has seen it all.
+        bool nosy = w.Acquaintances.Values.Any(x => x.WardId == ward && x.InPocketOf(gang.Id) && x.Traits.Contains(Trait.NosyParker));
+        double bonus = (w.HoldsTurfIn(gang, ward) ? 0.15 : 0) + w.TalkOf(o.CitizenId) + (enemies ? Content.EnemyTalks : 0) + (nosy ? 0.1 : 0);
         var unknown = Content.Facts.Where(f => !w.KnownAbout(o.CitizenId).HasFlag(f)).ToList();
         var heard = Fact.None;
         foreach (var fact in unknown)

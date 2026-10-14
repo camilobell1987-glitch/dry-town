@@ -1,7 +1,8 @@
 namespace DryTown.Core;
 
 /// <summary>What sort of person someone is, in the words of the day.</summary>
-public enum Trait { Pious, OnTheTake, HardBoiled, Yellow, Blabbermouth, Clam, SquareShooter, Hothead, Sap, Sharp, Tightwad, FamilyMan, Souse }
+public enum Trait { Pious, OnTheTake, HardBoiled, Yellow, Blabbermouth, Clam, SquareShooter, Hothead, Sap, Sharp, Tightwad, FamilyMan, Souse,
+    StoolPigeon, TwoTimer, HoldsAGrudge, WannabeTorpedo, StandUpGuy, NosyParker, Sport, Sheik }
 
 /// <summary>Where someone came from, which makes some traits likelier than others.</summary>
 public enum Background { None, Doughboy, Orphan, Greenhorn, Jailbird, PreachersKid, OldMoney, Hayseed, UnionMan }
@@ -25,8 +26,20 @@ public static partial class Content
         Trait.Sharp => "Sharp as a tack",
         Trait.Tightwad => "Tightwad",
         Trait.FamilyMan => "Family first",
+        Trait.StoolPigeon => "Stool pigeon",
+        Trait.TwoTimer => "Two-timer",
+        Trait.HoldsAGrudge => "Holds a grudge",
+        Trait.WannabeTorpedo => "Wannabe torpedo",
+        Trait.StandUpGuy => "Stand-up guy",
+        Trait.NosyParker => "Nosy Parker",
+        Trait.Sport => "Sport",
+        Trait.Sheik => "Sheik",
         _ => "Souse",
     };
+
+    /// <summary>A trait's name for this person: a fast-living woman is a flapper, not a sheik.</summary>
+    public static string Label(Trait t, bool woman) => t == Trait.Sheik && woman ? "Flapper"
+        : t == Trait.StandUpGuy && woman ? "Stand-up dame" : Label(t);
 
     /// <summary>What a trait means for anyone dealing with them.</summary>
     public static string Meaning(Trait t) => t switch
@@ -43,6 +56,14 @@ public static partial class Content
         Trait.Sharp => "Nobody's fool. Spots a tail and calls a bluff.",
         Trait.Tightwad => "Pinches every penny. A bribe has to be worth their while.",
         Trait.FamilyMan => "Would do anything for their own. Threats to the family work wonders.",
+        Trait.StoolPigeon => "Sings to the cops about anything they see. Buy them and they sing to you instead, and warn you before a raid.",
+        Trait.TwoTimer => "Takes anybody's money, and yours is no different. Cheap to buy, but liable to go over to a rival.",
+        Trait.HoldsAGrudge => "Never forgets a wrong. Takes things harder than most, and their grudges never fade on their own.",
+        Trait.WannabeTorpedo => "A young tough who wants in. Ask and they'll join your outfit.",
+        Trait.StandUpGuy => "Keeps their word and their mouth shut. Once bought, stays bought; blackmailed, keeps paying.",
+        Trait.NosyParker => "Has an eye on every window on the block. In your pocket, worth two of anybody else for news.",
+        Trait.Sport => "Can't keep away from the card table or the track. Always short, so money talks, and they owe somebody.",
+        Trait.Sheik => "Fast living and sweet talk. Never short of an admirer, and likely carrying on with someone.",
         _ => "Never far from a bottle. Talks too much when they drink.",
     };
 
@@ -76,6 +97,7 @@ public static partial class Content
     private static double TraitWeight(Trait t) => t switch
     {
         Trait.Pious or Trait.OnTheTake or Trait.Blabbermouth or Trait.Tightwad or Trait.FamilyMan => 1.2,
+        Trait.WannabeTorpedo or Trait.StoolPigeon or Trait.TwoTimer => 0.7,
         Trait.HardBoiled or Trait.Yellow or Trait.Clam or Trait.SquareShooter or Trait.Hothead or Trait.Sap or Trait.Souse => 1,
         _ => 0.8,
     };
@@ -87,6 +109,23 @@ public static partial class Content
         (Background.Doughboy, Trait.Hothead) => 2,
         (Background.Doughboy, Trait.Souse) => 1.5,
         (Background.Doughboy, Trait.Yellow) => 0.2,
+        (Background.Doughboy, Trait.StandUpGuy) => 1.5,
+        (Background.Doughboy, Trait.HoldsAGrudge) => 1.5,
+        (Background.Orphan, Trait.WannabeTorpedo) => 2.5,
+        (Background.Orphan, Trait.TwoTimer) => 1.5,
+        (Background.Orphan, Trait.HoldsAGrudge) => 1.5,
+        (Background.Jailbird, Trait.StoolPigeon) => 1.5,
+        (Background.Jailbird, Trait.StandUpGuy) => 2,
+        (Background.Jailbird, Trait.WannabeTorpedo) => 2,
+        (Background.Greenhorn, Trait.StandUpGuy) => 1.3,
+        (Background.Hayseed, Trait.NosyParker) => 1.5,
+        (Background.OldMoney, Trait.Sport) => 1.8,
+        (Background.OldMoney, Trait.Sheik) => 1.5,
+        (Background.OldMoney, Trait.WannabeTorpedo) => 0.2,
+        (Background.PreachersKid, Trait.Sport) => 0.3,
+        (Background.PreachersKid, Trait.Sheik) => 0.3,
+        (Background.UnionMan, Trait.StandUpGuy) => 2,
+        (Background.UnionMan, Trait.StoolPigeon) => 0.3,
         (Background.Orphan, Trait.Clam) => 2,
         (Background.Orphan, Trait.OnTheTake) => 1.8,
         (Background.Orphan, Trait.HardBoiled) => 1.5,
@@ -129,8 +168,16 @@ public static partial class Content
         (Trait.SquareShooter, Trait.OnTheTake) or (Trait.OnTheTake, Trait.SquareShooter) => true,
         (Trait.Sap, Trait.Sharp) or (Trait.Sharp, Trait.Sap) => true,
         (Trait.Hothead, Trait.Yellow) or (Trait.Yellow, Trait.Hothead) => true,
-        _ => false,
+        _ => Pair(a, b, Trait.StoolPigeon, Trait.Clam) || Pair(a, b, Trait.StoolPigeon, Trait.StandUpGuy) || Pair(a, b, Trait.TwoTimer, Trait.StandUpGuy)
+            || Pair(a, b, Trait.TwoTimer, Trait.SquareShooter) || Pair(a, b, Trait.HoldsAGrudge, Trait.Pious) || Pair(a, b, Trait.HoldsAGrudge, Trait.Sap)
+            || Pair(a, b, Trait.StandUpGuy, Trait.Blabbermouth) || Pair(a, b, Trait.StandUpGuy, Trait.Yellow) || Pair(a, b, Trait.Sheik, Trait.Pious)
+            || Pair(a, b, Trait.Sport, Trait.Tightwad) || Pair(a, b, Trait.WannabeTorpedo, Trait.Pious) || Pair(a, b, Trait.WannabeTorpedo, Trait.Yellow),
     };
+
+    private static bool Pair(Trait a, Trait b, Trait x, Trait y) => a == x && b == y || a == y && b == x;
+
+    /// <summary>Whether someone of this age and sex could be this sort: only a young man wants to be a torpedo.</summary>
+    public static bool Fits(Trait t, int age, bool woman) => t != Trait.WannabeTorpedo || !woman && age is >= 16 and <= 30;
 
     /// <summary>
     /// How much a trait changes the odds of each way of dealing with someone. The pious and the tightwad don't take
@@ -151,6 +198,12 @@ public static partial class Content
         (Trait.Hothead, Lean.Intimidate or Lean.Extort) => -0.12,
         (Trait.Hothead, Lean.Kidnap) => -0.1,
         (Trait.SquareShooter, Lean.Bribe) => -0.15,
+        (Trait.StoolPigeon or Trait.Sport, Lean.Bribe) => 0.1,
+        (Trait.TwoTimer, Lean.Bribe) => 0.2,
+        (Trait.StandUpGuy, Lean.Bribe) => -0.05,
+        (Trait.StandUpGuy, Lean.Intimidate or Lean.Extort) => -0.1,
+        (Trait.WannabeTorpedo, Lean.Recruit) => 0.4,
+        (Trait.HoldsAGrudge, Lean.Square or Lean.Favour or Lean.GoodWord) => -0.15,
         (Trait.OnTheTake, Lean.Square) => 0.15,
         (Trait.Tightwad or Trait.Pious, Lean.Square) => 0.1,
         (Trait.Hothead or Trait.HardBoiled, Lean.Square) => -0.1,
@@ -166,16 +219,18 @@ public static partial class Content
         Trait.Blabbermouth => 0.15,
         Trait.Souse => 0.06,
         Trait.Clam => -0.12,
+        Trait.Sheik => 0.05,
+        Trait.StandUpGuy => -0.05,
         _ => 0,
     };
 
     /// <summary>How much someone in your pocket counts as an informant: a blabbermouth tells you twice as much, a clam half.</summary>
     public static double AsInformant(IEnumerable<Trait> traits) =>
-        traits.Contains(Trait.Blabbermouth) ? 2 : traits.Contains(Trait.Clam) ? 0.5 : 1;
+        (traits.Contains(Trait.Blabbermouth) ? 2 : traits.Contains(Trait.Clam) ? 0.5 : 1) * (traits.Contains(Trait.NosyParker) ? 1.5 : 1);
 
     /// <summary>Extra heat when an attempt on someone fails, because they go straight to the cops, or less if they never would.</summary>
     public static int FailHeat(IEnumerable<Trait> traits, Background b) =>
-        (traits.Contains(Trait.SquareShooter) ? 2 : 0) + (traits.Contains(Trait.Pious) ? 1 : 0)
+        (traits.Contains(Trait.SquareShooter) || traits.Contains(Trait.StoolPigeon) ? 2 : 0) + (traits.Contains(Trait.Pious) ? 1 : 0)
         - (traits.Contains(Trait.Clam) || b == Background.Jailbird ? 1 : 0);
 
     /// <summary>The weighted chance of each trait for someone of this background, for picking.</summary>
@@ -211,7 +266,7 @@ public sealed partial class CityDirectory
         var all = Enum.GetValues<Trait>();
         for (int k = 0; k < count; k++)
         {
-            var open = all.Where(t => !traits.Contains(t) && !traits.Any(x => Content.Clash(x, t))).ToList();
+            var open = all.Where(t => !traits.Contains(t) && !traits.Any(x => Content.Clash(x, t)) && Content.Fits(t, c.Age, c.Woman)).ToList();
             double total = open.Sum(t => Content.TraitChance(background, t)), roll = Roll(id, 503 + k) * total;
             foreach (var t in open)
             {
