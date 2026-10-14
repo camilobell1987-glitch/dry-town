@@ -433,7 +433,7 @@ public partial class MapView : Control
         if (World == null || lot.WardId >= World.Wards.Count) return "";
         var ward = World.Wards[lot.WardId];
         string whose = ward.Reformer ? "a reformer" : ward.OwnerGangId >= 0 ? $"on {World.GangById(ward.OwnerGangId).Name}'s payroll" : "a party man";
-        return $"\n{ward.Name}: Alderman {ward.Alderman}, {whose}";
+        return $"{ZoneLine(lot)} · {ward.Name}: Alderman {ward.Alderman}, {whose}";
     }
 
     // ---- Layers ---------------------------------------------------------------

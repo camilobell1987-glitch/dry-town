@@ -1559,6 +1559,9 @@ public partial class Main : Control
                     "church" => W.Map.Lots.Where(l => l.Terrain == Terrain.Church).OrderBy(l => W.Map.Distance(hq, l)).First(),
                     "raid" => W.Script.LastOrDefault(x => x.Kind == ActionKind.Raid) is { } raid ? W.Map.LotAt(raid.ToLot) : hq,
                     "row" => ShopRowNearHq() ?? hq,
+                    "civic" => W.Map.Lots.Where(l => l.Terrain == Terrain.Civic).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    _ when focus.StartsWith("zone:") && Enum.TryParse<Zone>(focus[5..], true, out var zone) =>
+                        W.Map.Lots.Where(l => W.Map.ZoneOf(l) == zone && l.Terrain == Terrain.Land).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "garage" => W.Garages.Where(g => !g.Police).Select(g => W.Map.LotAt(g.LotId)).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     _ when int.TryParse(focus, out int lotId) => W.Map.LotAt(lotId),
                     "precinct" => W.Map.Lots.Where(l => l.Use == LotUse.Precinct).OrderBy(l => W.Map.Distance(hq, l)).First(),

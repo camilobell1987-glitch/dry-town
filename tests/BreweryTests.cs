@@ -82,7 +82,7 @@ public class BreweryTests
     [Fact]
     public void TheSquadGoesForTheBreweryFirst()
     {
-        var (sim, w, me) = Start(Y1927 + 10, gangs: 2, seed: 2);
+        var (sim, w, me) = Start(Y1927 + 10, gangs: 2, seed: 7);
         Give(w, me, RacketKind.Speakeasy, 6);
         var brewery = Give(w, me, RacketKind.Brewery, 1)[0];
         foreach (var h in w.HoodsOf(me.Id)) h.Stealth = 1;

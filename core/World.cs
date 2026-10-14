@@ -264,7 +264,22 @@ public sealed partial class World
         var firsts = kinds.ToList();
         Rng.Shuffle(firsts);
         Lot? row = null;
-        int rowSize = 0, next = 0, first = 0;
+        int rowSize = 0, first = 0;
+        // Each business takes the first free lot, in the shuffled order, in a part of town that suits it, and a ward
+        // with fewer than half its share of the shops so far gets the next one that suits.
+        var taken = new HashSet<Lot>();
+        var placed = new int[Map.WardCount];
+        var share = free.GroupBy(l => l.WardId).ToDictionary(g => g.Key, g => (double)count * g.Count() / free.Count);
+        Lot Take(BusinessKind kind)
+        {
+            bool Suits(Lot l) => !taken.Contains(l) && CityMap.Suits(kind, Map.ZoneOf(l), l.Id);
+            var lot = free.FirstOrDefault(l => Suits(l) && placed[l.WardId] < share[l.WardId] * 0.5)
+                ?? free.FirstOrDefault(Suits)
+                ?? free.First(l => !taken.Contains(l));
+            taken.Add(lot);
+            placed[lot.WardId]++;
+            return lot;
+        }
         for (int i = 0; i < count; i++)
         {
             Lot lot;
@@ -272,21 +287,25 @@ public sealed partial class World
             if (row != null && row.Shops.Count < rowSize)
             {
                 lot = row;
-                var taken = row.Shops.Select(id => Businesses[id].Kind).ToList();
-                var options = Content.ShopRowKinds.Where(k => !taken.Contains(k)).ToArray();
+                var inRow = row.Shops.Select(id => Businesses[id].Kind).ToList();
+                var options = Content.ShopRowKinds.Where(k => !inRow.Contains(k)).ToArray();
                 kind = options[Rng.Range(0, options.Length - 1)];
                 lot.Shops.Add(i);
             }
             else
             {
-                lot = free[next++];
                 kind = first < firsts.Count ? firsts[first++] : kinds[Rng.Range(0, kinds.Length - 1)];
+                lot = Take(kind);
                 row = null;
                 if (Content.ShopRowKinds.Contains(kind) && Rng.Chance(Content.ShopRowChance))
                 {
-                    row = lot;
-                    rowSize = Rng.Chance(0.5) ? 2 : 3;
-                    lot.Shops.Add(i);
+                    // The last businesses drawn can't start a row they wouldn't fill.
+                    rowSize = Math.Min(Rng.Chance(0.5) ? 2 : 3, count - i);
+                    if (rowSize >= 2)
+                    {
+                        row = lot;
+                        lot.Shops.Add(i);
+                    }
                 }
                 lot.BusinessId = i;
             }
@@ -298,7 +317,7 @@ public sealed partial class World
                 Id = i,
                 Name = $"{owner}'s {Content.Label(kind)}, {Map.StreetOf(lot)} St",
                 Kind = kind,
-                Takings = Rng.Range(min, max),
+                Takings = (int)Math.Round(Rng.Range(min, max) * CityMap.TakingsIn(Map.ZoneOf(lot))),
                 Toughness = Rng.Range(2, 9),
                 LotId = lot.Id,
             });

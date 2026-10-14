@@ -13,7 +13,7 @@ public partial class MapView
     public event Action<int>? CitizenClicked;
 
     /// <summary>Everyone who lives in the city, by the block and number the crowd draws them with.</summary>
-    public CityDirectory? Directory => World == null ? null : _directory ??= new CityDirectory(World, PopulationOf, l => FillerOf(l) == Filler.Tenement);
+    public CityDirectory? Directory => World == null ? null : _directory ??= new CityDirectory(World, PopulationOf, l => IsHome(FillerOf(l)));
 
     private CityDirectory? _directory;
 

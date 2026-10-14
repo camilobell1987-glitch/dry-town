@@ -62,6 +62,8 @@ public partial class MapView
     /// </summary>
     private (float X0, float Y0, float X1, float Y1) Footprint(Lot lot)
     {
+        if (lot.Terrain == Terrain.Civic) return CivicFootprint(lot);
+        if (FillerOf(lot) is Filler.House or Filler.Mansion) return HouseFootprint(lot);
         float x0 = lot.X + 0.07f, y0 = lot.Y + 0.1f, x1 = lot.X + 0.93f, y1 = lot.Y + 0.9f;
         var (bx, by, lx, row) = Place(lot);
         (x0, x1) = BesideRamp(lot, x0, x1);
@@ -478,6 +480,8 @@ public partial class MapView
                 return church == null ? "Churchyard" : $"Churchyard of {LandmarkName(church)}";
             case Terrain.Park:
                 return "City park";
+            case Terrain.Civic:
+                return CityMap.Label(Map.CivicOf(lot).Building);
         }
         return "";
     }

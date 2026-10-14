@@ -117,7 +117,7 @@ public class NightclubTests
     [Fact]
     public void ARichRivalWithAHotelOfItsOwnOpensAClub()
     {
-        var (_, w, _) = Start(gangs: 2, seed: 2);
+        var (_, w, _) = Start(gangs: 2, seed: 1);
         var g = w.LivingGangs.First(x => !x.IsPlayer);
         g.Cash = 20_000;
         g.Heat = 0;
