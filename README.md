@@ -2,10 +2,52 @@
 
 An open-ended Prohibition-era crime strategy game, inspired by how *Gangsters: Organized Crime* (1998) plays. It is a new game. It uses none of the original's art, audio, text, code, data or name.
 
-The open city has no win screen and keeps running; five scenarios give you a goal and a deadline instead. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6 added a huge one. Phase 7, the current state, draws the city at an angle the way Gangsters: Organized Crime did, with buildings standing up off the map, and adds a metropolis split by a river. It also puts people on the street you can deal with (drifters to hire, beat cops to pay off, reporters to buy and witnesses to lean on) and harder crimes: arson, hits, bank jobs and hijacked beer trucks, plus bookies, gambling dens and counterfeiting presses. The city now comes in six sizes, the largest with thirty wards, and four outfits run every one of them with small gangs dotted about between them, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out. Since then the crew has a rolodex of mugshots down the side of the screen, your men can carry guns and drive cars bought from the city's gun shops and motor dealers, you can buy businesses outright as fronts to wash your money before the tax men come for it, and a man charged with anything serious goes before a jury, where a lawyer, a paid judge or a visit to the jurors can still get him off. The outfits also talk to each other now: they hold grudges, agree truces, pay or demand tribute, and band together against whoever runs too much of the city, and from 1931 the bosses sit together on a Commission that has to say yes before any of them goes to war or touches another's boss. Every man has a rap sheet, and a man with three convictions behind him who is convicted again goes away for life. Elections are bigger too: you can run one of your own men for alderman, send men to lean on voters, and back a district attorney on the mayor's ballot, and every vote is counted ward by ward. The city has its own news, too: the Crash and the Depression come on the calendar, and heat waves, conventions, title fights, newspaper crusades, police shake-ups, strikes and fires come when they please. After repeal in 1934, the outfits turn to slot machines, casinos and the racing wire, and the G-men come after whoever the Bureau names Public Enemy Number One. Every ward is now the neighbourhood of one people (Irish, Italian, Jewish, Polish or German), and a man does better among his own. A boss sent away can run the outfit from his cell while a street boss minds things outside. A campaign takes one boss through all five scenarios, from 1920 to repeal. From 1927 a squad of Prohibition agents nobody can buy, the Untouchables, goes after the city's biggest bootlegger. Every boss earns a name, feared or admired, that helps on the street and in court but draws the Bureau. A man waiting on a trial can be bailed out, and can jump his bail and skip town, while any man can lie low out of town until things cool off. An outfit can run its own boats out to rum row for liquor, past the storms and the Coast Guard. A son or nephew can marry another boss's daughter, and then the two outfits are family. A warehouse can be turned into a brewery that keeps an outfit's speakeasies in beer, if the Untouchables don't find it first. An outfit with bookies can buy a fighter or a jockey and fix the week's card, at the other outfits' expense. A man can be snatched off the street and held until his outfit pays to get him back. A hotel or diner an outfit owns can be turned into a nightclub, where the city's names come to be seen and the aldermen drink on the house. And the aldermen let the city's contracts, for the garbage, the paving, the coal and the hospital linens, to whichever outfit has the most of them in its pocket. When a boss dies, the city holds off his outfit until he's buried, and everyone notices who sent flowers. The map is now seen straight down onto the roofs, with the angled view a menu choice away. Walls, roofs and pavements are weathered with damp and soot, buildings sit in their own shade, and the whole view has the colours and grain of an old photograph, with a soft glow round lamps and lit windows; the film look can be switched off in the Game menu.
+The open city has no win screen and keeps running; five scenarios give you a goal and a deadline instead. Phase 1 built the rules. Phase 2 made a week playable: you plan it on a district map, then watch it happen on the streets. Phase 3 made it a game you can keep coming back to. It saves itself every Sunday, you can run crews under lieutenants, you can step in during the week, and it has sound. Phase 4 let the game outlive your boss: men grow old and die, and the outfit passes to an heir. Phase 5 added politics and bigger cities, and Phase 6 added a huge one. Phase 7 drew the city at an angle the way Gangsters: Organized Crime did, with buildings standing up off the map, and adds a metropolis split by a river. It also puts people on the street you can deal with (drifters to hire, beat cops to pay off, reporters to buy and witnesses to lean on) and harder crimes: arson, hits, bank jobs and hijacked beer trucks, plus bookies, gambling dens and counterfeiting presses. The city now comes in six sizes, the largest with thirty wards, and four outfits run every one of them with small gangs dotted about between them, and every ward has an alderman who can be bought, a mayor who can be backed, and elections that can turn them all out. Since then the crew has a rolodex of mugshots down the side of the screen, your men can carry guns and drive cars bought from the city's gun shops and motor dealers, you can buy businesses outright as fronts to wash your money before the tax men come for it, and a man charged with anything serious goes before a jury, where a lawyer, a paid judge or a visit to the jurors can still get him off. The outfits also talk to each other now: they hold grudges, agree truces, pay or demand tribute, and band together against whoever runs too much of the city, and from 1931 the bosses sit together on a Commission that has to say yes before any of them goes to war or touches another's boss. Every man has a rap sheet, and a man with three convictions behind him who is convicted again goes away for life. Elections are bigger too: you can run one of your own men for alderman, send men to lean on voters, and back a district attorney on the mayor's ballot, and every vote is counted ward by ward. The city has its own news, too: the Crash and the Depression come on the calendar, and heat waves, conventions, title fights, newspaper crusades, police shake-ups, strikes and fires come when they please. After repeal in 1934, the outfits turn to slot machines, casinos and the racing wire, and the G-men come after whoever the Bureau names Public Enemy Number One. Every ward is now the neighbourhood of one people (Irish, Italian, Jewish, Polish or German), and a man does better among his own. A boss sent away can run the outfit from his cell while a street boss minds things outside. A campaign takes one boss through all five scenarios, from 1920 to repeal. From 1927 a squad of Prohibition agents nobody can buy, the Untouchables, goes after the city's biggest bootlegger. Every boss earns a name, feared or admired, that helps on the street and in court but draws the Bureau. A man waiting on a trial can be bailed out, and can jump his bail and skip town, while any man can lie low out of town until things cool off. An outfit can run its own boats out to rum row for liquor, past the storms and the Coast Guard. A son or nephew can marry another boss's daughter, and then the two outfits are family. A warehouse can be turned into a brewery that keeps an outfit's speakeasies in beer, if the Untouchables don't find it first. An outfit with bookies can buy a fighter or a jockey and fix the week's card, at the other outfits' expense. A man can be snatched off the street and held until his outfit pays to get him back. A hotel or diner an outfit owns can be turned into a nightclub, where the city's names come to be seen and the aldermen drink on the house. And the aldermen let the city's contracts, for the garbage, the paving, the coal and the hospital linens, to whichever outfit has the most of them in its pocket. When a boss dies, the city holds off his outfit until he's buried, and everyone notices who sent flowers. The map is now seen straight down onto the roofs, with the angled view a menu choice away. Walls, roofs and pavements are weathered with damp and soot, buildings sit in their own shade, and the whole view has the colours and grain of an old photograph, with a soft glow round lamps and lit windows; the film look can be switched off in the Game menu. Every one of the city's residents is now somebody: a name, a family, a job, a daily walk to work and back, often a secret, a character of their own and grudges that last, and any of them can be looked into, bought, frightened, blackmailed, snatched or killed. And the city is laid out the way New York had grown by 1920, with office towers and City Hall downtown, factories on the waterfront, immigrant tenements, brownstone rows, the mansions of the rich and the suburbs. Squares, markets, plazas and double blocks break up its street grid, and its people walk to work in the factories and offices that suit their trade.
 
 ![Planning a week](docs/screenshots/planning.png)
 ![The crew rolodex](docs/screenshots/rolodex.png)
+
+## Contents
+
+- [Layout](#layout)
+- [Run it](#run-it)
+- [Scenarios](#scenarios)
+- [How a week works](#how-a-week-works)
+- [The street](#the-street)
+- [The people of the city](#the-people-of-the-city)
+- [Shop rows](#shop-rows)
+- [Squares and plazas](#squares-and-plazas)
+- [Guns and cars](#guns-and-cars)
+- [Fronts and laundering](#fronts-and-laundering)
+- [Tenement courts](#tenement-courts)
+- [Rum-running](#rum-running)
+- [Rum row](#rum-row)
+- [Breweries](#breweries)
+- [The Untouchables](#the-untouchables)
+- [Fixed fights and races](#fixed-fights-and-races)
+- [Kidnapping](#kidnapping)
+- [Nightclubs](#nightclubs)
+- [After repeal](#after-repeal)
+- [Lawyers and trials](#lawyers-and-trials)
+- [Rats](#rats)
+- [Diplomacy](#diplomacy)
+- [Gangland funerals](#gangland-funerals)
+- [City Hall](#city-hall)
+- [City contracts](#city-contracts)
+- [Zoning](#zoning)
+- [Neighbourhoods](#neighbourhoods)
+- [The city in the news](#the-city-in-the-news)
+- [City sizes](#city-sizes)
+- [Small gangs](#small-gangs)
+- [Bosses grow old](#bosses-grow-old)
+- [Reputation](#reputation)
+- [Crews](#crews)
+- [Saving](#saving)
+- [Sound](#sound)
+- [The map](#the-map)
+- [Systems](#systems)
+- [Balance checks](#balance-checks)
+- [Not done yet](#not-done-yet)
 
 ## Layout
 
@@ -21,7 +63,7 @@ The open city has no win screen and keeps running; five scenarios give you a goa
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). To play the game, install the **.NET edition** of Godot 4.7, open `godot/project.godot` and press Play. If your editor is a different 4.x version, it updates the version in `DryTown.csproj` when it opens the project.
 
 ```sh
-dotnet test tests                                                    # 321 tests
+dotnet test tests                                                    # 464 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
@@ -102,6 +144,77 @@ Rival outfits do all of this too. They hire good drifters, buy their own stories
 
 ![A drifter looking for work](docs/screenshots/street.png)
 ![Hold-up at the bank](docs/screenshots/bank-job.png)
+
+## The people of the city
+
+Every grey dot is a resident with a card in the city directory, and every one of them can be found out about and dealt with.
+
+### Finding things out
+
+A card starts as question marks. There are five ways to fill it in:
+
+- **Ask around ($10).** Turns up a line or two, the easy ones (name, age, people, line of work) most often, and more in wards where you hold turf.
+- **Have them tailed.** One of your men follows them for the week and always learns where they live and work, and more the stealthier and sharper he is. If he's spotted he only gets the address, and your heat goes up by one. The man picker shows each man's chance of being spotted.
+- **Overhearing.** Click someone mid-conversation to learn both speakers' names and people, and the language they were speaking.
+- **Your shopkeepers.** Anyone whose shop pays you is known to you.
+- **Rumours.** Each week the street fills in a line on anyone you've clicked on, more often where you hold turf. People you've bought or frightened feed you rumours from their ward, and a landlord counts once for every building he owns.
+
+What you know is saved. Every known line that leads somewhere is a link: a home, a workplace, a shop or a landlord's tenements moves the map there and rings the spot in red, and a relative, boss, landlord or lover opens their card. With nothing selected, the Selected tab lists **Your directory** so you can find people again.
+
+### Dealing with them
+
+Any resident's card lets you send a man to **bribe** them onto your payroll, **lean on** them, **shake them down** for cash, **snatch** them for ransom or **kill** them. Each button shows the odds for the man you pick. Dollar amounts stay hidden until you know their job, and their nerve stays a guess ("maybe 43%") until you know four things about them or have dealt with them. Knowing someone's home, workplace or people makes the matching actions likelier to work.
+
+- **The payroll.** People on it cost a weekly retainer and walk if it isn't paid. A shopkeeper in your pocket takes your protection readily, resents it less and helps you take his shop from a rival. Witnesses keep quieter in wards where people are in your pocket.
+- **The held and the dead** disappear from the crowd. Ransoms settle within three weeks. A shakedown takes twice a person's weekly worth and a ransom four times, so neither beats protecting the same shop.
+
+### Families and bosses
+
+Residents live in households of one to five who share a surname, a people and an address, so a shopkeeper's wife and sons carry the shop's name. Workers are tied to the owner they work for. You find these ties out the same ways as everything else, and known relatives show on the card as names you can click. Each relative you know of makes threats and shakedowns likelier to work, holding one of them hostage makes it far likelier, and a ransom is set by the richest relative you know of.
+
+### Secrets
+
+About a third of grown-ups hide something: a lover on the block, drinking or gambling, a loan-shark debt, stealing from work or fencing, or a warrant from another city. Known secrets show in red on the card.
+
+- **Blackmail.** A known secret lets you take weekly hush money, which also puts the person in your pocket. Now and then a victim cracks.
+- **Leverage.** Every secret you know makes threats likelier to work.
+- **Turning them in.** A known crime can be handed to the police. It cools your heat, and a jailed shopkeeper's shop shuts for a month. The sentence fits the crime and the trial: car theft 2 to 4 years, manslaughter 5 to 15, robbery 5 to 20, cut by a plea deal or lengthened by a hanging judge.
+
+### Character
+
+Each resident has two or three traits in the slang of the day, and about half of grown-ups also have a background (Doughboy, Orphan, Greenhorn, Jailbird, Preacher's kid, Old money, Hayseed or Union man) that makes some traits likelier. A Doughboy is often Hard-boiled and seldom Yellow, and clashing traits never go together. The card's **Character** tab shows the background and the traits you've found out, with what each means, and the odds only count the traits you know.
+
+- **Pious** people turn down bribes and hide fewer secrets. **On the take** people are easy to buy.
+- **Yellow** people fold under threats. **Hard-boiled** people resist them and stop paying blackmail sooner.
+- **Blabbermouths** are easy to learn about and make double-value informants; **Clams** are the opposite. A **Nosy Parker** is worth half again as much as an informant.
+- **Square shooters** bring extra heat when a move on them fails. **Stool pigeons** sing to the cops, but one on your payroll tips you off before a raid.
+- A **Two-timer** is cheap to buy, but may take a rival's money any week and go over to them. A **Stand-up guy** (or **Stand-up dame**) stays bought, never stops paying blackmail and is hard to scare.
+- A **Wannabe torpedo**, a young man of 16 to 30, joins your crew if you ask.
+- A **Sport** always gambles and is easier to bribe. A **Sheik** (or **Flapper**) usually has a lover. A **Souse** always drinks.
+- The rest are **Hothead**, **Sap**, **Sharp as a tack**, **Tightwad**, **Family first** and **Holds a grudge**.
+
+### Grudges
+
+Residents and beat cops remember what was done to them. A grudge climbs through five tiers: prickly, sore, scowling, beefing and vendetta.
+
+- **Who holds them.** Anyone you lean on, shake down, blackmail, snatch or fail to kill holds a grudge against your outfit and the man you sent, and so does their family. A killing leaves a grudge the family never fully drops. Shopkeepers turn on whoever shoots up or bleeds their shop, people turned in turn on the cop who took them, and a cop turns on an outfit after a killing or snatching on his beat. Spouses turn on lovers when an affair comes out, and brothers and sisters fall out over money.
+- **What they do.** A grudge makes someone harder to bribe, scare or blackmail and quicker to come forward as a witness, and someone on your payroll may quit and go to the police. A cop with a grudge won't take your money, and raids come sooner. Someone who hates a neighbour talks freely about them.
+- **Acting on it.** Once beefing, people go to the police about your man, talk to a reporter, put a brick through your shop window, tell the papers a cop is on the take or turn in a neighbour. A Hothead or Hard-boiled person with a vendetta against one of your men may shoot him.
+- **Squaring it.** Short of a vendetta, a grudge eases over time. Paying someone to square things eases it most and calms their family too, and a favour, a good word for their shop, a place on the payroll and a soup kitchen in your name all help. A vendetta never fades and can't be squared.
+
+The card's **Grudges** tab shows who someone has it in for, why, and who has it in for them.
+
+### Gangsters' cards
+
+Every gangster, yours and the other outfits', has the same paper card with three tabs. **Particulars** shows his age, people, outfit, rank, skills, gear, collections and record, and for your own men loyalty, ambition, wage and when he joined. **Character** gives him a background and traits that change how he plays: a stand-up guy never informs, a stool pigeon or blabbermouth folds sooner to the DA, a two-timer is easier for another outfit to buy away, and a hard-boiled or sharp man is harder to kill. **Grudges** shows bad blood: when an outfit kills a man, everyone in his outfit holds a grudge against the killers, and a man sent to hit someone he has it in for has a better chance. A resident you sign on brings his background, traits and grudges with him.
+
+### Talk on the street
+
+Now and then two residents stop on the pavement and take turns talking, more of them at the rush hours. You only hear it when one of your people is within earshot: your headquarters, your men, cops you pay or residents on your payroll. A small bubble over the speaker shows the topic, taken from what's going on around them: their old country's flag in their own neighbourhood, a chalk outline after a killing in the ward, handcuffs after an arrest, a bottle near a speakeasy, a dollar bill after a shakedown (struck through when money's tight), a pistol when the ward has seen a lot of trouble, the newspaper for idle talk, and a green or red spot when they're praising or cursing the boss whose turf it is.
+
+### Daily routines
+
+Every resident has a day of their own and walks to it along the streets. Shopkeepers step out to open up in the morning and shut up at closing; diners open early and pool halls keep late hours. Working people walk to their work in the morning and home in the evening, each to the place that suits their trade (see **Zoning**). Landlords go round up to three of their buildings for the rent and are home after dark. Housewives and the out of work run errands to a grocer, diner, pharmacy, tailor or laundry. The old walk to the nearest park and sit on the grass, night watchmen go out as everyone else comes home, and children play round their own block. Between weeks, while you give orders, the city runs through a slow working day so people are still seen coming and going.
 
 ## Shop rows
 
@@ -665,6 +778,7 @@ The **Console** tab and `sim play` take the same text orders: `extort <hood> <bu
 - **Rum row.** Your own boats bring liquor in from St. Pierre and Nassau for speakeasies no supply line covers, past storms and the Coast Guard (see above).
 - **Breweries.** A brewery in a warehouse sells beer and keeps six of your speakeasies in it, but draws heat and the Untouchables (see above).
 - **Fixed fights and races.** Buy a fighter or a jockey before the week's card, and your bookies clear it at the other outfits' expense (see above).
+- **Residents.** Everyone in the city has a card, a family, a daily routine, often a secret, a character and grudges, and can be looked into, bought, frightened, blackmailed, snatched or killed (see above).
 - **Small gangs.** Hoodlums, street gangs and loan sharks hold one to four blocks each, and can be taken from, hired away, bought in or wiped out (see above).
 - **Gangland funerals.** A boss's funeral brings a truce nobody breaks lightly, and the outfits remember who sent flowers (see above).
 - **City contracts.** The aldermen let the city's garbage, paving, coal and linens to the outfit that owns the most of them (see above).
@@ -776,5 +890,4 @@ The AI is a cautious but simple player; a person paying attention should do bett
 
 ## Not done yet
 
-- **Mid-week saves.** If you quit during the live week, you go back to that week's Monday and your orders for it are lost.
 - **Crews in the console.** `crews`, `crew new|add|drop`, `send <crew> <biz>` and `post <crew> <biz>` work, but the in-game console only queues orders. It can't send men during the live week.
