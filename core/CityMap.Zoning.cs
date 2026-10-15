@@ -7,6 +7,9 @@ namespace DryTown.Core;
 /// </summary>
 public enum Zone { Downtown, Industrial, Tenements, Rowhouses, GoldCoast, Suburbs, River, Park }
 
+/// <summary>What a lot nobody does business on has on it.</summary>
+public enum Filler { None, Tenement, Office, Factory, Vacant, Parking, PocketPark, Rowhouse, House, Mansion, Apartment, Warehouse, Gasworks, Yard }
+
 /// <summary>One of the city's own buildings downtown, each taking two lots side by side.</summary>
 public enum Civic { CityHall, Courthouse, Municipal, Records, Library, Museum, Opera, Theatre }
 
@@ -137,6 +140,35 @@ public sealed partial class CityMap
         foreach (var b in blocks.OrderByDescending(b => CoreOf(b.X, b.Y)).Take(want))
             foreach (var lot in LotsOfBlock(b.X, b.Y)) lot.Terrain = Terrain.Civic;
     }
+
+    /// <summary>What stands on a lot nobody does business on, from its zone and a roll of its own.</summary>
+    public Filler FillerOf(Lot lot)
+    {
+        if (lot.Use != LotUse.Empty || lot.Terrain != Terrain.Land) return Filler.None;
+        if (lot.Court) return Filler.Tenement;
+        float h = Hash(lot.Id, 11);
+        return ZoneOf(lot) switch
+        {
+            Zone.Downtown => h < 0.88f ? Filler.Office : Filler.Parking,
+            Zone.Industrial => h switch
+            {
+                < 0.4f => Filler.Factory,
+                < 0.6f => Filler.Warehouse,
+                < 0.68f => Filler.Gasworks,
+                < 0.8f => Filler.Yard,
+                < 0.9f => Filler.Vacant,
+                _ => Filler.Parking,
+            },
+            Zone.Tenements => h switch { < 0.84f => Filler.Tenement, < 0.92f => Filler.Vacant, _ => Filler.PocketPark },
+            Zone.Rowhouses => h switch { < 0.8f => Filler.Rowhouse, < 0.88f => Filler.Tenement, < 0.94f => Filler.PocketPark, _ => Filler.Vacant },
+            Zone.GoldCoast => h switch { < 0.55f => Filler.Mansion, < 0.9f => Filler.Apartment, _ => Filler.PocketPark },
+            Zone.Suburbs => h < 0.9f ? Filler.House : Filler.Vacant,
+            _ => Filler.Tenement,
+        };
+    }
+
+    /// <summary>Whether people live in a building of this sort, rather than work in it.</summary>
+    public static bool IsHome(Filler f) => f is Filler.Tenement or Filler.Rowhouse or Filler.House or Filler.Mansion or Filler.Apartment;
 
     /// <summary>The blocks given to the city's own buildings, the heart of downtown first.</summary>
     public List<(int X, int Y)> CivicBlocks()
