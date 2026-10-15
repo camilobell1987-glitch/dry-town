@@ -729,7 +729,10 @@ public partial class MapView
         if (b.Kind == BusinessKind.GasStation) DrawFillingStation(lot, h, open);
         else if (b.Kind == BusinessKind.Scrapyard) DrawScrapyard(lot, h, open);
         else DrawBuilding(lot, b, gang, open, h, wall, roof);
-        DrawBillboard(lot, h, gang ?? new Color("3a332b"), gang.HasValue ? 3 : 1, open, () => { if (Fine) DrawTradeIcon(b.Kind, SignCentre(lot, h), _t * 0.11f); });
+        // Out in the open the sign goes on the office roof, clear of the pumps and the heaps.
+        var (xa, xb, front) = OfficeSign(lot, b.Kind) ?? (lot.X + 0.24f, lot.X + 0.76f, (float?)null);
+        DrawBillboard(lot, h, gang ?? new Color("3a332b"), gang.HasValue ? 3 : 1, open,
+            () => { if (Fine) DrawTradeIcon(b.Kind, SignCentre(lot, h, (xa + xb) / 2, front), _t * 0.11f); }, xa, xb, front);
         if (racket != RacketKind.None) DrawRacketBadge(Q(x0 + 0.2f, (y0 + y1) / 2, h), racket);
         if (b.IsFront) DrawFrontBadge(Q(x1 - 0.2f, (y0 + y1) / 2, h), Palette.Gang(World!, b.OwnerGangId));
         if (!open) DrawBoardedUp(lot, h);
@@ -897,9 +900,9 @@ public partial class MapView
     private Vector2 SignCentre(Lot lot, float h) => SignCentre(lot, h, lot.X + 0.5f);
 
     /// <summary>Where a sign centred along the roof at <paramref name="x"/> is centred, as drawn.</summary>
-    private Vector2 SignCentre(Lot lot, float h, float x)
+    private Vector2 SignCentre(Lot lot, float h, float x, float? front = null)
     {
-        var (_, _, _, y1) = Footprint(lot);
+        float y1 = front ?? Footprint(lot).Y1;
         return Angled ? Q(x, y1 - 0.12f, h + 0.19f) : P(x, y1 - 0.27f);
     }
 
@@ -911,9 +914,9 @@ public partial class MapView
         DrawBillboard(lot, h, frame, frameWidth, open, face, lot.X + 0.24f, lot.X + 0.76f);
 
     /// <summary>A sign on the roof between two points along it, for one of a row of shops.</summary>
-    private void DrawBillboard(Lot lot, float h, Color frame, float frameWidth, bool open, Action face, float xa, float xb)
+    private void DrawBillboard(Lot lot, float h, Color frame, float frameWidth, bool open, Action face, float xa, float xb, float? front = null)
     {
-        var (_, _, _, y1) = Footprint(lot);
+        float y1 = front ?? Footprint(lot).Y1;
         float y = y1 - 0.12f;
         var paper = open ? new Color("e6dcc2") : new Color("8a826e");
         if (!Angled)

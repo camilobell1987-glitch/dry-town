@@ -87,7 +87,9 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
         float hour = HourOfDay, taken = hour is >= 7 and < 19 ? 0.55f : 0.35f;
         _reserved.Clear();
         foreach (var lot in map.Lots)
-            if (lot.Use is LotUse.Headquarters or LotUse.Precinct && CornerOf(lot) == null) _reserved.Add((lot.X, lot.Y));
+            if (lot.Use is LotUse.Headquarters or LotUse.Precinct && CornerOf(lot) == null
+                || lot.Use == LotUse.Business && World!.BusinessById(lot.BusinessId).Kind == BusinessKind.GasStation)
+                _reserved.Add((lot.X, lot.Y));
         for (int by = by0; by <= by1; by++)
         for (int bx = bx0; bx <= bx1; bx++)
         {
@@ -133,7 +135,7 @@ vec2 widen2(vec2 p) { return vec2(widen(p.x, 5.0), widen(p.y, 3.0)); }
         }
     }
 
-    /// <summary>The lots whose kerb is kept clear for a headquarters' or a precinct's own cars.</summary>
+    /// <summary>The lots whose kerb is kept clear: for a headquarters' or a precinct's own cars, or a filling station's driveways.</summary>
     private readonly System.Collections.Generic.HashSet<(int X, int Y)> _reserved = new();
 
     /// <summary>Whether a street's north (0) or south (1) kerb has bays: not at the edge of the city or along the river.</summary>

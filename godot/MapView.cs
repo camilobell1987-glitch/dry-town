@@ -677,6 +677,7 @@ public partial class MapView : Control
         DrawParkedOfficials(night, view);
         if (Showroom == null) DrawParkedCars(night, view);
         if (Showroom == null) DrawGarageTraffic(night, view);
+        if (Showroom == null) DrawFillingStationTraffic(night, view);
         DrawShowroom();
         _clickables.Clear();
         DrawStreetPeople(view);
