@@ -94,6 +94,8 @@ public partial class MapView
     /// <summary>A box standing on the ground or raised off it: west wall, front wall, then the top.</summary>
     private void Box(float x0, float y0, float x1, float y1, float z0, float z1, Color front, Color side, Color top)
     {
+        // Seen from above, anything standing up off a roof throws a short shadow across it, the way the buildings do on the ground.
+        if (!Angled && z0 > 0 && z1 > z0 && Fine) RoofShadow(x0, y0, x1, y1, z1 - z0);
         C.DrawColoredPolygon(new[] { Q(x0, y1, z0), Q(x0, y0, z0), Q(x0, y0, z1), Q(x0, y1, z1) }, side);
         C.DrawColoredPolygon(new[] { Q(x0, y1, z0), Q(x1, y1, z0), Q(x1, y1, z1), Q(x0, y1, z1) }, front);
         C.DrawColoredPolygon(new[] { Q(x0, y0, z1), Q(x1, y0, z1), Q(x1, y1, z1), Q(x0, y1, z1) }, top);
@@ -352,6 +354,7 @@ public partial class MapView
         if (grown != cell) C.DrawRect(grown, Pavement.Darkened(0.35f));
         C.DrawRect(cell, Asphalt);
 
+        if (Fine) DrawRoadWear(bx, by, w, h);
         if (Fine)
         {
             // Patches of worn tarmac so the streets aren't one flat colour.
@@ -679,6 +682,13 @@ public partial class MapView
     /// Seen from above, a building shows its height by the shadow it throws to the south-west. The
     /// buildings drawn after it cover what falls on them, so the shadow shows on the street and the yards.
     /// </summary>
+    /// <summary>The shadow of something standing this tall on a roof, falling east like the buildings' own.</summary>
+    private void RoofShadow(float x0, float y0, float x1, float y1, float tall)
+    {
+        float dx = tall * 0.55f, dy = tall * 0.18f;
+        C.DrawColoredPolygon(new[] { P(x0, y0), P(x1, y0), P(x1 + dx, y0 + dy), P(x1 + dx, y1 + dy), P(x0 + dx, y1 + dy), P(x0, y1) }, Shadow with { A = 0.26f });
+    }
+
     private void CastShadow(float x0, float y0, float x1, float y1, float h)
     {
         float dx = -h * 0.22f, dy = h * 0.3f;
