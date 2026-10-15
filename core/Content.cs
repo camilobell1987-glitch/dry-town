@@ -143,6 +143,14 @@ public static partial class Content
         BusinessKind.Grocer or BusinessKind.Pharmacy => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Slots },
         BusinessKind.Tailor or BusinessKind.Haberdasher => new[] { RacketKind.LoanShark, RacketKind.Bookie },
         BusinessKind.Hardware => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Still },
+        // A bakery's ovens and a butcher's cold room hide a still; a cigar store is where the numbers and the bets are taken.
+        BusinessKind.Bakery or BusinessKind.Butcher => new[] { RacketKind.Numbers, RacketKind.LoanShark, RacketKind.Still },
+        BusinessKind.CigarStore => new[] { RacketKind.Numbers, RacketKind.Bookie, RacketKind.Slots },
+        BusinessKind.Florist => new[] { RacketKind.Bookie, RacketKind.LoanShark, RacketKind.Numbers },
+        BusinessKind.Pawnshop => new[] { RacketKind.LoanShark, RacketKind.Counterfeit },
+        BusinessKind.FuneralParlor => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.Counterfeit },
+        BusinessKind.PictureHouse => new[] { RacketKind.Numbers, RacketKind.Slots, RacketKind.Bookie },
+        BusinessKind.DanceHall => new[] { RacketKind.Speakeasy, RacketKind.GamblingDen, RacketKind.Slots, RacketKind.Nightclub },
         BusinessKind.Court => new[] { RacketKind.Speakeasy, RacketKind.Still, RacketKind.Numbers, RacketKind.GamblingDen, RacketKind.LoanShark },
         _ => new[] { RacketKind.LoanShark, RacketKind.Slots },
     };
@@ -152,6 +160,7 @@ public static partial class Content
     {
         BusinessKind.Grocer, BusinessKind.Diner, BusinessKind.Barber, BusinessKind.Tailor, BusinessKind.Laundry,
         BusinessKind.Pharmacy, BusinessKind.PoolHall, BusinessKind.Hardware, BusinessKind.Haberdasher,
+        BusinessKind.Bakery, BusinessKind.Butcher, BusinessKind.CigarStore, BusinessKind.Florist, BusinessKind.Pawnshop,
     };
     public const double ShopRowChance = 0.5;
 
@@ -169,6 +178,14 @@ public static partial class Content
         BusinessKind.Tailor => (110, 200),
         BusinessKind.Hardware => (130, 240),
         BusinessKind.Haberdasher => (100, 190),
+        BusinessKind.Bakery => (110, 200),
+        BusinessKind.Butcher => (140, 250),
+        BusinessKind.CigarStore => (90, 170),
+        BusinessKind.Florist => (90, 160),
+        BusinessKind.Pawnshop => (120, 230),
+        BusinessKind.FuneralParlor => (150, 280),
+        BusinessKind.PictureHouse => (260, 460),
+        BusinessKind.DanceHall => (220, 400),
         _ => (90, 170),
     };
 
@@ -305,6 +322,12 @@ public static partial class Content
         BusinessKind.PoolHall => "Pool Hall",
         BusinessKind.Hardware => "Hardware Store",
         BusinessKind.Haberdasher => "Haberdashery",
+        BusinessKind.Butcher => "Butcher Shop",
+        BusinessKind.CigarStore => "Cigar Store",
+        BusinessKind.Florist => "Flower Shop",
+        BusinessKind.FuneralParlor => "Funeral Parlor",
+        BusinessKind.PictureHouse => "Picture House",
+        BusinessKind.DanceHall => "Dance Hall",
         _ => kind.ToString(),
     };
 

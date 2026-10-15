@@ -207,9 +207,10 @@ public sealed partial class CityMap
         Zone.Industrial => kind is BusinessKind.Warehouse or BusinessKind.Garage or BusinessKind.Diner or BusinessKind.PoolHall
             or BusinessKind.Laundry or BusinessKind.Hardware,
         Zone.Tenements or Zone.Rowhouses => kind is not (BusinessKind.Hotel or BusinessKind.Warehouse),
-        Zone.GoldCoast => kind is BusinessKind.Hotel or BusinessKind.Tailor or BusinessKind.Haberdasher or BusinessKind.Pharmacy
+        Zone.GoldCoast => kind is BusinessKind.Hotel or BusinessKind.Tailor or BusinessKind.Haberdasher or BusinessKind.Pharmacy or BusinessKind.Florist
             && Hash(lotId, 1400) < 0.5f,
-        Zone.Suburbs => kind is not (BusinessKind.Hotel or BusinessKind.Warehouse or BusinessKind.PoolHall) && Hash(lotId, 1400) < 0.55f,
+        Zone.Suburbs => kind is not (BusinessKind.Hotel or BusinessKind.Warehouse or BusinessKind.PoolHall or BusinessKind.Pawnshop or BusinessKind.DanceHall)
+            && Hash(lotId, 1400) < 0.55f,
         _ => false,
     };
 

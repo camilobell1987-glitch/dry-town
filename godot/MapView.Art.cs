@@ -231,6 +231,8 @@ public partial class MapView
                     BusinessKind.Hotel => (1.0f + 0.3f * h) * (1 + 0.8f * d),
                     BusinessKind.Warehouse => 0.45f,
                     BusinessKind.Garage => 0.28f,
+                    BusinessKind.PictureHouse => 0.8f + 0.2f * h,
+                    BusinessKind.DanceHall => 0.7f + 0.15f * h,
                     BusinessKind.Court => (0.6f + 0.25f * h) * (1 + 1.2f * d),
                     _ => (0.4f + 0.25f * h) * (1 + 1.3f * d),
                 };
@@ -711,6 +713,9 @@ public partial class MapView
         {
             BusinessKind.Warehouse => new Color("7a7064"),
             BusinessKind.Garage => new Color("8a8070"),
+            BusinessKind.PictureHouse => new Color("c2a878"),
+            BusinessKind.DanceHall => new Color("8c4a3c"),
+            BusinessKind.FuneralParlor => new Color("5c5650"),
             _ => WallFor(lot),
         };
         var roof = RoofFor(lot);
@@ -730,12 +735,36 @@ public partial class MapView
             if (FacesSouth(lot)) DrawCourtPassage(lot, h, wall, open);
         }
         else if (FacesSouth(lot)) DrawShopfront(lot, b, gang, open);
+        if (b.Kind is BusinessKind.PictureHouse or BusinessKind.DanceHall && FacesSouth(lot)) DrawMarquee(lot, b.Kind, open);
         DrawBillboard(lot, h, gang ?? new Color("3a332b"), gang.HasValue ? 3 : 1, open, () => { if (Fine) DrawTradeIcon(b.Kind, SignCentre(lot, h), _t * 0.11f); });
         if (racket != RacketKind.None) DrawRacketBadge(Q(x0 + 0.2f, (y0 + y1) / 2, h), racket);
         if (b.IsFront) DrawFrontBadge(Q(x1 - 0.2f, (y0 + y1) / 2, h), Palette.Gang(World!, b.OwnerGangId));
         if (!open) DrawBoardedUp(lot, h);
         if (World!.StrikeAt(b) != null) DrawPickets(lot, h);
         if (World.IsWireRoom(b)) DrawWireMast(lot, h);
+    }
+
+    /// <summary>A picture house's or dance hall's marquee: a band over the doors ringed with bulbs, lit while it's open.</summary>
+    private void DrawMarquee(Lot lot, BusinessKind kind, bool open)
+    {
+        var (x0, _, x1, y1) = Footprint(lot);
+        float a = x0 + 0.12f, b = x1 - 0.12f, lo = 0.3f, hi = 0.42f, y = y1 + 0.06f;
+        var face = kind == BusinessKind.PictureHouse ? new Color("e8d8a8") : new Color("2a1e2e");
+        C.DrawColoredPolygon(new[] { Q(a, y, lo), Q(b, y, lo), Q(b, y, hi), Q(a, y, hi) }, open ? face : face.Darkened(0.4f));
+        if (!Fine) return;
+        var bulb = open ? new Color("ffd860") : new Color("6a6050");
+        float r = Mathf.Max(1, _t * 0.012f);
+        for (float x = a + 0.04f; x < b; x += 0.08f)
+        {
+            C.DrawCircle(Q(x, y, hi), r, bulb);
+            C.DrawCircle(Q(x, y, lo), r, bulb);
+        }
+        // A line of black letters on the picture house's board, a pink stripe on the dance hall's.
+        if (kind == BusinessKind.PictureHouse)
+            for (float x = a + 0.08f; x < b - 0.06f; x += 0.07f)
+                C.DrawLine(Q(x, y, lo + 0.04f), Q(x, y, hi - 0.04f), new Color("2a241e"), Mathf.Max(1, _t * 0.012f));
+        else
+            C.DrawLine(Q(a + 0.04f, y, (lo + hi) / 2), Q(b - 0.04f, y, (lo + hi) / 2), new Color("e070a8"), Mathf.Max(1, _t * 0.02f));
     }
 
     /// <summary>The wire room: a telegraph mast on the roof, its wires running off to the street.</summary>
@@ -1011,6 +1040,72 @@ public partial class MapView
                 C.DrawRect(new Rect2(c.X - h * 0.9f, c.Y + h * 0.45f, h * 1.8f, h * 0.22f), ink);
                 C.DrawRect(new Rect2(c.X - h * 0.5f, c.Y - h * 0.85f, h * 1.0f, h * 1.32f), ink);
                 C.DrawRect(new Rect2(c.X - h * 0.5f, c.Y + h * 0.1f, h * 1.0f, h * 0.22f), new Color("a8332c"));
+                break;
+            case BusinessKind.Bakery:
+                // A round loaf with slashes across the crust.
+                C.DrawColoredPolygon(new[]
+                {
+                    c + new Vector2(-h * 0.9f, h * 0.45f), c + new Vector2(-h * 0.75f, -h * 0.2f), c + new Vector2(-h * 0.35f, -h * 0.5f),
+                    c + new Vector2(h * 0.35f, -h * 0.5f), c + new Vector2(h * 0.75f, -h * 0.2f), c + new Vector2(h * 0.9f, h * 0.45f),
+                }, new Color("c8893c"));
+                for (int i = -1; i <= 1; i++)
+                    C.DrawLine(c + new Vector2(i * h * 0.4f - h * 0.12f, -h * 0.05f), c + new Vector2(i * h * 0.4f + h * 0.12f, -h * 0.35f), new Color("f0d8a0"), lw);
+                break;
+            case BusinessKind.Butcher:
+                // A cleaver: a broad grey blade on a wooden handle.
+                C.DrawRect(new Rect2(c.X - h * 0.85f, c.Y - h * 0.65f, h * 1.1f, h * 0.9f), new Color("8a9096"));
+                C.DrawCircle(c + new Vector2(-h * 0.6f, -h * 0.42f), h * 0.1f, ink);
+                C.DrawLine(c + new Vector2(h * 0.25f, -h * 0.25f), c + new Vector2(h * 0.9f, -h * 0.25f), new Color("7a4a2a"), lw * 2.2f);
+                C.DrawLine(c + new Vector2(-h * 0.85f, h * 0.25f), c + new Vector2(h * 0.25f, h * 0.25f), new Color("c8463c"), lw * 0.7f);
+                break;
+            case BusinessKind.CigarStore:
+                // A cigar with a red band and a glowing tip.
+                C.DrawLine(c + new Vector2(-h * 0.9f, h * 0.3f), c + new Vector2(h * 0.7f, -h * 0.3f), new Color("7a4a2a"), lw * 2.4f);
+                C.DrawLine(c + new Vector2(-h * 0.45f, h * 0.13f), c + new Vector2(-h * 0.25f, h * 0.06f), new Color("c8463c"), lw * 2.6f);
+                C.DrawCircle(c + new Vector2(h * 0.78f, -h * 0.33f), h * 0.16f, new Color("e8703a"));
+                C.DrawArc(c + new Vector2(h * 0.75f, -h * 0.75f), h * 0.2f, Mathf.Pi * 0.5f, Mathf.Pi * 1.4f, 6, new Color("9a9286"), lw * 0.7f);
+                break;
+            case BusinessKind.Florist:
+                // A flower: five petals round a yellow heart, on a stem.
+                C.DrawLine(c + new Vector2(0, -h * 0.1f), c + new Vector2(0, h * 0.9f), new Color("4a7a3a"), lw);
+                C.DrawCircle(c + new Vector2(h * 0.3f, h * 0.55f), h * 0.16f, new Color("4a7a3a"));
+                for (int i = 0; i < 5; i++)
+                    C.DrawCircle(c + new Vector2(0, -h * 0.35f) + Vector2.FromAngle(i * Mathf.Tau / 5 - Mathf.Pi / 2) * h * 0.32f, h * 0.24f, new Color("d8507a"));
+                C.DrawCircle(c + new Vector2(0, -h * 0.35f), h * 0.16f, new Color("f0c040"));
+                break;
+            case BusinessKind.Pawnshop:
+                // The pawnbroker's three gold balls hanging from a bar.
+                C.DrawLine(c + new Vector2(-h * 0.8f, -h * 0.85f), c + new Vector2(h * 0.8f, -h * 0.85f), ink, lw);
+                foreach (var (dx, dy) in new[] { (-0.45f, -0.2f), (0.45f, -0.2f), (0.0f, 0.5f) })
+                {
+                    C.DrawLine(c + new Vector2(dx * h, -h * 0.85f), c + new Vector2(dx * h, dy * h), ink, lw * 0.5f);
+                    C.DrawCircle(c + new Vector2(dx * h, dy * h), h * 0.33f, new Color("d8a830"));
+                }
+                break;
+            case BusinessKind.FuneralParlor:
+                // A laurel wreath with a black bow.
+                C.DrawArc(c, h * 0.62f, 0, Mathf.Tau, 16, new Color("3a6a3a"), lw * 1.8f);
+                C.DrawColoredPolygon(new[] { c + new Vector2(0, h * 0.6f), c + new Vector2(-h * 0.4f, h * 0.35f), c + new Vector2(-h * 0.4f, h * 0.9f) }, ink);
+                C.DrawColoredPolygon(new[] { c + new Vector2(0, h * 0.6f), c + new Vector2(h * 0.4f, h * 0.35f), c + new Vector2(h * 0.4f, h * 0.9f) }, ink);
+                break;
+            case BusinessKind.PictureHouse:
+                // A film reel.
+                C.DrawCircle(c, h * 0.85f, ink);
+                for (int i = 0; i < 5; i++)
+                    C.DrawCircle(c + Vector2.FromAngle(i * Mathf.Tau / 5) * h * 0.48f, h * 0.2f, new Color("e8d8a8"));
+                C.DrawCircle(c, h * 0.12f, new Color("e8d8a8"));
+                break;
+            case BusinessKind.DanceHall:
+                // Two quavers joined by a beam.
+                C.DrawCircle(c + new Vector2(-h * 0.55f, h * 0.55f), h * 0.28f, ink);
+                C.DrawCircle(c + new Vector2(h * 0.45f, h * 0.4f), h * 0.28f, ink);
+                C.DrawLine(c + new Vector2(-h * 0.3f, h * 0.55f), c + new Vector2(-h * 0.3f, -h * 0.65f), ink, lw);
+                C.DrawLine(c + new Vector2(h * 0.7f, h * 0.4f), c + new Vector2(h * 0.7f, -h * 0.8f), ink, lw);
+                C.DrawColoredPolygon(new[]
+                {
+                    c + new Vector2(-h * 0.3f, -h * 0.65f), c + new Vector2(h * 0.7f, -h * 0.8f),
+                    c + new Vector2(h * 0.7f, -h * 0.55f), c + new Vector2(-h * 0.3f, -h * 0.4f),
+                }, ink);
                 break;
             case BusinessKind.Warehouse:
                 foreach (var (dx, dy) in new[] { (-0.85f, 0.0f), (0.0f, 0.0f), (-0.42f, -0.8f) })

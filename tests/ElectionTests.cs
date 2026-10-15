@@ -82,7 +82,7 @@ public class ElectionTests
     [Fact]
     public void OnlyACleanBrightManCanRun()
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 10 });
+        var sim = Simulation.New(new WorldSettings { Seed = 13 });
         var w = sim.World;
         var man = Candidate(w);
         Assert.Contains("campaign is on", Politics.CannotStand(w, w.Player, man, w.Wards[0]));

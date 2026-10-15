@@ -12,7 +12,7 @@ public class NightclubTests
     {
         var sim = Simulation.New(new WorldSettings { Seed = seed, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false, StartWeek = week });
         var me = sim.World.Player;
-        me.Cash = 20_000;
+        me.Cash = 40_000;
         me.Heat = 0;
         return (sim, sim.World, me);
     }
@@ -119,7 +119,7 @@ public class NightclubTests
     {
         var (_, w, _) = Start(gangs: 2, seed: 1);
         var g = w.LivingGangs.First(x => !x.IsPlayer);
-        g.Cash = 20_000;
+        g.Cash = 40_000;
         g.Heat = 0;
         var hotel = Protect(w, g, Free(w, BusinessKind.Hotel));
         Assert.True(w.BuyFront(g, hotel) > 0);

@@ -1,6 +1,6 @@
 namespace DryTown.Core;
 
-/// <summary>Nightclubs: a jazz club in a hotel or diner an outfit owns outright, where the city's names and its politicians come to be seen.</summary>
+/// <summary>Nightclubs: a jazz club in a hotel, diner or dance hall an outfit owns outright, where the city's names and its politicians come to be seen.</summary>
 public static partial class Content
 {
     /// <summary>The respect a club earns its outfit's boss each week, with the bandleaders, ballplayers and society people at its tables.</summary>
