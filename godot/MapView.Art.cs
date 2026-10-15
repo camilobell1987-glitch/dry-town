@@ -225,6 +225,7 @@ public partial class MapView
             case LotUse.Bank: return 0.68f;
             case LotUse.GunShop: return 0.5f + 0.15f * h;
             case LotUse.CarDealer: return 0.24f;
+            case LotUse.Yard: return 0.15f;
             case LotUse.Business:
                 return World.BusinessById(lot.BusinessId).Kind switch
                 {
@@ -232,6 +233,8 @@ public partial class MapView
                     BusinessKind.Warehouse => 0.45f,
                     BusinessKind.Garage => 0.28f,
                     BusinessKind.PictureHouse => 0.8f + 0.2f * h,
+                    BusinessKind.GasStation => 0.22f,
+                    BusinessKind.Scrapyard => 0.24f,
                     BusinessKind.DanceHall => 0.7f + 0.15f * h,
                     BusinessKind.Court => (0.6f + 0.25f * h) * (1 + 1.2f * d),
                     _ => (0.4f + 0.25f * h) * (1 + 1.3f * d),
@@ -629,6 +632,9 @@ public partial class MapView
             case LotUse.CarDealer:
                 DrawCarDealer(lot);
                 break;
+            case LotUse.Yard:
+                DrawYardLot(lot);
+                break;
             default:
                 DrawFiller(lot);
                 break;
@@ -720,6 +726,24 @@ public partial class MapView
         };
         var roof = RoofFor(lot);
         if (!open) { wall = wall.Darkened(0.3f); roof = roof.Darkened(0.3f); }
+        if (b.Kind == BusinessKind.GasStation) DrawFillingStation(lot, h, open);
+        else if (b.Kind == BusinessKind.Scrapyard) DrawScrapyard(lot, h, open);
+        else DrawBuilding(lot, b, gang, open, h, wall, roof);
+        // Out in the open the sign goes on the office roof, clear of the pumps and the heaps.
+        var (xa, xb, front) = OfficeSign(lot, b.Kind) ?? (lot.X + 0.24f, lot.X + 0.76f, (float?)null);
+        DrawBillboard(lot, h, gang ?? new Color("3a332b"), gang.HasValue ? 3 : 1, open,
+            () => { if (Fine) DrawTradeIcon(b.Kind, SignCentre(lot, h, (xa + xb) / 2, front), _t * 0.11f); }, xa, xb, front);
+        if (racket != RacketKind.None) DrawRacketBadge(Q(x0 + 0.2f, (y0 + y1) / 2, h), racket);
+        if (b.IsFront) DrawFrontBadge(Q(x1 - 0.2f, (y0 + y1) / 2, h), Palette.Gang(World!, b.OwnerGangId));
+        if (!open) DrawBoardedUp(lot, h);
+        if (World!.StrikeAt(b) != null) DrawPickets(lot, h);
+        if (World.IsWireRoom(b)) DrawWireMast(lot, h);
+    }
+
+    /// <summary>A shop's building: walls, roof and what stands on it, and the front it shows the street.</summary>
+    private void DrawBuilding(Lot lot, Business b, Color? gang, bool open, float h, Color wall, Color roof)
+    {
+        var (x0, y0, x1, y1) = Footprint(lot);
         DrawBlock(lot, h, wall, roof, FacesSouth(lot) ? 0 : 1);
 
         if (b.Kind == BusinessKind.Warehouse && Fine)
@@ -736,12 +760,6 @@ public partial class MapView
         }
         else if (FacesSouth(lot)) DrawShopfront(lot, b, gang, open);
         if (b.Kind is BusinessKind.PictureHouse or BusinessKind.DanceHall && FacesSouth(lot)) DrawMarquee(lot, b.Kind, open);
-        DrawBillboard(lot, h, gang ?? new Color("3a332b"), gang.HasValue ? 3 : 1, open, () => { if (Fine) DrawTradeIcon(b.Kind, SignCentre(lot, h), _t * 0.11f); });
-        if (racket != RacketKind.None) DrawRacketBadge(Q(x0 + 0.2f, (y0 + y1) / 2, h), racket);
-        if (b.IsFront) DrawFrontBadge(Q(x1 - 0.2f, (y0 + y1) / 2, h), Palette.Gang(World!, b.OwnerGangId));
-        if (!open) DrawBoardedUp(lot, h);
-        if (World!.StrikeAt(b) != null) DrawPickets(lot, h);
-        if (World.IsWireRoom(b)) DrawWireMast(lot, h);
     }
 
     /// <summary>A picture house's or dance hall's marquee: a band over the doors ringed with bulbs, lit while it's open.</summary>
@@ -882,9 +900,9 @@ public partial class MapView
     private Vector2 SignCentre(Lot lot, float h) => SignCentre(lot, h, lot.X + 0.5f);
 
     /// <summary>Where a sign centred along the roof at <paramref name="x"/> is centred, as drawn.</summary>
-    private Vector2 SignCentre(Lot lot, float h, float x)
+    private Vector2 SignCentre(Lot lot, float h, float x, float? front = null)
     {
-        var (_, _, _, y1) = Footprint(lot);
+        float y1 = front ?? Footprint(lot).Y1;
         return Angled ? Q(x, y1 - 0.12f, h + 0.19f) : P(x, y1 - 0.27f);
     }
 
@@ -896,9 +914,9 @@ public partial class MapView
         DrawBillboard(lot, h, frame, frameWidth, open, face, lot.X + 0.24f, lot.X + 0.76f);
 
     /// <summary>A sign on the roof between two points along it, for one of a row of shops.</summary>
-    private void DrawBillboard(Lot lot, float h, Color frame, float frameWidth, bool open, Action face, float xa, float xb)
+    private void DrawBillboard(Lot lot, float h, Color frame, float frameWidth, bool open, Action face, float xa, float xb, float? front = null)
     {
-        var (_, _, _, y1) = Footprint(lot);
+        float y1 = front ?? Footprint(lot).Y1;
         float y = y1 - 0.12f;
         var paper = open ? new Color("e6dcc2") : new Color("8a826e");
         if (!Angled)
@@ -1106,6 +1124,21 @@ public partial class MapView
                     c + new Vector2(-h * 0.3f, -h * 0.65f), c + new Vector2(h * 0.7f, -h * 0.8f),
                     c + new Vector2(h * 0.7f, -h * 0.55f), c + new Vector2(-h * 0.3f, -h * 0.4f),
                 }, ink);
+                break;
+            case BusinessKind.GasStation:
+                // A petrol pump with a glass globe on top and its hose hanging off the side.
+                C.DrawRect(new Rect2(c.X - h * 0.4f, c.Y - h * 0.35f, h * 0.7f, h * 1.2f), new Color("c8463c"));
+                C.DrawCircle(c + new Vector2(-h * 0.05f, -h * 0.6f), h * 0.3f, new Color("f0e8d0"));
+                C.DrawRect(new Rect2(c.X - h * 0.25f, c.Y - h * 0.15f, h * 0.4f, h * 0.3f), new Color("f0e8d0"));
+                C.DrawArc(c + new Vector2(h * 0.45f, h * 0.15f), h * 0.3f, -Mathf.Pi / 2, Mathf.Pi / 2, 8, ink, lw);
+                break;
+            case BusinessKind.Scrapyard:
+                // A crane's horseshoe magnet.
+                C.DrawArc(c + new Vector2(0, h * 0.05f), h * 0.6f, 0, Mathf.Pi, 12, new Color("a8332c"), lw * 2.2f);
+                C.DrawRect(new Rect2(c.X - h * 0.78f, c.Y - h * 0.65f, h * 0.36f, h * 0.7f), new Color("a8332c"));
+                C.DrawRect(new Rect2(c.X + h * 0.42f, c.Y - h * 0.65f, h * 0.36f, h * 0.7f), new Color("a8332c"));
+                C.DrawRect(new Rect2(c.X - h * 0.78f, c.Y - h * 0.85f, h * 0.36f, h * 0.22f), new Color("c8c4bc"));
+                C.DrawRect(new Rect2(c.X + h * 0.42f, c.Y - h * 0.85f, h * 0.36f, h * 0.22f), new Color("c8c4bc"));
                 break;
             case BusinessKind.Warehouse:
                 foreach (var (dx, dy) in new[] { (-0.85f, 0.0f), (0.0f, 0.0f), (-0.42f, -0.8f) })

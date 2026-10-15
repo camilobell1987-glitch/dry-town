@@ -400,6 +400,8 @@ public sealed partial class CityDirectory
         BusinessKind.Warehouse => (6.5f, 17.5f),
         BusinessKind.Garage => (7.5f, 18),
         BusinessKind.Bakery => (6, 18),
+        BusinessKind.GasStation => (6, 21),
+        BusinessKind.Scrapyard => (7, 17.5f),
         BusinessKind.Butcher => (7, 18),
         BusinessKind.CigarStore => (7, 21),
         BusinessKind.PictureHouse => (12, 23.5f),

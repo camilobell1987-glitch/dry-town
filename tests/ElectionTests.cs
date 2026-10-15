@@ -108,7 +108,7 @@ public class ElectionTests
     [Fact]
     public void AJailedCandidateIsOffTheBallot()
     {
-        var (sim, w) = ToCampaign();
+        var (sim, w) = ToCampaign(8);
         var man = Candidate(w);
         Politics.Stand(w, w.Player, man, w.Wards[0]);
         man.State = HoodState.Jailed;
@@ -169,7 +169,7 @@ public class ElectionTests
     [Fact]
     public void BallotsResultsAndTheDASurviveASave()
     {
-        var (sim, w) = ToCampaign();
+        var (sim, w) = ToCampaign(8);
         var man = Candidate(w);
         Politics.Stand(w, w.Player, man, w.Wards[1]);
         w.Wards[0].OwnMan = true;

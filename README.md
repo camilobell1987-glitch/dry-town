@@ -251,6 +251,13 @@ Eight more trades fill out the streets, each with its own sign on the roof:
 
 The bakery, butcher, cigar store, flower shop and pawnshop go into shop rows with the rest; the funeral parlor, picture house and dance hall are buildings of their own. Housewives now shop at the bakery, the butcher and the flower shop too, and the new trades bring their own jobs to the directory: bakers, butchers and delivery boys, counter girls, cigar girls and flower girls, pawnbrokers' clerks, embalmers and hearse drivers, projectionists, ushers and usherettes, bouncers, bandleaders, hatcheck girls and taxi dancers.
 
+### Filling stations and scrapyards
+
+![The big scrapyard spread over two lots, with its crane over the heaps](docs/screenshots/scrapyard.png)
+
+- **Filling station** ($110 to $210 a week): a little office at the back of a forecourt, with two red pumps on an island under a green canopy and a driveway at each end. Cars and trucks come along the kerb lane, turn in at one driveway, stop at the pumps with the hose in, and drive out by the other and on up the street, one after another all day. Nobody parks across its driveways. It opens from six in the morning to nine at night, its pump boys and mechanics are Teamsters, and it can hide a still, a numbers game or slot machines. Filling stations go anywhere but the rich streets.
+- **Scrapyards.** Every city has exactly three, out among the factories and never drawn at random. Two are small yards ($100 to $190) behind a board fence: heaps of scrap, rusting wrecks and stacked tyres round a tin office. The third is the big yard, an Iron & Metal company ($300 to $480) that spreads over the lot next door too, with a crane and its magnet over the heaps. Clicking either lot picks the yard. Junkmen, rag pickers and crane men work there, and a yard can hide a still, a counterfeiting press or a loan book. The three come on top of a city's usual count of shops.
+
 ![A row of three shops, one of them burnt out](docs/screenshots/shop-row.png)
 
 ## Squares and plazas

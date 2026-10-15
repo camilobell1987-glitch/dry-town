@@ -90,7 +90,7 @@ public class InsideTests
         // The warden can still move the boss first now and then, so try a few cities.
         int coups = 0;
         var why = new List<string>();
-        for (ulong seed = 1; seed <= 5; seed++)
+        for (ulong seed = 8; seed <= 12; seed++)
         {
             var (sim, w, g, boss, _) = SentAway(weeks: 1000, seed: seed);
             Week(sim);

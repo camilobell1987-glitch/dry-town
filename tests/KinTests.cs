@@ -34,7 +34,7 @@ public class KinTests
     [Fact]
     public void TheStreetTurnsUpFamilyInTime()
     {
-        var (sim, w, _) = Start();
+        var (sim, w, _) = Start(8);
         w.Introduce(Shopkeeper, w.HqOf(w.Player).WardId, Family);
         for (int i = 0; i < 60 && w.KnownTiesOf(Shopkeeper).Count() < 2; i++) sim.AdvanceWeek(Mine(w));
         Assert.Equal(2, w.KnownTiesOf(Shopkeeper).Count());

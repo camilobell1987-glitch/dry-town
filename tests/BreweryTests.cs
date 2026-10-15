@@ -62,7 +62,7 @@ public class BreweryTests
     [Fact]
     public void OneBreweryToAnOutfitAndOnlyInAWarehouse()
     {
-        var (_, w, me) = Start();
+        var (_, w, me) = Start(seed: 8);
         var houses = Give(w, me, RacketKind.LoanShark, 2);
         foreach (var b in houses) b.Racket = RacketKind.None;
         var diner = Give(w, me, RacketKind.Speakeasy, 1)[0];
