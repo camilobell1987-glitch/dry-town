@@ -1570,8 +1570,9 @@ public partial class Main : Control
                     "arcade" => W.Map.Squares.Where(s => s.Avenue && !W.Map.BuiltOver(s.Bx, s.By) && MapView.IsArcade(s.Bx, s.By)).Select(s => W.Map.LotsOfBlock(Math.Max(0, s.Bx - 1), s.By).Last()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "plaza" => W.Map.Squares.Where(s => s.Avenue && !W.Map.BuiltOver(s.Bx, s.By)).Select(s => W.Map.LotsOfBlock(Math.Max(0, s.Bx - 1), s.By).Last()).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "civic" => W.Map.Lots.Where(l => l.Terrain == Terrain.Civic).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                    "bigyard" => W.Map.Lots.FirstOrDefault(l => l.Use == LotUse.Yard) ?? hq,
                     _ when focus.StartsWith("kind:") && Enum.TryParse<BusinessKind>(focus[5..], true, out var trade) =>
-                        W.Businesses.Where(b => b.Kind == trade && W.LotOf(b) is { } kl && kl.FrontY > kl.Y).Select(W.LotOf).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
+                        W.Businesses.Where(b => b.Kind == trade && W.YardOf(b) == null).Select(W.LotOf).OrderBy(l => l.FrontY > l.Y ? 0 : 1).ThenBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     _ when focus.StartsWith("zone:") && Enum.TryParse<Zone>(focus[5..], true, out var zone) =>
                         W.Map.Lots.Where(l => W.Map.ZoneOf(l) == zone && l.Terrain == Terrain.Land).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,
                     "garage" => W.Garages.Where(g => !g.Police).Select(g => W.Map.LotAt(g.LotId)).OrderBy(l => W.Map.Distance(hq, l)).FirstOrDefault() ?? hq,

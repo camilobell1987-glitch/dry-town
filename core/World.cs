@@ -199,6 +199,16 @@ public sealed partial class World
     public void Act(ScriptAction action) => Script.Add(action with { Tick = Tick });
 
     public Lot LotOf(Business b) => Map.LotAt(b.LotId);
+
+    /// <summary>The back lot a big scrapyard spreads over, or null for any other business.</summary>
+    public Lot? YardOf(Business b) =>
+        b.Kind == BusinessKind.Scrapyard ? Map.Lots.FirstOrDefault(l => l.Use == LotUse.Yard && l.BusinessId == b.Id) : null;
+
+    /// <summary>A free lot beside this one on the same block and street, for a big scrapyard to spread onto.</summary>
+    private Lot? BackLot(Lot lot, HashSet<Lot> taken) =>
+        Map.Lots.Where(n => n.IsFree && !n.Court && !lot.Court && !taken.Contains(n) && n.Y == lot.Y && n.FrontY == lot.FrontY && Math.Abs(n.X - lot.X) == 1
+                && (n.X - 1) / CityMap.StrideX == (lot.X - 1) / CityMap.StrideX)
+            .OrderBy(n => n.X).FirstOrDefault();
     public Lot HqOf(Gang g) => Map.LotAt(g.HqLotId);
     public Lot Precinct => Map.Lots.First(l => l.Use == LotUse.Precinct);
 
@@ -256,8 +266,8 @@ public sealed partial class World
 
         var free = Map.Lots.Where(l => l.IsFree).ToList();
         Rng.Shuffle(free);
-        var kinds = Enum.GetValues<BusinessKind>().Where(k => k != BusinessKind.Court).ToArray();
-        int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs - Settings.SmallGangCount);
+        var kinds = Enum.GetValues<BusinessKind>().Where(k => k is not (BusinessKind.Court or BusinessKind.Scrapyard)).ToArray();
+        int count = Math.Min(Settings.BusinessCount, free.Count - 8 - 2 * shape.MaxGangs - Settings.SmallGangCount - Content.Scrapyards - 1);
         // Small shops often share a building, two or three in a row along the ground floor with flats above. A hotel,
         // a warehouse or a motor garage has a building to itself, and so do some of the small shops.
         // Every trade is in town at least once before the rest are drawn at random.
@@ -319,6 +329,44 @@ public sealed partial class World
                 Kind = kind,
                 Takings = (int)Math.Round(Rng.Range(min, max) * CityMap.TakingsIn(Map.ZoneOf(lot))),
                 Toughness = Rng.Range(2, 9),
+                LotId = lot.Id,
+            });
+        }
+
+        // Three scrapyards to a city, out among the factories: a big one spread over its own lot and the one beside it,
+        // and two small ones.
+        for (int k = 0; k < Content.Scrapyards; k++)
+        {
+            bool big = k == 0;
+            Lot? yard = null;
+            Lot lot;
+            if (big && free.Where(l => !taken.Contains(l) && CityMap.Suits(BusinessKind.Scrapyard, Map.ZoneOf(l), l.Id))
+                    .Select(l => (Lot: l, Next: BackLot(l, taken))).FirstOrDefault(p => p.Next != null) is { Lot: { } l } pair)
+            {
+                lot = l;
+                yard = pair.Next!;
+                taken.Add(lot);
+                taken.Add(yard);
+                placed[lot.WardId]++;
+            }
+            else lot = Take(BusinessKind.Scrapyard);
+            int id = Businesses.Count;
+            var (min, max) = yard != null ? Content.BigScrapyardTakings : Content.TakingsFor(BusinessKind.Scrapyard);
+            string owner = LastName(Neighbourhood(lot.WardId));
+            lot.Use = LotUse.Business;
+            lot.BusinessId = id;
+            if (yard != null)
+            {
+                yard.Use = LotUse.Yard;
+                yard.BusinessId = id;
+            }
+            Businesses.Add(new Business
+            {
+                Id = id,
+                Name = yard != null ? $"{owner}'s Iron & Metal Yard, {Map.StreetOf(lot)} St" : $"{owner}'s {Content.Label(BusinessKind.Scrapyard)}, {Map.StreetOf(lot)} St",
+                Kind = BusinessKind.Scrapyard,
+                Takings = (int)Math.Round(Rng.Range(min, max) * CityMap.TakingsIn(Map.ZoneOf(lot))),
+                Toughness = Rng.Range(4, 9),
                 LotId = lot.Id,
             });
         }

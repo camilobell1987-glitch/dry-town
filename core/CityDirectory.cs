@@ -382,6 +382,8 @@ public sealed partial class CityDirectory
         BusinessKind.FuneralParlor => Roll(id, 12) < 0.5 ? "Embalmer" : "Hearse driver",
         BusinessKind.PictureHouse => Roll(id, 12) < 0.5 ? "Projectionist" : "Usher",
         BusinessKind.DanceHall => Roll(id, 12) < 0.5 ? "Bouncer" : "Bandleader",
+        BusinessKind.GasStation => Roll(id, 12) < 0.6 ? "Pump boy" : "Mechanic",
+        BusinessKind.Scrapyard => Roll(id, 12) < 0.4 ? "Junkman" : Roll(id, 13) < 0.5 ? "Rag picker" : "Crane man",
         _ => "Clerk",
     };
 
@@ -391,7 +393,7 @@ public sealed partial class CityDirectory
         BusinessKind.Tailor => "Seamstress",
         BusinessKind.Hotel => Roll(id, 12) < 0.5 ? "Chambermaid" : "Switchboard girl",
         BusinessKind.Laundry => "Laundress",
-        BusinessKind.Warehouse or BusinessKind.Garage or BusinessKind.FuneralParlor => "Bookkeeper",
+        BusinessKind.Warehouse or BusinessKind.Garage or BusinessKind.FuneralParlor or BusinessKind.GasStation or BusinessKind.Scrapyard => "Bookkeeper",
         BusinessKind.Bakery => "Counter girl",
         BusinessKind.Florist => "Flower girl",
         BusinessKind.CigarStore => "Cigar girl",

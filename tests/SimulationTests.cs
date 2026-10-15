@@ -428,7 +428,12 @@ public class Phase5Tests
         // Four outfits run every city, whatever its size; the small gangs grow with it.
         Assert.Equal(Content.Outfits, w.Outfits.Count());
         Assert.Equal(smallGangs, w.SmallGangs.Count());
-        Assert.Equal(Content.Shape(size).Businesses, w.Businesses.Count(b => b.Kind != BusinessKind.Court));
+        Assert.Equal(Content.Shape(size).Businesses, w.Businesses.Count(b => b.Kind is not (BusinessKind.Court or BusinessKind.Scrapyard)));
+        // Three scrapyards on top of the shops, the first of them big enough to spread over the lot next door.
+        var yards = w.Businesses.Where(b => b.Kind == BusinessKind.Scrapyard).ToList();
+        Assert.Equal(Content.Scrapyards, yards.Count);
+        Assert.Equal(1, yards.Count(b => w.YardOf(b) != null));
+        Assert.True(yards.First(b => w.YardOf(b) != null).Takings > yards.Where(b => w.YardOf(b) == null).Max(b => b.Takings));
         Assert.Equal(w.Map.CourtGates().Count(), w.Businesses.Count(b => b.Kind == BusinessKind.Court));
         // Every ward has shops in it, and every walk stays on the streets.
         foreach (var ward in w.Wards) Assert.True(Politics.BusinessesIn(w, ward).Count() >= 10);

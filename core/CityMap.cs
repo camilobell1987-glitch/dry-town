@@ -1,6 +1,7 @@
 namespace DryTown.Core;
 
-public enum LotUse { Empty, Business, Headquarters, Precinct, Bank, GunShop, CarDealer }
+/// <summary>What stands on a lot. <see cref="Yard"/> is the back lot of a big scrapyard, its <see cref="Lot.BusinessId"/> the yard's.</summary>
+public enum LotUse { Empty, Business, Headquarters, Precinct, Bank, GunShop, CarDealer, Yard }
 
 /// <summary>
 /// What the ground under a lot is. Only land can be built on; the river, the parks, the graveyards

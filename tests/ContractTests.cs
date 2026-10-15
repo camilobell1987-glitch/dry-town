@@ -6,9 +6,9 @@ namespace DryTown.Core.Tests;
 public class ContractTests
 {
     /// <summary>A quiet medium city at the turn of a quarter, where the player has money and nobody else to bother him.</summary>
-    private static (Simulation Sim, World W, Gang Me) Start(int gangs = 1)
+    private static (Simulation Sim, World W, Gang Me) Start(int gangs = 1, ulong seed = 4)
     {
-        var sim = Simulation.New(new WorldSettings { Seed = 4, Size = CitySize.Medium, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false });
+        var sim = Simulation.New(new WorldSettings { Seed = seed, Size = CitySize.Medium, StartingGangs = gangs, CityEventsEnabled = false, DirectorEnabled = false });
         var w = sim.World;
         w.Week = Content.ContractLetting;
         w.Player.Cash = 50_000;
@@ -79,7 +79,7 @@ public class ContractTests
     [Fact]
     public void TheMayorsFriendHasTheMostVotes()
     {
-        var (_, w, me) = Start(gangs: 2);
+        var (_, w, me) = Start(gangs: 2, seed: 8);
         var rival = w.LivingGangs.First(g => !g.IsPlayer);
         Front(w, me, BusinessKind.Warehouse);
         rival.Cash = 50_000;

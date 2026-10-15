@@ -405,7 +405,7 @@ public partial class MapView : Control
         var lot = World.Map.LotAt(lotId);
         switch (lot.Use)
         {
-            case LotUse.Business:
+            case LotUse.Business or LotUse.Yard:
                 var b = World.BusinessById(BusinessUnder(lot, atPosition));
                 string owner = b.IsProtected ? World.GangById(b.ProtectorGangId).Name : "Nobody's paying anyone";
                 string racket = b.Racket != RacketKind.None ? $"\nBack room: {Content.Rackets[b.Racket].Label}" : "";
@@ -723,7 +723,7 @@ public partial class MapView : Control
         float width = Px(2);
         Color? rim = null;
         if (lot.Use == LotUse.Business && lot.Shops.Count > 1) DrawUnitRims(lot);
-        else if (lot.Use == LotUse.Business)
+        else if (lot.Use is LotUse.Business or LotUse.Yard)
         {
             var (protector, _) = ShownState(w.BusinessById(lot.BusinessId));
             if (protector >= 0) rim = Palette.Gang(w, protector);
@@ -746,7 +746,7 @@ public partial class MapView : Control
             C.DrawPolyline(grown.Append(grown[0]).ToArray(), Palette.Ink with { A = pulse }, Px(2.5f));
             return;
         }
-        bool selected = (lot.Use == LotUse.Business && lot.BusinessId == SelectedBusiness)
+        bool selected = (lot.Use is LotUse.Business or LotUse.Yard && lot.BusinessId == SelectedBusiness)
             || (lot.Use == LotUse.Bank && SelectedBank >= 0 && w.BankById(SelectedBank)?.LotId == lot.Id)
             || lot.Id == SelectedShop;
         if (selected)

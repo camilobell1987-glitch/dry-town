@@ -151,6 +151,9 @@ public static partial class Content
         BusinessKind.FuneralParlor => new[] { RacketKind.Still, RacketKind.LoanShark, RacketKind.Counterfeit },
         BusinessKind.PictureHouse => new[] { RacketKind.Numbers, RacketKind.Slots, RacketKind.Bookie },
         BusinessKind.DanceHall => new[] { RacketKind.Speakeasy, RacketKind.GamblingDen, RacketKind.Slots, RacketKind.Nightclub },
+        // A filling station sells bootleg alcohol cut from the pump; a scrapyard can melt down a car or hide a press under the junk.
+        BusinessKind.GasStation => new[] { RacketKind.Still, RacketKind.Numbers, RacketKind.Slots },
+        BusinessKind.Scrapyard => new[] { RacketKind.Still, RacketKind.Counterfeit, RacketKind.LoanShark },
         BusinessKind.Court => new[] { RacketKind.Speakeasy, RacketKind.Still, RacketKind.Numbers, RacketKind.GamblingDen, RacketKind.LoanShark },
         _ => new[] { RacketKind.LoanShark, RacketKind.Slots },
     };
@@ -186,6 +189,8 @@ public static partial class Content
         BusinessKind.FuneralParlor => (150, 280),
         BusinessKind.PictureHouse => (260, 460),
         BusinessKind.DanceHall => (220, 400),
+        BusinessKind.GasStation => (110, 210),
+        BusinessKind.Scrapyard => (100, 190),
         _ => (90, 170),
     };
 
@@ -317,6 +322,12 @@ public static partial class Content
     /// <summary>Heat a racket in a tenement court draws less each week: the beat cop can't see it from the street.</summary>
     public const int CourtHeatOff = 1;
 
+    /// <summary>Scrapyards to a city, the first of them the big one spread over two lots; nobody draws them at random.</summary>
+    public const int Scrapyards = 3;
+
+    /// <summary>What the big scrapyard takes in a week, before protection.</summary>
+    public static readonly (int Min, int Max) BigScrapyardTakings = (300, 480);
+
     public static string Label(BusinessKind kind) => kind switch
     {
         BusinessKind.PoolHall => "Pool Hall",
@@ -328,6 +339,8 @@ public static partial class Content
         BusinessKind.FuneralParlor => "Funeral Parlor",
         BusinessKind.PictureHouse => "Picture House",
         BusinessKind.DanceHall => "Dance Hall",
+        BusinessKind.GasStation => "Filling Station",
+        BusinessKind.Scrapyard => "Scrap Yard",
         _ => kind.ToString(),
     };
 
