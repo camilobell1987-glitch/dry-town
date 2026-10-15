@@ -34,30 +34,42 @@ public class RoutineTests
     }
 
     [Fact]
-    public void ALandlordGoesRoundHisBuildingsAndIsHomeAfterDark()
+    public void ALandlordCollectsTheRentOnSaturdayAndLooksInDuringTheWeek()
     {
         var (w, d) = Start();
-        var landlord = Everyone(w, d).First(c => c.Owns.Count(l => l != c.HomeLotId) >= 2 && c.OwnsBusinessId < 0);
-        var r = d.RoutineOf(landlord.Id);
-        Assert.Equal(RoutineKind.Landlord, r.Kind);
-        Assert.All(r.Stops, s => Assert.Contains(s.LotId, landlord.Owns));
-        Assert.InRange(r.LeaveHome, 8.5f, 10);
-        float home = r.Stops[^1].Leave + w.Map.Distance(w.Map.LotAt(r.Stops[^1].LotId), w.Map.LotAt(landlord.HomeLotId)) / Content.ResidentPace;
+        var landlord = Everyone(w, d).First(c => c.Owns.Count(l => l != c.HomeLotId) >= 2 && c.OwnsBusinessId < 0 && d.RestDayOf(c) == 6);
+        var rent = d.RoutineOf(landlord.Id, 5);
+        Assert.Equal(RoutineKind.Landlord, rent.Kind);
+        Assert.All(rent.Stops, s => Assert.Contains(s.LotId, landlord.Owns));
+        Assert.True(rent.Stops.Count >= 2);
+        Assert.InRange(rent.LeaveHome, 8.5f, 10);
+        float home = rent.Stops[^1].Leave + w.Map.Distance(w.Map.LotAt(rent.Stops[^1].LotId), w.Map.LotAt(landlord.HomeLotId)) / Content.ResidentPace;
         Assert.InRange(home, 19, 21.5f);
         // Each call comes after the last.
-        Assert.True(r.Stops.Zip(r.Stops.Skip(1)).All(p => p.First.Leave < p.Second.Leave));
+        Assert.True(rent.Stops.Zip(rent.Stops.Skip(1)).All(p => p.First.Leave < p.Second.Leave));
+        // In the week he looks in on a building or two and is home in the afternoon, unless he goes out again.
+        var tuesday = d.RoutineOf(landlord.Id, 1);
+        var calls = tuesday.Stops.Where(s => s.Why == Errand.Rent).ToList();
+        Assert.InRange(calls.Count, 1, 2);
+        Assert.True(calls[^1].Leave < 17.5f);
     }
 
     [Fact]
-    public void AWomanKeepingHouseGoesToTheShopsAndIsHomeForSupper()
+    public void AWomanKeepingHouseWashesOnMondayShopsInTheWeekAndGoesToMarketOnSaturday()
     {
         var (w, d) = Start();
-        var wife = Everyone(w, d).First(c => c.Job == "Keeps house" && d.RoutineOf(c.Id).Kind == RoutineKind.Errands);
-        var r = d.RoutineOf(wife.Id);
-        Assert.InRange(r.Stops.Count, 1, 2);
-        Assert.All(r.Stops, s => Assert.Contains(w.Businesses, b => b.LotId == s.LotId));
-        Assert.InRange(r.LeaveHome, 9.5f, 11.5f);
-        Assert.True(r.Stops[^1].Leave < 18);
+        var wives = Everyone(w, d).Where(c => c.Job == "Keeps house" && d.RoutineOf(c.Id, 1).Kind == RoutineKind.Errands).ToList();
+        Assert.NotEmpty(wives);
+        foreach (var wife in wives)
+        {
+            Assert.Equal(RoutineKind.Loafer, d.RoutineOf(wife.Id, 0).Kind);
+            var r = d.RoutineOf(wife.Id, 1);
+            Assert.InRange(r.Stops.Count, 1, 2);
+            Assert.All(r.Stops, s => Assert.Contains(w.Businesses, b => b.LotId == s.LotId));
+            Assert.InRange(r.LeaveHome, 9.5f, 11.5f);
+            Assert.True(r.Stops[^1].Leave < 18);
+        }
+        Assert.Contains(wives, c => d.RoutineOf(c.Id, 5).Stops.Count(s => s.Why == Errand.Shop) >= 2);
     }
 
     [Fact]
@@ -71,7 +83,7 @@ public class RoutineTests
             Assert.True(r.Stops.Count <= Content.MostStops);
             if (r.Kind == RoutineKind.Loafer) continue;
             Assert.True(r.LeaveHome < r.Stops[0].Leave, $"{c.Job}: leaves at {r.LeaveHome} but done at the first stop at {r.Stops[0].Leave}");
-            if (c.WorkBusinessId >= 0) Assert.Equal(RoutineKind.Worker, r.Kind);
+            if (c.WorkBusinessId >= 0 && c.Age >= 14 && d.RestDayOf(c) == 6) Assert.Equal(RoutineKind.Worker, r.Kind);
         }
         // Most grown-ups have somewhere to be.
         var grown = people.Where(c => c.Age >= 18).ToList();
@@ -122,5 +134,98 @@ public class RoutineTests
             var f = w.Map.FillerOf(w.Map.LotAt(d.RoutineOf(c.Id).Stops[0].LotId));
             Assert.False(CityMap.IsHome(f) || f is Filler.Vacant or Filler.Parking or Filler.PocketPark, $"{c.Job} works at a {f}");
         }
+    }
+
+    [Fact]
+    public void EveryDayOfTheWeekHoldsTogether()
+    {
+        var (w, d) = Start();
+        foreach (var c in Everyone(w, d))
+        for (int day = 0; day < 7; day++)
+        {
+            var r = d.RoutineOf(c.Id, day);
+            Assert.True(r.Stops.Count <= Content.MostStops);
+            if (r.Kind == RoutineKind.Loafer) continue;
+            Assert.True(r.LeaveHome < r.Stops[0].Leave, $"{c.Job} on {Content.DayNames[day]}: leaves at {r.LeaveHome}, done at {r.Stops[0].Leave}");
+            Assert.True(r.Stops.Zip(r.Stops.Skip(1)).All(p => p.First.Leave <= p.Second.Leave), $"{c.Job} on {Content.DayNames[day]}");
+            Assert.All(r.Stops, s => Assert.True(s.Outside >= 0));
+        }
+    }
+
+    [Fact]
+    public void AWorkingManWorksSixDaysAHalfDayOnSaturdayAndRestsOnSunday()
+    {
+        var (w, d) = Start();
+        var man = Everyone(w, d).First(c => c.WorkBusinessId >= 0 && c.Age >= 18 && d.RestDayOf(c) == 6 && d.RoutineOf(c.Id).Kind == RoutineKind.Worker);
+        for (int day = 0; day < 5; day++) Assert.Contains(d.RoutineOf(man.Id, day).Stops, s => s.Why == Errand.Work && s.Leave >= 16);
+        Assert.Contains(d.RoutineOf(man.Id, 5).Stops, s => s.Why == Errand.Work && s.Leave < 14);
+        Assert.DoesNotContain(d.RoutineOf(man.Id, 6).Stops, s => s.Why == Errand.Work);
+    }
+
+    [Fact]
+    public void ACatholicFamilyGoesToMassTogetherOnSunday()
+    {
+        var (w, d) = Start(7);
+        var families = Everyone(w, d).Where(c => c.Origin is Ethnicity.Irish or Ethnicity.Italian or Ethnicity.Polish && c.Ties.Any(t => t.Kin == Kin.Spouse))
+            .Where(c => d.RoutineOf(c.Id, 6).Stops.FirstOrDefault().Why == Errand.Church).ToList();
+        Assert.NotEmpty(families);
+        foreach (var c in families.Take(40))
+        {
+            var spouse = c.Ties.First(t => t.Kin == Kin.Spouse).Id;
+            var mine = d.RoutineOf(c.Id, 6).Stops[0];
+            var theirs = d.RoutineOf(spouse, 6).Stops.FirstOrDefault();
+            // The same church at the same Mass, unless one of them would rather not go.
+            if (theirs.Why == Errand.Church) Assert.Equal((mine.LotId, mine.Leave), (theirs.LotId, theirs.Leave));
+            Assert.Equal(Terrain.Church, w.Map.LotAt(mine.LotId).Terrain);
+        }
+        // Hardly anyone goes to church on a working day.
+        Assert.DoesNotContain(Everyone(w, d), c => d.RoutineOf(c.Id, 1).Stops.Any(s => s.Why == Errand.Church && s.Leave < 17));
+    }
+
+    [Fact]
+    public void ASouseDrinksMostNightsAndAFamilyManStaysIn()
+    {
+        var (w, d) = Start(7);
+        var people = Everyone(w, d).Where(c => c.Age >= 18).ToList();
+        var souse = people.First(c => d.CharacterOf(c.Id).Traits.Contains(Trait.Souse) && d.SecretsOf(c.Id).Any(s => s.Vice == Vice.Drink)
+            && d.RoutineOf(c.Id).Kind == RoutineKind.Worker);
+        int nights = Enumerable.Range(0, 7).Count(day => d.RoutineOf(souse.Id, day).Stops.Any(s => s.Why == Errand.Drink));
+        Assert.True(nights >= 5, $"drinks {nights} nights");
+        foreach (var c in people.Where(c => d.CharacterOf(c.Id).Traits.Contains(Trait.FamilyMan)).Take(60))
+            for (int day = 0; day < 7; day++)
+                Assert.DoesNotContain(d.RoutineOf(c.Id, day).Stops, s => s.Why is Errand.Drink or Errand.Gamble or Errand.NightOut or Errand.Lover);
+    }
+
+    [Fact]
+    public void SaturdayNightIsWhenTheYoungGoOut()
+    {
+        var (w, d) = Start(7);
+        var people = Everyone(w, d).Where(c => c.Age >= 18).ToList();
+        int Out(int day) => people.Count(c => d.RoutineOf(c.Id, day).Stops.Any(s => s.Why == Errand.NightOut));
+        Assert.True(Out(5) > 3 * Math.Max(1, Out(1)), $"Saturday {Out(5)}, Tuesday {Out(1)}");
+        // A man with a woman on the side calls on her at home.
+        var visits = people.SelectMany(c => d.RoutineOf(c.Id, 2).Stops.Where(s => s.Why == Errand.Lover).Select(s => (c, s))).ToList();
+        Assert.NotEmpty(visits);
+        Assert.All(visits, v => Assert.Equal(d.Get(d.SecretsOf(v.c.Id).First(x => x.Vice == Vice.Lover).Other).HomeLotId, v.s.LotId));
+    }
+
+    [Fact]
+    public void AJewWhoKeepsTheSabbathRestsOnSaturdayAndAJewishShopShutsThen()
+    {
+        var (w, d) = Start(7);
+        var people = Everyone(w, d).ToList();
+        var observant = people.Where(c => c.Origin == Ethnicity.Jewish && c.Age >= 18 && d.RestDayOf(c) == 5 && d.RoutineOf(c.Id).Kind == RoutineKind.Worker).ToList();
+        Assert.NotEmpty(observant);
+        foreach (var c in observant)
+        {
+            Assert.DoesNotContain(d.RoutineOf(c.Id, 5).Stops, s => s.Why == Errand.Work);
+            Assert.Contains(d.RoutineOf(c.Id, 6).Stops, s => s.Why == Errand.Work);
+            // Home before sundown on Friday.
+            Assert.True(d.RoutineOf(c.Id, 4).Stops.First(s => s.Why == Errand.Work).Leave <= 15.5f);
+        }
+        var shops = people.Where(c => c.Origin == Ethnicity.Jewish && c.OwnsBusinessId >= 0
+            && w.BusinessById(c.OwnsBusinessId).Kind is not (BusinessKind.Diner or BusinessKind.Hotel or BusinessKind.PoolHall)).ToList();
+        Assert.All(shops, c => Assert.NotEqual(RoutineKind.Shopkeeper, d.RoutineOf(c.Id, 5).Kind));
+        Assert.All(shops, c => Assert.Equal(RoutineKind.Shopkeeper, d.RoutineOf(c.Id, 6).Kind));
     }
 }

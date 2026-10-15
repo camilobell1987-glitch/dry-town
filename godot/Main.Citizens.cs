@@ -93,13 +93,14 @@ public partial class Main
             AddLabel(lines, stamp, dealt.Standing is Standing.Dead or Standing.Held or Standing.Jailed ? new Color("9a2a22") : new Color("3c6a34"), wrap: true);
         }
 
-        CardTabs(lines);
+        CardTabs(lines, week: true);
         var grid = new GridContainer { Columns = 2, Visible = _cardTab == CardTab.Particulars };
         grid.AddThemeConstantOverride("h_separation", 12);
         grid.AddThemeConstantOverride("v_separation", 3);
         lines.AddChild(grid);
         if (_cardTab == CardTab.Character) CharacterTab(lines, id, known);
         if (_cardTab == CardTab.Grudges) GrudgesTab(lines, Party.Resident, id);
+        if (_cardTab == CardTab.Week) WeekTab(lines, id, known);
         // Each line you know is a link where it leads somewhere: a place moves the map there, a person opens their card.
         void Line(string label, Fact fact, Func<string> value, Action? go = null)
         {
@@ -260,12 +261,15 @@ public partial class Main
     }
 
     /// <summary>Tabs, like the dividers in a card file: the particulars, what sort of person they are, and their grudges.</summary>
-    private void CardTabs(VBoxContainer lines)
+    private void CardTabs(VBoxContainer lines, bool week = false)
     {
         var tabs = new HBoxContainer();
         tabs.AddThemeConstantOverride("separation", 14);
         lines.AddChild(tabs);
-        foreach (var (title, which) in new[] { ("Particulars", CardTab.Particulars), ("Character", CardTab.Character), ("Grudges", CardTab.Grudges) })
+        // A gangster's card has no week on it; one left on that tab shows his particulars.
+        if (!week && _cardTab == CardTab.Week) _cardTab = CardTab.Particulars;
+        var all = new[] { ("Particulars", CardTab.Particulars), ("Character", CardTab.Character), ("Grudges", CardTab.Grudges), ("Week", CardTab.Week) };
+        foreach (var (title, which) in all.Where(t => week || t.Item2 != CardTab.Week))
         {
             bool on = _cardTab == which;
             // The grudges tab explains itself when the pointer rests on it, rather than taking room on the card.
@@ -312,7 +316,7 @@ public partial class Main
         }
     }
 
-    private enum CardTab { Particulars, Character, Grudges }
+    private enum CardTab { Particulars, Character, Grudges, Week }
 
     /// <summary>Which tab of a resident's card is showing.</summary>
     private CardTab _cardTab;
@@ -545,5 +549,92 @@ public partial class Main
         if (lot.BusinessId is int biz and >= 0) return $"Over {W.BusinessById(biz).Name}";
         int number = 100 * (lot.X / CityMap.StrideX + 1) + (lot.X % CityMap.StrideX) * 12 + (lot.FrontY < lot.Y ? 1 : 2);
         return $"{number} {W.Map.StreetOf(lot)} St";
+    }
+
+    /// <summary>
+    /// The card's last tab: someone's week, a line a day, once you know where they live and work. Where they go for
+    /// something you haven't found out yet, a bar, a game or a woman, the card only says they go out somewhere.
+    /// </summary>
+    private void WeekTab(VBoxContainer lines, int id, Fact known)
+    {
+        var d = _map.Directory!;
+        var c = d.Get(id);
+        if (!_revealCitizens && !(known.HasFlag(Fact.Home) && known.HasFlag(Fact.Work)))
+        {
+            AddLabel(lines, "You'd need to know where they live and work to know their week. Have them tailed.", CardFaint, 13, wrap: true);
+            return;
+        }
+        var secrets = (_revealCitizens ? d.SecretsOf(id) : W.KnownSecretsOf(id)).Select(s => s.Vice).ToHashSet();
+        var traits = (_revealCitizens ? d.CharacterOf(id).Traits : W.KnownTraitsOf(id)).ToHashSet();
+        string Place(int lot)
+        {
+            var l = W.Map.LotAt(lot);
+            if (W.Businesses.FirstOrDefault(b => b.LotId == lot) is { } biz) return biz.Name;
+            return l.Terrain switch
+            {
+                Terrain.Church => "church",
+                Terrain.Park => "the park",
+                Terrain.Civic => CityMap.Label(W.Map.CivicOf(l).Building),
+                Terrain.Water => "the docks",
+                _ => l.Use == LotUse.Precinct ? "the precinct house" : l.Use == LotUse.Bank ? "the bank" : Address(l),
+            };
+        }
+        string Work() => c.WorkBusinessId >= 0 ? W.BusinessById(c.WorkBusinessId).Name : c.OwnsBusinessId >= 0 ? W.BusinessById(c.OwnsBusinessId).Name : "";
+        var grid = new GridContainer { Columns = 2 };
+        grid.AddThemeConstantOverride("h_separation", 12);
+        grid.AddThemeConstantOverride("v_separation", 4);
+        lines.AddChild(grid);
+        for (int day = 0; day < 7; day++)
+        {
+            var r = d.RoutineOf(id, day);
+            var parts = new List<string>();
+            int from = c.HomeLotId;
+            float at = r.LeaveHome;
+            for (int s = 0; s < r.Stops.Count; s++)
+            {
+                var stop = r.Stops[s];
+                float arrive = at + W.Map.Distance(W.Map.LotAt(from), W.Map.LotAt(stop.LotId)) / Content.ResidentPace;
+                string when = $"{Clock(arrive)} to {Clock(stop.Leave)}";
+                string? part = stop.Why switch
+                {
+                    Errand.Work when r.Kind == RoutineKind.Shopkeeper => s == 0 ? $"opens up at {Clock(arrive)}" : $"shuts up at {Clock(stop.Leave)}",
+                    Errand.Work when r.Kind == RoutineKind.NightShift => $"keeps watch at {Place(stop.LotId)}, {when}",
+                    Errand.Work => $"works at {(Work() is { Length: > 0 } w ? w : Place(stop.LotId))}, {when}",
+                    Errand.Shop => $"shops at {Place(stop.LotId)}",
+                    Errand.Church => arrive < 13 ? $"Mass at {Clock(stop.Leave - 1.1f)}" : "church in the evening",
+                    Errand.Park => $"the park, {when}",
+                    Errand.Rent => day == 5 ? $"rent at {Address(W.Map.LotAt(stop.LotId))}" : $"calls at {Address(W.Map.LotAt(stop.LotId))}",
+                    Errand.JobHunt => $"asks for work at {Place(stop.LotId)}",
+                    Errand.Cafe => $"the café at {Place(stop.LotId)}",
+                    Errand.NightOut => $"a night out at {Place(stop.LotId)}, {when}",
+                    Errand.Drink => secrets.Contains(Vice.Drink) ? $"drinks at {Place(stop.LotId)}, {when}" : $"out somewhere, {when}",
+                    Errand.Gamble => secrets.Contains(Vice.Gambling) ? $"plays at {Place(stop.LotId)}, {when}" : $"out somewhere, {when}",
+                    Errand.Lover => secrets.Contains(Vice.Lover) ? $"calls on their lover, {when}" : $"out somewhere, {when}",
+                    Errand.LoanShark => secrets.Contains(Vice.Debt) ? $"pays the loan shark at {Place(stop.LotId)}" : "out for an hour",
+                    Errand.Precinct => traits.Contains(Trait.StoolPigeon) ? "a word at the precinct house" : "out for an hour",
+                    _ => null,
+                };
+                if (part != null) parts.Add(part);
+                from = stop.LotId;
+                at = stop.Leave;
+            }
+            string text = parts.Count == 0 ? (c.Age < 14 ? "Plays round the block" : day == 0 && c.Job is "Keeps house" or "Takes in washing" ? "Wash day at home" : "At home")
+                : string.Join("; then ", parts);
+            text = char.ToUpperInvariant(text[0]) + text[1..] + ".";
+            bool today = _map.Live && day == (int)Mathf.Clamp(_map.Clock / 24, 0, 6);
+            AddLabel(grid, Content.DayNames[day][..3], today ? new Color("9a2a22") : CardFaint, 13);
+            var line = AddLabel(grid, text, CardInk, 13, wrap: true);
+            line.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        }
+    }
+
+    /// <summary>An hour of the day as the card writes it, to the quarter hour: "7:15 AM", "noon", "1:30 AM".</summary>
+    private static string Clock(float hour)
+    {
+        int quarters = (int)MathF.Round(hour * 4) % 96;
+        int h = quarters / 4, m = quarters % 4 * 15;
+        if (m == 0 && h == 12) return "noon";
+        if (m == 0 && h == 0) return "midnight";
+        return $"{(h % 12 == 0 ? 12 : h % 12)}:{m:00} {(h < 12 ? "AM" : "PM")}";
     }
 }
