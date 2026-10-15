@@ -186,6 +186,28 @@ public partial class MapView
             C.DrawColoredPolygon(new[] { Q(px, py, h), Q(px + pw, py, h), Q(px + pw, py + ph, h), Q(px, py + ph, h) },
                 (i % 2 == 0 ? roof.Lightened(0.05f) : roof.Darkened(0.06f)) with { A = 0.45f });
         }
+        // Tar and gravel: a scatter of grit a shade lighter or darker than the roof, thicker toward the drains.
+        for (int i = 0; i < 40; i++)
+        {
+            float gx = x0 + 0.03f + Hash(lot.Id, 1950 + i) * (x1 - x0 - 0.06f), gy = y0 + 0.03f + Hash(lot.Id, 1990 + i) * (y1 - y0 - 0.06f);
+            var grit = Hash(lot.Id, 2030 + i) < 0.5f ? roof.Lightened(0.16f) : roof.Darkened(0.2f);
+            C.DrawCircle(Q(gx, gy, h), Mathf.Max(0.6f, Hair(0.004f + Hash(lot.Id, 2070 + i) * 0.005f)), grit with { A = 0.55f });
+        }
+        // Vent pipes from the flats below, each with its cap and its own little shadow.
+        var vent = new Color("5a5652");
+        for (int i = 0; i < 1 + (int)(Hash(lot.Id, 2110) * 3); i++)
+        {
+            float vx = x0 + 0.1f + Hash(lot.Id, 2120 + i) * (x1 - x0 - 0.25f), vy = y0 + 0.12f + Hash(lot.Id, 2130 + i) * (y1 - y0 - 0.3f);
+            Box(vx, vy, vx + 0.025f, vy + 0.025f, h, h + 0.06f, vent, vent.Darkened(0.15f), vent.Lightened(0.1f));
+            C.DrawCircle(Q(vx + 0.0125f, vy + 0.0125f, h + 0.06f), Mathf.Max(1, Hair(0.012f)), new Color("2a2826"));
+        }
+        // The parapet's own shade along the roof's south and east edges, and a dark line where the roof edge drops away.
+        if (!Angled)
+        {
+            C.DrawShadedQuad(Q(x1 - e * 0.6f, y0, h), Q(x1, y0, h), Q(x1, y1, h), Q(x1 - e * 0.6f, y1, h), Clear, ao, ao, Clear);
+            var edge = new Color(0, 0, 0, 0.55f);
+            C.DrawPolyline(new[] { P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1), P(x0, y0) }, edge, Mathf.Max(1, Hair(0.012f)));
+        }
         var coping = roof.Lightened(0.32f);
         C.DrawLine(Q(x0, y0, h), Q(x1, y0, h), coping, Hair(0.014f));
         C.DrawLine(Q(x0, y0, h), Q(x0, y1, h), coping, Hair(0.014f));
@@ -338,5 +360,51 @@ public partial class MapView
         Box(ax - 0.025f, ay - 0.02f, ax + 0.025f, ay + 0.02f, 0, 0.07f, can, can.Lightened(0.1f), can.Darkened(0.2f));
         C.DrawLine(Q(ax - 0.025f, ay + 0.02f, 0.025f), Q(ax + 0.025f, ay + 0.02f, 0.025f), can.Darkened(0.25f), Hair(0.005f));
         C.DrawLine(Q(ax - 0.025f, ay + 0.02f, 0.05f), Q(ax + 0.025f, ay + 0.02f, 0.05f), can.Darkened(0.25f), Hair(0.005f));
+    }
+
+    /// <summary>
+    /// The wear a street takes: a dark oily strip down the middle of each lane where the engines drip, paler tracks
+    /// polished by the tyres either side of it, and a few cracks run with tar.
+    /// </summary>
+    private void DrawRoadWear(int bx, int by, float w, float h)
+    {
+        float x0 = bx * CityMap.StrideX, y0 = by * CityMap.StrideY;
+        var oil = new Color(0, 0, 0, 0.16f);
+        var polish = new Color(1, 1, 1, 0.035f);
+        bool street = bx < Map.BlocksX && !Map.StreetClosed(bx, by) && by != Map.RiverRow;
+        bool avenue = by < Map.BlocksY && !Map.AvenueClosed(bx, by) && by != Map.RiverRow;
+        foreach (float share in new[] { NearLane, FarLane })
+        {
+            if (street)
+            {
+                float y = Across(by, CityMap.StrideY, share), a = x0 + 1.05f, b = x0 + w - 0.05f;
+                C.DrawLine(P(a, y), P(b, y), oil, Hair(0.05f));
+                foreach (float off in new[] { -0.07f, 0.07f }) C.DrawLine(P(a, y + off), P(b, y + off), polish, Hair(0.035f));
+            }
+            if (avenue)
+            {
+                float x = Across(bx, CityMap.StrideX, share), a = y0 + 1.05f, b = y0 + h - 0.05f;
+                C.DrawLine(P(x, a), P(x, b), oil, Hair(0.05f));
+                foreach (float off in new[] { -0.07f, 0.07f }) C.DrawLine(P(x + off, a), P(x + off, b), polish, Hair(0.035f));
+            }
+        }
+        // A crack or two, wandering across the tarmac, sealed with a darker line of tar.
+        var tar = new Color("1c1b1d");
+        for (int i = 0; i < 3; i++)
+        {
+            int k = (bx * 53 + by) * 11 + i;
+            bool along = Hash(k, 1900) < 0.5f;
+            if (along ? !street : !avenue) continue;
+            float cx = along ? x0 + 1.3f + Hash(k, 1901) * (w - 1.8f) : Across(bx, CityMap.StrideX, 0.15f + Hash(k, 1902) * 0.7f);
+            float cy = along ? Across(by, CityMap.StrideY, 0.15f + Hash(k, 1902) * 0.7f) : y0 + 1.3f + Hash(k, 1901) * (h - 1.8f);
+            var pts = new Vector2[5];
+            for (int j = 0; j < pts.Length; j++)
+            {
+                pts[j] = P(cx, cy);
+                float step = 0.07f + Hash(k, 1910 + j) * 0.06f, wander = (Hash(k, 1920 + j) - 0.5f) * 0.08f;
+                if (along) { cx += step; cy += wander; } else { cy += step; cx += wander; }
+            }
+            C.DrawPolyline(pts, tar with { A = 0.8f }, Mathf.Max(1, Hair(0.012f)));
+        }
     }
 }

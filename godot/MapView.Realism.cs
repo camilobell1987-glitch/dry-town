@@ -62,7 +62,8 @@ void fragment() {
 shader_type canvas_item;
 uniform sampler2D screen : hint_screen_texture, filter_linear_mipmap;
 uniform float vignette = 0.22;
-uniform float grain = 0.03;
+uniform float grain = 0.022;
+uniform float sharpen = 0.6;
 uniform float saturation = 0.9;
 uniform float bloom = 0.9;
 
@@ -70,6 +71,11 @@ vec3 bright(vec2 uv) { return max(texture(screen, uv).rgb - 0.6, 0.0); }
 
 void fragment() {
     vec3 c = clamp(texture(screen, SCREEN_UV).rgb, 0.0, 1.0);
+    // An unsharp mask, so edges, lines and lettering stand out crisply from the grade.
+    vec2 px = SCREEN_PIXEL_SIZE;
+    vec3 soft = (texture(screen, SCREEN_UV + vec2(px.x, 0.0)).rgb + texture(screen, SCREEN_UV - vec2(px.x, 0.0)).rgb
+        + texture(screen, SCREEN_UV + vec2(0.0, px.y)).rgb + texture(screen, SCREEN_UV - vec2(0.0, px.y)).rgb) * 0.25;
+    c = clamp(c + (c - soft) * sharpen, 0.0, 1.0);
     // Light spills a little round anything bright: lamps, lit windows, the fire in a burning shop.
     vec3 glow = vec3(0.0);
     for (int ring = 1; ring <= 2; ring++)
