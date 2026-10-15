@@ -70,8 +70,8 @@ public sealed partial class CityDirectory
             // He lives over the shop: he's out front to open up in the morning, and again to shut up for the night.
             var shop = _w.BusinessById(c.OwnsBusinessId);
             var (open, shut) = Hours(shop.Kind);
-            // A diner, a hotel and a pool hall open every day; anything else shuts on its owner's day of rest.
-            bool everyDay = shop.Kind is BusinessKind.Diner or BusinessKind.Hotel or BusinessKind.PoolHall;
+            // A diner, a hotel, a pool hall, a picture house and a dance hall open every day; anything else shuts on its owner's day of rest.
+            bool everyDay = shop.Kind is BusinessKind.Diner or BusinessKind.Hotel or BusinessKind.PoolHall or BusinessKind.PictureHouse or BusinessKind.DanceHall;
             if (restDay && !everyDay) return RestDay(c, character, day, plan);
             if (day == 5) shut += 1;
             if (day == 6 && everyDay) open += 2;
@@ -361,11 +361,11 @@ public sealed partial class CityDirectory
         (_businessesInWard.GetValueOrDefault(home.WardId) ?? new List<int>()).Select(_w.BusinessById).Where(fits)
             .OrderBy(b => _w.Map.Distance(home, _w.LotOf(b))).ThenBy(b => b.Id);
 
-    /// <summary>Where the ward goes on a Saturday night: a speakeasy or a club, or a pool hall, a hotel bar or a diner.</summary>
+    /// <summary>Where the ward goes on a Saturday night: a speakeasy, a club or a dance hall, or a picture house, a pool hall, a hotel bar or a diner.</summary>
     private int? NightSpot(Lot home, int who)
     {
-        var spots = WardBusinesses(home, b => b.Racket is RacketKind.Speakeasy or RacketKind.Nightclub).Take(3).ToList();
-        if (spots.Count == 0) spots = WardBusinesses(home, b => b.Kind is BusinessKind.PoolHall or BusinessKind.Hotel or BusinessKind.Diner).Take(3).ToList();
+        var spots = WardBusinesses(home, b => b.Racket is RacketKind.Speakeasy or RacketKind.Nightclub || b.Kind == BusinessKind.DanceHall).Take(3).ToList();
+        if (spots.Count == 0) spots = WardBusinesses(home, b => b.Kind is BusinessKind.PictureHouse or BusinessKind.PoolHall or BusinessKind.Hotel or BusinessKind.Diner).Take(3).ToList();
         return spots.Count == 0 ? null : spots[(int)(Roll(who, 695) * spots.Count)].LotId;
     }
 
@@ -399,6 +399,11 @@ public sealed partial class CityDirectory
         BusinessKind.Hotel => (7, 22),
         BusinessKind.Warehouse => (6.5f, 17.5f),
         BusinessKind.Garage => (7.5f, 18),
+        BusinessKind.Bakery => (6, 18),
+        BusinessKind.Butcher => (7, 18),
+        BusinessKind.CigarStore => (7, 21),
+        BusinessKind.PictureHouse => (12, 23.5f),
+        BusinessKind.DanceHall => (19, 26),
         _ => (8.5f, 18),
     };
 
@@ -492,7 +497,8 @@ public sealed partial class CityDirectory
     {
         var shops = (_businessesInWard.GetValueOrDefault(home.WardId) ?? new List<int>())
             .Select(_w.BusinessById)
-            .Where(b => b.Kind is BusinessKind.Grocer or BusinessKind.Diner or BusinessKind.Pharmacy or BusinessKind.Tailor or BusinessKind.Laundry or BusinessKind.Hardware or BusinessKind.Haberdasher)
+            .Where(b => b.Kind is BusinessKind.Grocer or BusinessKind.Diner or BusinessKind.Pharmacy or BusinessKind.Tailor or BusinessKind.Laundry or BusinessKind.Hardware or BusinessKind.Haberdasher
+                or BusinessKind.Bakery or BusinessKind.Butcher or BusinessKind.Florist)
             .Select(b => b.LotId).Distinct().ToList();
         if (shops.Count == 0) return shops;
         var picked = new List<int>();

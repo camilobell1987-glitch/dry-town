@@ -5,7 +5,8 @@ namespace DryTown.Core;
 public enum HoodState { Free, Jailed, Dead, Gone, Inside, Lam, Held }
 
 /// <summary>A court is the yard in the middle of a tenement block: no shop, but out of sight of the street.</summary>
-public enum BusinessKind { Grocer, Diner, Barber, Tailor, Garage, Laundry, Hotel, Pharmacy, PoolHall, Warehouse, Court, Hardware, Haberdasher }
+public enum BusinessKind { Grocer, Diner, Barber, Tailor, Garage, Laundry, Hotel, Pharmacy, PoolHall, Warehouse, Court, Hardware, Haberdasher,
+    Bakery, Butcher, CigarStore, Florist, Pawnshop, FuneralParlor, PictureHouse, DanceHall }
 
 /// <summary>What a man carries. Better guns win fights but bring more heat.</summary>
 public enum Weapon { None, Pistol, Shotgun, TommyGun }
