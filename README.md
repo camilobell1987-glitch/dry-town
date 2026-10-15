@@ -63,7 +63,7 @@ The open city has no win screen and keeps running; five scenarios give you a goa
 You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). To play the game, install the **.NET edition** of Godot 4.7, open `godot/project.godot` and press Play. If your editor is a different 4.x version, it updates the version in `DryTown.csproj` when it opens the project.
 
 ```sh
-dotnet test tests                                                    # 464 tests
+dotnet test tests                                                    # 470 tests
 dotnet run --project sim -- play --seed 42                           # play in the terminal
 dotnet run --project sim -- soak --seeds 40 --years 10               # balance check across many cities
 dotnet run --project sim -- soak --seeds 40 --years 10 --difficulty Hard
@@ -212,9 +212,21 @@ Every gangster, yours and the other outfits', has the same paper card with three
 
 Now and then two residents stop on the pavement and take turns talking, more of them at the rush hours. You only hear it when one of your people is within earshot: your headquarters, your men, cops you pay or residents on your payroll. A small bubble over the speaker shows the topic, taken from what's going on around them: their old country's flag in their own neighbourhood, a chalk outline after a killing in the ward, handcuffs after an arrest, a bottle near a speakeasy, a dollar bill after a shakedown (struck through when money's tight), a pistol when the ward has seen a lot of trouble, the newspaper for idle talk, and a green or red spot when they're praising or cursing the boss whose turf it is.
 
-### Daily routines
+### A week of their own
 
-Every resident has a day of their own and walks to it along the streets. Shopkeepers step out to open up in the morning and shut up at closing; diners open early and pool halls keep late hours. Working people walk to their work in the morning and home in the evening, each to the place that suits their trade (see **Zoning**). Landlords go round up to three of their buildings for the rent and are home after dark. Housewives and the out of work run errands to a grocer, diner, pharmacy, tailor or laundry. The old walk to the nearest park and sit on the grass, night watchmen go out as everyone else comes home, and children play round their own block. Between weeks, while you give orders, the city runs through a slow working day so people are still seen coming and going.
+Every resident has a week of their own, made from their job, their people, their family and their character, and walks it along the streets.
+
+- **Work.** Working people go to the place that suits their trade (see **Zoning**) six days a week, with a half day on Saturday. Shopkeepers step out to open up in the morning and shut up at night, and stay open an hour later on Saturday; diners, hotels and pool halls open on Sunday too, a couple of hours late. Night watchmen go out as everyone else comes home, six nights a week. Landlords look in on a building or two in the week and go round up to three of them for the rent on Saturday. A man out of work goes round the factory gates and the shops in the mornings asking for work.
+- **Keeping house.** Monday is wash day and nobody goes out. In the week she runs to a shop or a diner, a nosy parker to two and stopping longer at each, and Saturday is market day, round two or three of them.
+- **The day of rest.** Most rest on Sunday. The Catholic families, nine in ten of the Poles, most of the Irish and Italians and over half the Germans, walk to Mass together at eight, half past nine or eleven, and the devout go to church on Wednesday evening too. In the afternoon a family man takes his family to the park, and so do the Germans and many other families; the Italians sit down to Sunday dinner at home and walk out to a café at dusk. A Jew who keeps the Sabbath (the devout, the old, the greenhorns and many others) is home before sundown on Friday, rests on Saturday with a walk in the park, and works on Sunday; every Jewish shop but a diner, a hotel or a pool hall shuts on Saturday and opens on Sunday.
+- **Evenings.** A family man goes straight home every night. Otherwise who they are decides it. A souse is at his bar six nights a week, and an ordinary drinker on Wednesday and Saturday. Anyone with a gambling habit is at the game on Tuesday, Thursday and Friday, and a sport on Saturday too. Someone carrying on with a neighbour calls at their home on Wednesday and Saturday evening. A man who owes the loan shark pays him on Friday, and a stool pigeon with something to tell drops in at the precinct house on a Thursday. On Saturday night the young and single go out to a speakeasy or a club, or a pool hall or a diner where there's none, and so do the sheiks and flappers on Friday, and half the married hotheads and Irishmen. A tightwad or a pious soul stays in.
+- **Children** play round their own block, and go to Mass and the park with their family on Sunday. The old walk to the nearest park and sit on the grass most days.
+
+The day turns over at five in the morning, so a Saturday night out still walks home in the small hours of Sunday. Between weeks, while you give orders, the city runs through a slow Monday so people are still seen coming and going.
+
+A resident's card has a **Week** tab with a line for each day: where they go and when. It shows once you know where they live and work. Where they go for something you haven't found out, a bar, a card game, a lover, the loan shark or the precinct house, the card only says they're out somewhere, so tailing them is how you find out what they do on a Wednesday night.
+
+![A resident's week on her card](docs/screenshots/week.png)
 
 ## Shop rows
 

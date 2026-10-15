@@ -215,6 +215,7 @@ void fragment() {
             _goneCount = gone;
             FillCrowd();
         }
+        KeepPlans();
         float hour = HourOfDay;
         _crowdMaterial.SetShaderParameter("t", _anim);
         _crowdMaterial.SetShaderParameter("hour", CrowdHour);

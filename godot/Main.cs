@@ -1344,6 +1344,10 @@ public partial class Main : Control
                 "feud" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
                     .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n))
                     .First(i => directory.Get(i).Age >= 25 && directory.Get(i).Ties.Count(t => t.Kin != Kin.Employer) >= 2),
+                // Whoever near headquarters has the fullest week, for the card's week tab.
+                "busy" => Enumerable.Range(0, directory.CountOn((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY))
+                    .Select(n => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, n))
+                    .OrderByDescending(i => Enumerable.Range(0, 7).SelectMany(day => directory.RoutineOf(i, day).Stops.Select(s => s.Why)).Distinct().Count()).First(),
                 _ => directory.IdOf((hq.X - 1) / CityMap.StrideX, (hq.Y - 1) / CityMap.StrideY, 0),
             };
             _map.Select(citizen: pick);
@@ -1352,6 +1356,7 @@ public partial class Main : Control
         _revealCitizens = Flag("--reveal");
         if (Flag("--character-tab")) _cardTab = CardTab.Character;
         if (Flag("--grudge-tab")) _cardTab = CardTab.Grudges;
+        if (Flag("--week-tab")) _cardTab = CardTab.Week;
         _pinGrudgeHelp = Flag("--grudge-help");
         if (Arg("--select-bank") is string bankArg)
             _map.Select(bank: bankArg == "near" ? W.Banks.OrderBy(b => W.Map.Distance(W.HqOf(W.Player), W.Map.LotAt(b.LotId))).First().Id : int.Parse(bankArg));

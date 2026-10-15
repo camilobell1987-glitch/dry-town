@@ -45,12 +45,29 @@ public partial class MapView
         return best + (from.X > best + 0.5f ? 0.9f : 0.1f);
     }
 
-    /// <summary>Write everyone's day into the texture the crowd shader reads.</summary>
+    /// <summary>Who is at each place in the crowd's order, or -1 for a place nobody fills.</summary>
+    private int[] _crowdIds = Array.Empty<int>();
+
+    /// <summary>The day of the week the texture holds, and the next day's, written a slice a frame ahead of time.</summary>
+    private int _plansDay = -1;
+    private float[]? _nextPlans;
+    private int _nextDay = -1, _nextDone;
+
+    /// <summary>People written into the next day's plans each frame, so the day turns over without a stall.</summary>
+    private const int PlansPerFrame = 3000;
+
+    /// <summary>
+    /// The day of the week the crowd keeps: from the clock while a week runs, turning over at five in the morning so a
+    /// Saturday night out still walks home in the small hours of Sunday. Between weeks it's a Monday.
+    /// </summary>
+    private int CrowdDay => Live ? ((int)Mathf.Floor((Clock - Content.DayTurns) / 24f) % 7 + 7) % 7 : 0;
+
+    /// <summary>Note who is where in the crowd and write the day that's showing.</summary>
     private void BuildPlans()
     {
         var map = World!.Map;
         var d = Directory!;
-        _plans = new float[Population * PlanFloats];
+        _crowdIds = new int[Population];
         _crowdStart = new int[map.BlocksX, map.BlocksY];
         int i = 0;
         for (int by = 0; by < map.BlocksY; by++)
@@ -60,50 +77,102 @@ public partial class MapView
             for (int n = 0; n < _crowdBlocks[bx, by]; n++, i++)
             {
                 int id = d.IdOf(bx, by, n);
-                if (!d.Exists(id)) continue;
-                var routine = d.RoutineOf(id);
-                int k = i * PlanFloats;
-                _plans[k + 20] = (Hash(id, 970) - 0.5f) * 0.14f;
-                if (routine.Kind == RoutineKind.Loafer) continue;
-                float jitter = (Hash(id, 971) - 0.5f) * 0.6f;
-                var home = FrontPavement(map.LotAt(d.Get(id).HomeLotId), jitter);
-                int stops = routine.Stops.Count;
-                // The places in order: home, each stop, and home again.
-                var points = new Vector2[stops + 2];
-                points[0] = home;
-                for (int s = 0; s < stops; s++) points[s + 1] = FrontPavement(map.LotAt(routine.Stops[s].LotId), jitter);
-                // In the park they sit about on the grass, not on the pavement.
-                if (routine.Kind == RoutineKind.Park)
-                {
-                    var park = map.LotAt(routine.Stops[0].LotId);
-                    points[1] = new Vector2(park.X + 0.15f + Hash(id, 972) * 0.7f, park.Y + 0.15f + Hash(id, 973) * 0.7f);
-                }
-                points[stops + 1] = home;
-                // Room for three stops; a shorter day fills the rest with home.
-                for (int s = 0; s < 3; s++)
-                {
-                    var p = points[Math.Min(s + 1, stops + 1)];
-                    _plans[k + s * 2 + 2] = p.X;
-                    _plans[k + s * 2 + 3] = p.Y;
-                }
-                _plans[k + 0] = home.X;
-                _plans[k + 1] = home.Y;
-                // When they set out from each place.
-                _plans[k + 8] = routine.LeaveHome;
-                for (int s = 0; s < 3; s++) _plans[k + 9 + s] = s < stops ? routine.Stops[s].Leave : 0;
-                for (int s = 0; s < 3; s++) _plans[k + 12 + s] = s < stops ? routine.Stops[s].Outside : 0;
-                _plans[k + 15] = stops;
-                for (int s = 0; s < 4; s++) _plans[k + 16 + s] = s <= stops ? AvenueBetween(points[s], points[s + 1]) : -1;
+                _crowdIds[i] = d.Exists(id) ? id : -1;
             }
         }
-        int rows = Math.Max(1, (Population * PlanFloats / 4 + PlansWide - 1) / PlansWide);
+        _nextPlans = null;
+        _nextDay = -1;
+        SwitchPlans(CrowdDay);
+        _crowdMaterial!.SetShaderParameter("plans_wide", PlansWide);
+        _crowdMaterial.SetShaderParameter("pace", Content.ResidentPace);
+    }
+
+    /// <summary>Show a day of the week: the one written ahead if it's ready, or write it now.</summary>
+    private void SwitchPlans(int day)
+    {
+        if (_nextDay == day && _nextPlans != null && _nextDone >= _crowdIds.Length) _plans = _nextPlans;
+        else
+        {
+            _plans = new float[_crowdIds.Length * PlanFloats];
+            WritePlans(_plans, day, 0, _crowdIds.Length);
+        }
+        _plansDay = day;
+        _nextPlans = null;
+        _nextDay = -1;
+        int rows = Math.Max(1, (_crowdIds.Length * PlanFloats / 4 + PlansWide - 1) / PlansWide);
         var bytes = new byte[PlansWide * rows * 16];
         Buffer.BlockCopy(_plans, 0, bytes, 0, _plans.Length * 4);
         var image = Image.CreateFromData(PlansWide, rows, false, Image.Format.Rgbaf, bytes);
-        _plansTexture = ImageTexture.CreateFromImage(image);
+        if (_plansTexture != null && _plansTexture.GetHeight() == rows) _plansTexture.Update(image);
+        else _plansTexture = ImageTexture.CreateFromImage(image);
         _crowdMaterial!.SetShaderParameter("plans", _plansTexture);
-        _crowdMaterial.SetShaderParameter("plans_wide", PlansWide);
-        _crowdMaterial.SetShaderParameter("pace", Content.ResidentPace);
+    }
+
+    /// <summary>Keep the crowd on the right day, and while a week runs, write tomorrow a slice at a time.</summary>
+    private void KeepPlans()
+    {
+        if (_crowdIds.Length == 0) return;
+        int day = CrowdDay;
+        if (day != _plansDay) { SwitchPlans(day); return; }
+        if (!Live) return;
+        int next = (day + 1) % 7;
+        if (_nextDay != next)
+        {
+            _nextPlans = new float[_crowdIds.Length * PlanFloats];
+            _nextDay = next;
+            _nextDone = 0;
+        }
+        if (_nextDone >= _crowdIds.Length) return;
+        int to = Math.Min(_crowdIds.Length, _nextDone + PlansPerFrame);
+        WritePlans(_nextPlans!, next, _nextDone, to);
+        _nextDone = to;
+    }
+
+    /// <summary>Write everyone's day, for places from to to in the crowd, laid out as the shader reads it.</summary>
+    private void WritePlans(float[] plans, int day, int from, int to)
+    {
+        var map = World!.Map;
+        var d = Directory!;
+        for (int i = from; i < to; i++)
+        {
+            int id = _crowdIds[i];
+            if (id < 0) continue;
+            var routine = d.RoutineOf(id, day);
+            int k = i * PlanFloats;
+            plans[k + 20] = (Hash(id, 970) - 0.5f) * 0.14f;
+            if (routine.Kind == RoutineKind.Loafer) continue;
+            float jitter = (Hash(id, 971) - 0.5f) * 0.6f;
+            var home = FrontPavement(map.LotAt(d.Get(id).HomeLotId), jitter);
+            int stops = routine.Stops.Count;
+            // The places in order: home, each stop, and home again.
+            var points = new Vector2[stops + 2];
+            points[0] = home;
+            for (int s = 0; s < stops; s++)
+            {
+                var stop = routine.Stops[s];
+                var lot = map.LotAt(stop.LotId);
+                // In the park they sit about on the grass, not on the pavement.
+                points[s + 1] = stop.Why == Errand.Park
+                    ? new Vector2(lot.X + 0.15f + Hash(id, 972) * 0.7f, lot.Y + 0.15f + Hash(id, 973) * 0.7f)
+                    : FrontPavement(lot, jitter);
+            }
+            points[stops + 1] = home;
+            // Room for three stops; a shorter day fills the rest with home.
+            for (int s = 0; s < 3; s++)
+            {
+                var p = points[Math.Min(s + 1, stops + 1)];
+                plans[k + s * 2 + 2] = p.X;
+                plans[k + s * 2 + 3] = p.Y;
+            }
+            plans[k + 0] = home.X;
+            plans[k + 1] = home.Y;
+            // When they set out from each place.
+            plans[k + 8] = routine.LeaveHome;
+            for (int s = 0; s < 3; s++) plans[k + 9 + s] = s < stops ? routine.Stops[s].Leave : 0;
+            for (int s = 0; s < 3; s++) plans[k + 12 + s] = s < stops ? routine.Stops[s].Outside : 0;
+            plans[k + 15] = stops;
+            for (int s = 0; s < 4; s++) plans[k + 16 + s] = s <= stops ? AvenueBetween(points[s], points[s + 1]) : -1;
+        }
     }
 
     /// <summary>
